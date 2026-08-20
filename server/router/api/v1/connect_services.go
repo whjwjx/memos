@@ -523,6 +523,14 @@ func (s *ConnectServiceHandler) Transcribe(ctx context.Context, req *connect.Req
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) TestAIProvider(ctx context.Context, req *connect.Request[v1pb.TestAIProviderRequest]) (*connect.Response[v1pb.TestAIProviderResponse], error) {
+	resp, err := s.APIV1Service.TestAIProvider(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // MemoViewService
 
 // ListMemoViews lists the saved memo views owned by a user.
