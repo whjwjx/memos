@@ -34,6 +34,8 @@ type Server struct {
 	echoServer *echo.Echo
 	httpServer *http.Server
 	sseHub     *apiv1.SSEHub
+
+	apiV1Service *apiv1.APIV1Service
 }
 
 func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store) (*Server, error) {
@@ -69,6 +71,7 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 	rootGroup := echoServer.Group("")
 
 	apiV1Service := apiv1.NewAPIV1Service(s.Secret, profile, store)
+	s.apiV1Service = apiV1Service
 	s.sseHub = apiV1Service.SSEHub
 
 	// Register HTTP file server routes BEFORE gRPC-Gateway to ensure proper range request handling for Safari.
@@ -116,6 +119,7 @@ func (s *Server) Start() error {
 
 	// Start Echo server directly (no cmux needed - all traffic is HTTP).
 	s.httpServer = &http.Server{Handler: s.echoServer}
+	s.apiV1Service.StartAgentReplyScheduler()
 	go func() {
 		if err := s.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 			slog.Error("failed to start echo server", "error", err)
@@ -132,6 +136,7 @@ func (s *Server) Shutdown(ctx context.Context) {
 	slog.Info("server shutting down")
 
 	s.closeLongLivedConnections()
+	s.apiV1Service.StopAgentReplyScheduler(ctx)
 	s.shutdownHTTPServer(ctx)
 
 	// Close database connection.

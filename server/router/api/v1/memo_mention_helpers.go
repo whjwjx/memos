@@ -23,6 +23,22 @@ func isMentionNotificationSuppressed(ctx context.Context) bool {
 	return ok && v
 }
 
+// systemAgentCallKey marks a context as an internal agent-driven call. When
+// set, memo read-access checks are skipped for admin viewers so the agent
+// reply worker can post comments on private memos it did not author — the
+// same authority an admin moderator enjoys when replying on behalf of the
+// instance.
+type systemAgentCallKey struct{}
+
+func withSystemAgentCall(ctx context.Context) context.Context {
+	return context.WithValue(ctx, systemAgentCallKey{}, true)
+}
+
+func isSystemAgentCall(ctx context.Context) bool {
+	v, ok := ctx.Value(systemAgentCallKey{}).(bool)
+	return ok && v
+}
+
 func (s *APIV1Service) resolveMentionTargets(ctx context.Context, content string) (map[int32]*store.User, error) {
 	targets := make(map[int32]*store.User)
 	if content == "" {

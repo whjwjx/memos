@@ -56,7 +56,9 @@ func (s *APIV1Service) CreateMemoComment(ctx context.Context, request *v1pb.Crea
 
 	// Create the memo comment first; suppress the generic memo.created SSE event
 	// since CreateMemoComment broadcasts memo.comment.created for the parent instead.
-	memoComment, err := s.CreateMemo(withSuppressMentionNotifications(withSuppressSSE(ctx)), &v1pb.CreateMemoRequest{
+	// Also suppress agent scheduling so a comment (including an agent's own reply)
+	// does not enqueue further agent replies, which would loop forever.
+	memoComment, err := s.CreateMemo(withSuppressMentionNotifications(withSuppressSSE(withSuppressAgentScheduling(ctx))), &v1pb.CreateMemoRequest{
 		Memo:   comment,
 		MemoId: request.CommentId,
 	})

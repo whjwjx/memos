@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -14,6 +15,7 @@ import (
 	"github.com/usememos/memos/internal/httpgetter"
 	"github.com/usememos/memos/internal/markdown"
 	"github.com/usememos/memos/internal/profile"
+	"github.com/usememos/memos/internal/scheduler"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/server/auth"
 	"github.com/usememos/memos/server/notification"
@@ -50,6 +52,10 @@ type APIV1Service struct {
 	instanceStatsCache instanceStatsCache
 
 	linkMetadataFetcher linkMetadataFetcher
+
+	// agentReplyScheduler polls the agent_reply_task table and posts agent
+	// replies once their due time arrives.
+	agentReplyScheduler *scheduler.Scheduler
 }
 
 // NewAPIV1Service creates an API v1 service with its shared dependencies.
@@ -69,7 +75,42 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		imageProcessingSemaphore: semaphore.NewWeighted(2),
 	}
 	service.linkMetadataFetcher = httpgetter.NewHTMLMetaFetcher()
+
+	agentScheduler := scheduler.New()
+	agentJob := &scheduler.Job{
+		Name:     "agent-reply-poller",
+		Schedule: agentReplyScanInterval,
+		Handler: func(ctx context.Context) error {
+			service.processDueAgentReplies(ctx)
+			return nil
+		},
+	}
+	if err := agentScheduler.Register(agentJob); err != nil {
+		slog.Warn("Failed to register agent reply poller", slog.Any("err", err))
+	} else {
+		service.agentReplyScheduler = agentScheduler
+	}
 	return service
+}
+
+// StartAgentReplyScheduler starts the background poller that posts queued
+// agent replies. It is safe to call once during server startup.
+func (s *APIV1Service) StartAgentReplyScheduler() {
+	if s.agentReplyScheduler != nil {
+		if err := s.agentReplyScheduler.Start(); err != nil {
+			slog.Warn("Failed to start agent reply poller", slog.Any("err", err))
+		}
+	}
+}
+
+// StopAgentReplyScheduler stops the background poller. It is safe to call once
+// during graceful shutdown.
+func (s *APIV1Service) StopAgentReplyScheduler(ctx context.Context) {
+	if s.agentReplyScheduler != nil {
+		if err := s.agentReplyScheduler.Stop(ctx); err != nil {
+			slog.Warn("Failed to stop agent reply poller", slog.Any("err", err))
+		}
+	}
 }
 
 // newGatewayMarshaler mirrors grpc-gateway's default JSON marshaler with one
