@@ -17,6 +17,17 @@ service AIService {
     };
     option (google.api.method_signature) = "audio";
   }
+
+  // TestAIProvider verifies that an instance AI provider can reach its chat
+  // model endpoint and authenticate. Returns the provider's reply so the
+  // caller can confirm end-to-end connectivity.
+  rpc TestAIProvider(TestAIProviderRequest) returns (TestAIProviderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/providers:test"
+      body: "*"
+    };
+    option (google.api.method_signature) = "provider_id,model";
+  }
 }
 
 message TranscribeRequest {
@@ -43,4 +54,24 @@ message TranscriptionAudio {
 message TranscribeResponse {
   // The transcribed text.
   string text = 1;
+}
+
+message TestAIProviderRequest {
+  // Required. The instance AI provider ID to test.
+  string provider_id = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. The provider-specific model id to use for the probe. If omitted,
+  // the provider's default chat model is used.
+  string model = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message TestAIProviderResponse {
+  // True when the provider answered with a non-empty reply.
+  bool ok = 1;
+
+  // The provider's reply text, if any. Useful for confirming the round trip.
+  string reply = 2;
+
+  // Error message when ok is false; empty otherwise.
+  string error = 3;
 }

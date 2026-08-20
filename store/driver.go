@@ -85,4 +85,9 @@ type Driver interface {
 	CreateUserWithIdentity(ctx context.Context, createUser *User, createIdentity *UserIdentity) (*User, error)
 	ListUserIdentities(ctx context.Context, find *FindUserIdentity) ([]*UserIdentity, error)
 	DeleteUserIdentities(ctx context.Context, delete *DeleteUserIdentity) error
+
+	// AgentReplyTask model related methods.
+	UpsertAgentReplyTask(ctx context.Context, create *CreateAgentReplyTask) (*AgentReplyTask, error)
+	ListAgentReplyTasks(ctx context.Context, find *FindAgentReplyTask) ([]*AgentReplyTask, error)
+	UpdateAgentReplyTask(ctx context.Context, update *UpdateAgentReplyTask) error
 }
