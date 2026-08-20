@@ -123,3 +123,18 @@ CREATE TABLE `user_identity` (
 );
 
 CREATE INDEX `idx_user_identity_user_id` ON `user_identity`(`user_id`);
+
+-- agent_reply_task
+CREATE TABLE `agent_reply_task` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `memo_id` INT NOT NULL,
+  `agent_id` VARCHAR(256) NOT NULL,
+  `status` VARCHAR(256) NOT NULL DEFAULT 'PENDING',
+  `due_at` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `updated_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  UNIQUE (`memo_id`, `agent_id`),
+  FOREIGN KEY (`memo_id`) REFERENCES `memo`(`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX `idx_agent_reply_task_status_due` ON `agent_reply_task`(`status`, `due_at`);

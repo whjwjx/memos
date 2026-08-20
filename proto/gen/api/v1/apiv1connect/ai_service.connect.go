@@ -35,12 +35,19 @@ const (
 const (
 	// AIServiceTranscribeProcedure is the fully-qualified name of the AIService's Transcribe RPC.
 	AIServiceTranscribeProcedure = "/memos.api.v1.AIService/Transcribe"
+	// AIServiceTestAIProviderProcedure is the fully-qualified name of the AIService's TestAIProvider
+	// RPC.
+	AIServiceTestAIProviderProcedure = "/memos.api.v1.AIService/TestAIProvider"
 )
 
 // AIServiceClient is a client for the memos.api.v1.AIService service.
 type AIServiceClient interface {
 	// Transcribe transcribes an audio file using an instance AI provider.
 	Transcribe(context.Context, *connect.Request[v1.TranscribeRequest]) (*connect.Response[v1.TranscribeResponse], error)
+	// TestAIProvider verifies that an instance AI provider can reach its chat
+	// model endpoint and authenticate. Returns the provider's reply so the
+	// caller can confirm end-to-end connectivity.
+	TestAIProvider(context.Context, *connect.Request[v1.TestAIProviderRequest]) (*connect.Response[v1.TestAIProviderResponse], error)
 }
 
 // NewAIServiceClient constructs a client for the memos.api.v1.AIService service. By default, it
@@ -60,12 +67,19 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(aIServiceMethods.ByName("Transcribe")),
 			connect.WithClientOptions(opts...),
 		),
+		testAIProvider: connect.NewClient[v1.TestAIProviderRequest, v1.TestAIProviderResponse](
+			httpClient,
+			baseURL+AIServiceTestAIProviderProcedure,
+			connect.WithSchema(aIServiceMethods.ByName("TestAIProvider")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // aIServiceClient implements AIServiceClient.
 type aIServiceClient struct {
-	transcribe *connect.Client[v1.TranscribeRequest, v1.TranscribeResponse]
+	transcribe     *connect.Client[v1.TranscribeRequest, v1.TranscribeResponse]
+	testAIProvider *connect.Client[v1.TestAIProviderRequest, v1.TestAIProviderResponse]
 }
 
 // Transcribe calls memos.api.v1.AIService.Transcribe.
@@ -73,10 +87,19 @@ func (c *aIServiceClient) Transcribe(ctx context.Context, req *connect.Request[v
 	return c.transcribe.CallUnary(ctx, req)
 }
 
+// TestAIProvider calls memos.api.v1.AIService.TestAIProvider.
+func (c *aIServiceClient) TestAIProvider(ctx context.Context, req *connect.Request[v1.TestAIProviderRequest]) (*connect.Response[v1.TestAIProviderResponse], error) {
+	return c.testAIProvider.CallUnary(ctx, req)
+}
+
 // AIServiceHandler is an implementation of the memos.api.v1.AIService service.
 type AIServiceHandler interface {
 	// Transcribe transcribes an audio file using an instance AI provider.
 	Transcribe(context.Context, *connect.Request[v1.TranscribeRequest]) (*connect.Response[v1.TranscribeResponse], error)
+	// TestAIProvider verifies that an instance AI provider can reach its chat
+	// model endpoint and authenticate. Returns the provider's reply so the
+	// caller can confirm end-to-end connectivity.
+	TestAIProvider(context.Context, *connect.Request[v1.TestAIProviderRequest]) (*connect.Response[v1.TestAIProviderResponse], error)
 }
 
 // NewAIServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -92,10 +115,18 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(aIServiceMethods.ByName("Transcribe")),
 		connect.WithHandlerOptions(opts...),
 	)
+	aIServiceTestAIProviderHandler := connect.NewUnaryHandler(
+		AIServiceTestAIProviderProcedure,
+		svc.TestAIProvider,
+		connect.WithSchema(aIServiceMethods.ByName("TestAIProvider")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/memos.api.v1.AIService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AIServiceTranscribeProcedure:
 			aIServiceTranscribeHandler.ServeHTTP(w, r)
+		case AIServiceTestAIProviderProcedure:
+			aIServiceTestAIProviderHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -107,4 +138,8 @@ type UnimplementedAIServiceHandler struct{}
 
 func (UnimplementedAIServiceHandler) Transcribe(context.Context, *connect.Request[v1.TranscribeRequest]) (*connect.Response[v1.TranscribeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.Transcribe is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) TestAIProvider(context.Context, *connect.Request[v1.TestAIProviderRequest]) (*connect.Response[v1.TestAIProviderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.TestAIProvider is not implemented"))
 }
