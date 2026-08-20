@@ -188,6 +188,41 @@ message InstanceAISetting {
   // transcription is the speech-to-text feature configuration.
   // When unset or transcription.provider_id is empty, transcription is disabled.
   TranscriptionConfig transcription = 2;
+
+  // agents is the list of AI agents that can automatically reply to memos.
+  // Each agent is backed by a provider and a personality prompt. When empty,
+  // the agent-reply feature is disabled.
+  repeated AIAgentConfig agents = 3;
+}
+
+// AIAgentConfig describes an AI persona that posts comment-style replies to
+// memos. Agents are configured instance-wide by an admin; regular users only
+// consume them (their memos get replied to).
+message AIAgentConfig {
+  // id is the stable identifier of the agent.
+  string id = 1;
+  // name is the human-readable persona name shown as a suffix on replies
+  // (e.g. "Edison" -> reply ends with "—— Edison").
+  string name = 2;
+  // provider_id references an entry in InstanceAISetting.providers[].id.
+  // Empty string means the agent is disabled.
+  string provider_id = 3;
+  // model is the provider-specific text-generation model identifier.
+  // Empty string falls back to the engine default.
+  string model = 4;
+  // persona_prompt defines the agent's personality, tone, and speaking style.
+  string persona_prompt = 5;
+  // system_prompt is an admin-controlled safety/behavior constraint applied
+  // to every generation (e.g. language, length, injection-resistance).
+  string system_prompt = 6;
+  // enabled toggles whether the agent replies to new memos.
+  bool enabled = 7;
+  // delay_minutes is how long to wait after a memo is created before the
+  // agent replies. 0 means reply immediately. Defaults to 5 when unset.
+  int32 delay_minutes = 8;
+  // max_length caps the generated reply length (in characters) sent to the
+  // model as a soft limit. 0 means the model default is used.
+  int32 max_length = 9;
 }
 
 message AIProviderConfig {

@@ -4,6 +4,7 @@ import { MoreVerticalIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { v4 as uuidv4 } from "uuid";
+import { aiServiceClient } from "@/connect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useInstance } from "@/contexts/InstanceContext";
 import {
+  InstanceSetting_AgentConfig,
+  InstanceSetting_AgentConfigSchema,
   InstanceSetting_AIProviderConfig,
   InstanceSetting_AIProviderConfigSchema,
   InstanceSetting_AIProviderType,
@@ -23,6 +26,7 @@ import {
   InstanceSetting_TranscriptionConfigSchema,
   InstanceSettingSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
+import { TestAIProviderRequestSchema } from "@/types/proto/api/v1/ai_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import SettingGroup from "./SettingGroup";
 import { SettingPanel } from "./SettingList";
@@ -84,6 +88,55 @@ const newProvider = (): LocalAIProvider => ({
   apiKeyHint: "",
 });
 
+type LocalAgent = {
+  id: string;
+  name: string;
+  providerId: string;
+  model: string;
+  personaPrompt: string;
+  systemPrompt: string;
+  enabled: boolean;
+  delayMinutes: number;
+  maxLength: number;
+};
+
+const toLocalAgent = (agent: InstanceSetting_AgentConfig): LocalAgent => ({
+  id: agent.id,
+  name: agent.name,
+  providerId: agent.providerId,
+  model: agent.model,
+  personaPrompt: agent.personaPrompt,
+  systemPrompt: agent.systemPrompt,
+  enabled: agent.enabled,
+  delayMinutes: agent.delayMinutes,
+  maxLength: agent.maxLength,
+});
+
+const newAgent = (): LocalAgent => ({
+  id: uuidv4(),
+  name: "",
+  providerId: "",
+  model: "",
+  personaPrompt: "",
+  systemPrompt: "",
+  enabled: false,
+  delayMinutes: 5,
+  maxLength: 0,
+});
+
+const toAgentConfig = (agent: LocalAgent) =>
+  create(InstanceSetting_AgentConfigSchema, {
+    id: agent.id,
+    name: agent.name.trim(),
+    providerId: agent.providerId,
+    model: agent.model.trim(),
+    personaPrompt: agent.personaPrompt,
+    systemPrompt: agent.systemPrompt,
+    enabled: agent.enabled,
+    delayMinutes: agent.delayMinutes,
+    maxLength: agent.maxLength,
+  });
+
 const toProviderConfig = (provider: LocalAIProvider) =>
   create(InstanceSetting_AIProviderConfigSchema, {
     id: provider.id,
@@ -107,12 +160,19 @@ const AISection = () => {
   const { aiSetting: originalSetting } = useInstance();
   const [providers, setProviders] = useState<LocalAIProvider[]>(() => originalSetting.providers.map(toLocalProvider));
   const [transcription, setTranscription] = useState<LocalTranscription>(() => toLocalTranscription(originalSetting.transcription));
+  const [agents, setAgents] = useState<LocalAgent[]>(() => originalSetting.agents.map(toLocalAgent));
   const [editingProvider, setEditingProvider] = useState<LocalAIProvider | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<LocalAIProvider | undefined>();
+  const [editingAgent, setEditingAgent] = useState<LocalAgent | undefined>();
+  const [deleteAgentTarget, setDeleteAgentTarget] = useState<LocalAgent | undefined>();
 
   useEffect(() => {
     setProviders(originalSetting.providers.map(toLocalProvider));
   }, [originalSetting.providers]);
+
+  useEffect(() => {
+    setAgents(originalSetting.agents.map(toLocalAgent));
+  }, [originalSetting.agents]);
 
   // Only re-sync the transcription draft when the server-side content actually
   // changes — not on every originalSetting identity change. This prevents
@@ -135,12 +195,13 @@ const AISection = () => {
     [providers, transcription.providerId],
   );
 
-  // Persists the AI setting using a specific providers list and transcription
-  // value. Provider operations pass originalSetting.transcription so an
-  // in-progress transcription draft is never accidentally committed.
+  // Persists the AI setting using a specific providers list, transcription
+  // value, and agents list. Provider/transcription operations pass the current
+  // agents so an in-progress agent draft is never accidentally committed.
   const persistAISetting = async (
     nextProviders: LocalAIProvider[],
     nextTranscription: InstanceSetting_TranscriptionConfig | undefined,
+    nextAgents: LocalAgent[],
     errorContext: string,
   ) => {
     return saveInstanceSetting({
@@ -152,6 +213,7 @@ const AISection = () => {
           value: create(InstanceSetting_AISettingSchema, {
             providers: nextProviders.map(toProviderConfig),
             transcription: nextTranscription,
+            agents: nextAgents.map(toAgentConfig),
           }),
         },
       }),
@@ -186,7 +248,7 @@ const AISection = () => {
       ? providers.map((item) => (item.id === normalizedProvider.id ? normalizedProvider : item))
       : [...providers, normalizedProvider];
 
-    const ok = await persistAISetting(nextProviders, originalSetting.transcription, "Update AI provider");
+    const ok = await persistAISetting(nextProviders, originalSetting.transcription, agents, "Update AI provider");
     if (!ok) return;
     setProviders(nextProviders);
     setEditingProvider(undefined);
@@ -206,7 +268,7 @@ const AISection = () => {
         ? create(InstanceSetting_TranscriptionConfigSchema, {})
         : persistedTranscription;
 
-    const ok = await persistAISetting(nextProviders, nextTranscription, "Delete AI provider");
+    const ok = await persistAISetting(nextProviders, nextTranscription, agents, "Delete AI provider");
     if (!ok) return;
     setProviders(nextProviders);
     if (transcription.providerId === target.id) {
@@ -220,7 +282,57 @@ const AISection = () => {
       toast.error(t("setting.ai.transcription-empty-providers"));
       return;
     }
-    await persistAISetting(providers, toTranscriptionConfig(transcription), "Update transcription");
+    await persistAISetting(providers, toTranscriptionConfig(transcription), agents, "Update transcription");
+  };
+
+  const handleCreateAgent = () => {
+    setEditingAgent(newAgent());
+  };
+
+  const handleEditAgent = (agent: LocalAgent) => {
+    setEditingAgent({ ...agent });
+  };
+
+  const handleSaveAgent = async (agent: LocalAgent) => {
+    const name = agent.name.trim();
+    const enabled = agent.enabled;
+
+    if (!name) {
+      toast.error(t("setting.ai.agent-name-required"));
+      return;
+    }
+    if (enabled && !agent.providerId) {
+      toast.error(t("setting.ai.agent-provider-required"));
+      return;
+    }
+
+    const normalizedAgent = { ...agent, name };
+    const exists = agents.some((item) => item.id === normalizedAgent.id);
+    const nextAgents = exists
+      ? agents.map((item) => (item.id === normalizedAgent.id ? normalizedAgent : item))
+      : [...agents, normalizedAgent];
+
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, "Update AI agent");
+    if (!ok) return;
+    setAgents(nextAgents);
+    setEditingAgent(undefined);
+  };
+
+  const handleToggleAgent = async (agent: LocalAgent) => {
+    const nextAgents = agents.map((item) => (item.id === agent.id ? { ...item, enabled: !item.enabled } : item));
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, "Toggle AI agent");
+    if (!ok) return;
+    setAgents(nextAgents);
+  };
+
+  const handleDeleteAgent = async () => {
+    if (!deleteAgentTarget) return;
+    const target = deleteAgentTarget;
+    const nextAgents = agents.filter((agent) => agent.id !== target.id);
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, "Delete AI agent");
+    if (!ok) return;
+    setAgents(nextAgents);
+    setDeleteAgentTarget(undefined);
   };
 
   return (
@@ -328,6 +440,75 @@ const AISection = () => {
         />
       </SettingGroup>
 
+      <SettingGroup
+        title={t("setting.ai.agents-title")}
+        description={t("setting.ai.agents-description")}
+        showSeparator
+        actions={
+          <Button onClick={handleCreateAgent}>
+            <PlusIcon className="w-4 h-4 mr-2" />
+            {t("setting.ai.add-agent")}
+          </Button>
+        }
+      >
+        <SettingTable
+          columns={[
+            {
+              key: "name",
+              header: t("common.name"),
+              render: (_, agent: LocalAgent) => (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-foreground">{agent.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{agent.id}</span>
+                </div>
+              ),
+            },
+            {
+              key: "providerId",
+              header: t("setting.ai.agent-provider"),
+              render: (_, agent: LocalAgent) => {
+                const provider = providers.find((item) => item.id === agent.providerId);
+                return <span>{provider ? provider.title || provider.id : "-"}</span>;
+              },
+            },
+            {
+              key: "enabled",
+              header: t("setting.ai.agent-enabled"),
+              render: (_, agent: LocalAgent) => (
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={agent.enabled}
+                  onChange={() => handleToggleAgent(agent)}
+                  aria-label={t("setting.ai.agent-toggle-aria", { name: agent.name })}
+                />
+              ),
+            },
+            {
+              key: "actions",
+              header: "",
+              className: "text-right",
+              render: (_, agent: LocalAgent) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                    <MoreVerticalIcon className="w-4 h-auto" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={2}>
+                    <DropdownMenuItem onClick={() => handleEditAgent(agent)}>{t("common.edit")}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setDeleteAgentTarget(agent)} className="text-destructive focus:text-destructive">
+                      {t("common.delete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ),
+            },
+          ]}
+          data={agents}
+          emptyMessage={t("setting.ai.no-agents")}
+          getRowKey={(agent) => agent.id}
+        />
+      </SettingGroup>
+
       <AIProviderDialog
         provider={editingProvider}
         onOpenChange={(open) => !open && setEditingProvider(undefined)}
@@ -341,6 +522,23 @@ const AISection = () => {
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}
         onConfirm={handleDeleteProvider}
+        confirmVariant="destructive"
+      />
+
+      <AIAgentDialog
+        agent={editingAgent}
+        providers={providers}
+        onOpenChange={(open) => !open && setEditingAgent(undefined)}
+        onSave={handleSaveAgent}
+      />
+
+      <ConfirmDialog
+        open={!!deleteAgentTarget}
+        onOpenChange={(open) => !open && setDeleteAgentTarget(undefined)}
+        title={deleteAgentTarget ? t("setting.ai.delete-agent", { name: deleteAgentTarget.name }) : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={handleDeleteAgent}
         confirmVariant="destructive"
       />
     </SettingSection>
@@ -528,6 +726,195 @@ const AIProviderDialog = ({ provider, onOpenChange, onSave }: AIProviderDialogPr
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t("common.cancel")}
+          </Button>
+          <Button onClick={handleSave}>{t("common.save")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+interface AIAgentDialogProps {
+  agent?: LocalAgent;
+  providers: LocalAIProvider[];
+  onOpenChange: (open: boolean) => void;
+  onSave: (agent: LocalAgent) => void;
+}
+
+const AIAgentDialog = ({ agent, providers, onOpenChange, onSave }: AIAgentDialogProps) => {
+  const t = useTranslate();
+  const [draft, setDraft] = useState<LocalAgent>(() => agent ?? newAgent());
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    setDraft(agent ?? newAgent());
+  }, [agent]);
+
+  const updateDraft = (partial: Partial<LocalAgent>) => {
+    setDraft((prev) => ({ ...prev, ...partial }));
+  };
+
+  const providerOptions = useMemo(
+    () => [
+      { value: "__none__", label: t("setting.ai.agent-no-provider") },
+      ...providers.map((provider) => ({ value: provider.id, label: provider.title || provider.id })),
+    ],
+    [providers, t],
+  );
+
+  const handleSave = () => {
+    onSave(draft);
+  };
+
+  const referencedProvider = providers.find((item) => item.id === draft.providerId);
+  const hasApiKey = !!referencedProvider && (referencedProvider.apiKeySet || referencedProvider.apiKey.trim() !== "");
+  const canTest = !!draft.providerId && draft.model.trim() !== "" && hasApiKey;
+
+  const handleTest = async () => {
+    if (!canTest) return;
+    setTesting(true);
+    try {
+      const response = await aiServiceClient.testAIProvider(
+        create(TestAIProviderRequestSchema, {
+          providerId: draft.providerId,
+          model: draft.model.trim(),
+        }),
+      );
+      if (response.ok) {
+        toast.success(t("setting.ai.test-provider-success", { reply: response.reply || "ok" }));
+      } else {
+        toast.error(t("setting.ai.test-provider-failed", { error: response.error || "unknown" }));
+      }
+    } catch (err) {
+      toast.error(t("setting.ai.test-provider-failed", { error: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const placeholderForProvider = (provider: LocalAIProvider | undefined) => {
+    if (!provider) return "";
+    return provider.type === InstanceSetting_AIProviderType.GEMINI
+      ? t("setting.ai.transcription-model-placeholder-gemini")
+      : t("setting.ai.transcription-model-placeholder-openai");
+  };
+
+  return (
+    <Dialog open={!!agent} onOpenChange={onOpenChange}>
+      <DialogContent size="2xl">
+        <DialogHeader>
+          <DialogTitle>{t("setting.ai.edit-agent")}</DialogTitle>
+          <DialogDescription>{t("setting.ai.agent-dialog-description")}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.agent-name")}</Label>
+            <Input
+              value={draft.name}
+              onChange={(e) => updateDraft({ name: e.target.value })}
+              placeholder={t("setting.ai.agent-name-placeholder")}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.agent-provider")}</Label>
+            <Select
+              value={draft.providerId || "__none__"}
+              items={providerOptions}
+              onValueChange={(value) => updateDraft({ providerId: value === "__none__" ? "" : value })}
+              disabled={providers.length === 0}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {providerOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {providers.length === 0 && <p className="text-xs text-muted-foreground">{t("setting.ai.agent-empty-providers")}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.agent-model")}</Label>
+            <Input
+              value={draft.model}
+              onChange={(e) => updateDraft({ model: e.target.value })}
+              placeholder={placeholderForProvider(referencedProvider)}
+              disabled={!draft.providerId}
+              maxLength={256}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.agent-delay")}</Label>
+            <Input
+              type="number"
+              min={0}
+              value={draft.delayMinutes}
+              onChange={(e) => updateDraft({ delayMinutes: Number(e.target.value) || 0 })}
+            />
+            <p className="text-xs text-muted-foreground">{t("setting.ai.agent-delay-help")}</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.agent-max-length")}</Label>
+            <Input
+              type="number"
+              min={0}
+              value={draft.maxLength}
+              onChange={(e) => updateDraft({ maxLength: Number(e.target.value) || 0 })}
+            />
+            <p className="text-xs text-muted-foreground">{t("setting.ai.agent-max-length-help")}</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.agent-enabled")}</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={draft.enabled}
+                onChange={(e) => updateDraft({ enabled: e.target.checked })}
+              />
+              <span className="text-xs text-muted-foreground">{t("setting.ai.agent-enabled-help")}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label>{t("setting.ai.agent-persona")}</Label>
+            <Textarea
+              value={draft.personaPrompt}
+              onChange={(e) => updateDraft({ personaPrompt: e.target.value })}
+              placeholder={t("setting.ai.agent-persona-placeholder")}
+              rows={3}
+              maxLength={4096}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label>{t("setting.ai.agent-system")}</Label>
+            <Textarea
+              value={draft.systemPrompt}
+              onChange={(e) => updateDraft({ systemPrompt: e.target.value })}
+              placeholder={t("setting.ai.agent-system-placeholder")}
+              rows={3}
+              maxLength={4096}
+            />
+            <p className="text-xs text-muted-foreground">{t("setting.ai.agent-system-help")}</p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="outline" onClick={handleTest} disabled={!canTest || testing}>
+            {testing ? t("setting.ai.test-provider-testing") : t("setting.ai.test-agent")}
           </Button>
           <Button onClick={handleSave}>{t("common.save")}</Button>
         </DialogFooter>

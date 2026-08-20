@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file api/v1/ai_service.proto.
  */
 export const file_api_v1_ai_service: GenFile = /*@__PURE__*/
-  fileDesc("ChdhcGkvdjEvYWlfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIkkKEVRyYW5zY3JpYmVSZXF1ZXN0EjQKBWF1ZGlvGAEgASgLMiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpcHRpb25BdWRpb0ID4EECIncKElRyYW5zY3JpcHRpb25BdWRpbxIWCgdjb250ZW50GAEgASgMQgPgQQRIABINCgN1cmkYAiABKAlIABIVCghmaWxlbmFtZRgDIAEoCUID4EEBEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUID4EEBQggKBnNvdXJjZSIiChJUcmFuc2NyaWJlUmVzcG9uc2USDAoEdGV4dBgBIAEoCTKGAQoJQUlTZXJ2aWNlEnkKClRyYW5zY3JpYmUSHy5tZW1vcy5hcGkudjEuVHJhbnNjcmliZVJlcXVlc3QaIC5tZW1vcy5hcGkudjEuVHJhbnNjcmliZVJlc3BvbnNlIijaQQVhdWRpb4LT5JMCGjoBKiIVL2FwaS92MS9haTp0cmFuc2NyaWJlQqYBChBjb20ubWVtb3MuYXBpLnYxQg5BaVNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior]);
+  fileDesc("ChdhcGkvdjEvYWlfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIkkKEVRyYW5zY3JpYmVSZXF1ZXN0EjQKBWF1ZGlvGAEgASgLMiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpcHRpb25BdWRpb0ID4EECIncKElRyYW5zY3JpcHRpb25BdWRpbxIWCgdjb250ZW50GAEgASgMQgPgQQRIABINCgN1cmkYAiABKAlIABIVCghmaWxlbmFtZRgDIAEoCUID4EEBEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUID4EEBQggKBnNvdXJjZSIiChJUcmFuc2NyaWJlUmVzcG9uc2USDAoEdGV4dBgBIAEoCSJFChVUZXN0QUlQcm92aWRlclJlcXVlc3QSGAoLcHJvdmlkZXJfaWQYASABKAlCA+BBAhISCgVtb2RlbBgCIAEoCUID4EEBIkIKFlRlc3RBSVByb3ZpZGVyUmVzcG9uc2USCgoCb2sYASABKAgSDQoFcmVwbHkYAiABKAkSDQoFZXJyb3IYAyABKAkyngIKCUFJU2VydmljZRJ5CgpUcmFuc2NyaWJlEh8ubWVtb3MuYXBpLnYxLlRyYW5zY3JpYmVSZXF1ZXN0GiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpYmVSZXNwb25zZSIo2kEFYXVkaW+C0+STAho6ASoiFS9hcGkvdjEvYWk6dHJhbnNjcmliZRKVAQoOVGVzdEFJUHJvdmlkZXISIy5tZW1vcy5hcGkudjEuVGVzdEFJUHJvdmlkZXJSZXF1ZXN0GiQubWVtb3MuYXBpLnYxLlRlc3RBSVByb3ZpZGVyUmVzcG9uc2UiONpBEXByb3ZpZGVyX2lkLG1vZGVsgtPkkwIeOgEqIhkvYXBpL3YxL2FpL3Byb3ZpZGVyczp0ZXN0QqYBChBjb20ubWVtb3MuYXBpLnYxQg5BaVNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior]);
 
 /**
  * @generated from message memos.api.v1.TranscribeRequest
@@ -101,6 +101,66 @@ export const TranscribeResponseSchema: GenMessage<TranscribeResponse> = /*@__PUR
   messageDesc(file_api_v1_ai_service, 2);
 
 /**
+ * @generated from message memos.api.v1.TestAIProviderRequest
+ */
+export type TestAIProviderRequest = Message<"memos.api.v1.TestAIProviderRequest"> & {
+  /**
+   * Required. The instance AI provider ID to test.
+   *
+   * @generated from field: string provider_id = 1;
+   */
+  providerId: string;
+
+  /**
+   * Optional. The provider-specific model id to use for the probe. If omitted,
+   * the provider's default chat model is used.
+   *
+   * @generated from field: string model = 2;
+   */
+  model: string;
+};
+
+/**
+ * Describes the message memos.api.v1.TestAIProviderRequest.
+ * Use `create(TestAIProviderRequestSchema)` to create a new message.
+ */
+export const TestAIProviderRequestSchema: GenMessage<TestAIProviderRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 3);
+
+/**
+ * @generated from message memos.api.v1.TestAIProviderResponse
+ */
+export type TestAIProviderResponse = Message<"memos.api.v1.TestAIProviderResponse"> & {
+  /**
+   * True when the provider answered with a non-empty reply.
+   *
+   * @generated from field: bool ok = 1;
+   */
+  ok: boolean;
+
+  /**
+   * The provider's reply text, if any. Useful for confirming the round trip.
+   *
+   * @generated from field: string reply = 2;
+   */
+  reply: string;
+
+  /**
+   * Error message when ok is false; empty otherwise.
+   *
+   * @generated from field: string error = 3;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message memos.api.v1.TestAIProviderResponse.
+ * Use `create(TestAIProviderResponseSchema)` to create a new message.
+ */
+export const TestAIProviderResponseSchema: GenMessage<TestAIProviderResponse> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 4);
+
+/**
  * @generated from service memos.api.v1.AIService
  */
 export const AIService: GenService<{
@@ -113,6 +173,18 @@ export const AIService: GenService<{
     methodKind: "unary";
     input: typeof TranscribeRequestSchema;
     output: typeof TranscribeResponseSchema;
+  },
+  /**
+   * TestAIProvider verifies that an instance AI provider can reach its chat
+   * model endpoint and authenticate. Returns the provider's reply so the
+   * caller can confirm end-to-end connectivity.
+   *
+   * @generated from rpc memos.api.v1.AIService.TestAIProvider
+   */
+  testAIProvider: {
+    methodKind: "unary";
+    input: typeof TestAIProviderRequestSchema;
+    output: typeof TestAIProviderResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_api_v1_ai_service, 0);

@@ -87,6 +87,47 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 	if err := preparePersistedTranscriptionConfig(setting, existing); err != nil {
 		return err
 	}
+	if err := preparePersistedAgentConfigs(setting, existing, existingProviders); err != nil {
+		return err
+	}
+	return nil
+}
+
+func preparePersistedAgentConfigs(setting *storepb.InstanceAISetting, existing *storepb.InstanceAISetting, existingProviders map[string]*storepb.AIProviderConfig) error {
+	agentIDs := map[string]bool{}
+	for _, agent := range setting.GetAgents() {
+		if agent == nil {
+			return errors.New("agent cannot be nil")
+		}
+
+		agent.Id = strings.TrimSpace(agent.Id)
+		if agent.Id == "" {
+			agent.Id = shortuuid.New()
+		}
+		if agentIDs[agent.Id] {
+			return errors.Errorf("duplicate agent ID %q", agent.Id)
+		}
+		agentIDs[agent.Id] = true
+
+		agent.Name = strings.TrimSpace(agent.Name)
+		if agent.Name == "" {
+			return errors.New("agent name is required")
+		}
+
+		agent.ProviderId = strings.TrimSpace(agent.ProviderId)
+		if agent.ProviderId != "" {
+			if _, ok := existingProviders[agent.ProviderId]; !ok {
+				return errors.Errorf("agent %q references unknown provider_id %q", agent.Id, agent.ProviderId)
+			}
+		}
+
+		if agent.DelayMinutes < 0 {
+			return errors.Errorf("agent %q delay_minutes must be >= 0", agent.Id)
+		}
+		if agent.MaxLength < 0 {
+			return errors.Errorf("agent %q max_length must be >= 0", agent.Id)
+		}
+	}
 	return nil
 }
 
