@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -202,7 +203,12 @@ func TestLoadDeploymentConfigurationAcceptsRegularFileSymlink(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(t.TempDir(), "provider.json")
 	writeDeploymentIdentityProvider(t, target, "primary-sso", "Primary", "secret")
-	require.NoError(t, os.Symlink(target, filepath.Join(dir, "memos-idp-primary.json")))
+	if err := os.Symlink(target, filepath.Join(dir, "memos-idp-primary.json")); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("skipping symlink test on Windows without symlink privilege: %v", err)
+		}
+		require.NoError(t, err)
+	}
 	require.NoError(t, stores.LoadDeploymentConfigurationDir(ctx, dir))
 	assert.True(t, stores.IsIdentityProviderDeploymentConfigured("primary-sso"))
 }
