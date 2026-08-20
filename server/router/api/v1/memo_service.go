@@ -36,6 +36,20 @@ func isSSESuppressed(ctx context.Context) bool {
 	return ok && v
 }
 
+// suppressAgentSchedulingKey marks a context so CreateMemo does not enqueue
+// agent reply tasks. It is set when CreateMemo creates a comment memo, so an
+// agent's reply does not trigger further agent replies (infinite loop).
+type suppressAgentSchedulingKey struct{}
+
+func withSuppressAgentScheduling(ctx context.Context) context.Context {
+	return context.WithValue(ctx, suppressAgentSchedulingKey{}, true)
+}
+
+func isAgentSchedulingSuppressed(ctx context.Context) bool {
+	v, ok := ctx.Value(suppressAgentSchedulingKey{}).(bool)
+	return ok && v
+}
+
 func (s *APIV1Service) checkMemoReadAccess(ctx context.Context, memo *store.Memo) error {
 	return s.checkMemoReadAccessWithParent(ctx, memo, nil)
 }
@@ -59,6 +73,11 @@ func (s *APIV1Service) checkMemoReadAccessWithParent(ctx context.Context, memo, 
 	user, err := s.fetchCurrentUser(ctx)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to get user")
+	}
+	// Internal agent calls act with admin authority and may read any memo so
+	// the reply worker can comment on private memos it did not author.
+	if isSystemAgentCall(ctx) && user != nil && user.Role == store.RoleAdmin {
+		return nil
 	}
 	allowAnonymous := s.Profile != nil && s.Profile.AllowAnonymous()
 	return memoAccessDecisionError(access.CheckMemoRead(memo, parent, user, allowAnonymous, nil))
@@ -148,6 +167,13 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 			return nil, status.Errorf(codes.AlreadyExists, "memo with ID %q already exists", memoUID)
 		}
 		return nil, err
+	}
+
+	// Queue agent replies in the background. This is best-effort: a failure to
+	// schedule must not fail the memo creation request. Skip scheduling when
+	// the memo is itself an agent reply comment to avoid an infinite loop.
+	if !isAgentSchedulingSuppressed(ctx) {
+		s.scheduleAgentRepliesForMemo(ctx, memo.ID)
 	}
 
 	attachments := []*store.Attachment{}
