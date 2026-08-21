@@ -6,6 +6,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
@@ -14,10 +15,13 @@ import (
 	"github.com/usememos/memos/internal/ai"
 	"github.com/usememos/memos/internal/ai/audiollm"
 	audiollmgemini "github.com/usememos/memos/internal/ai/audiollm/gemini"
+	agentpkg "github.com/usememos/memos/internal/ai/agent"
+	"github.com/usememos/memos/internal/ai/chat"
 	"github.com/usememos/memos/internal/ai/stt"
 	sttopenai "github.com/usememos/memos/internal/ai/stt/openai"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
+	"github.com/usememos/memos/store"
 )
 
 const (
@@ -118,6 +122,80 @@ func (s *APIV1Service) Transcribe(ctx context.Context, request *v1pb.TranscribeR
 		return nil, status.Errorf(codes.Internal, "failed to transcribe audio: %v", err)
 	}
 	return &v1pb.TranscribeResponse{Text: text}, nil
+}
+
+// testAIProviderProbeTimeout caps how long TestAIProvider waits for a provider
+// response. Connectivity checks should fail fast rather than block the caller.
+const testAIProviderProbeTimeout = 30 * time.Second
+
+// TestAIProvider verifies that a provider can reach its chat model endpoint
+// and authenticate by sending a trivial "ping" prompt. It is intended for the
+// settings UI so administrators get immediate feedback when a provider's
+// endpoint, API key, or model id is misconfigured.
+func (s *APIV1Service) TestAIProvider(ctx context.Context, request *v1pb.TestAIProviderRequest) (*v1pb.TestAIProviderResponse, error) {
+	user, err := s.fetchCurrentUser(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get current user: %v", err)
+	}
+	if user == nil {
+		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
+	}
+	if user.Role != store.RoleAdmin {
+		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
+	}
+
+	providerID := strings.TrimSpace(request.GetProviderId())
+	if providerID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "provider_id is required")
+	}
+
+	aiSetting, err := s.Store.GetInstanceAISetting(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get AI setting: %v", err)
+	}
+	provider, err := s.resolveAIProvider(aiSetting, providerID)
+	if err != nil {
+		return nil, err
+	}
+	if provider.APIKey == "" {
+		return nil, status.Errorf(codes.FailedPrecondition, "provider %q has no API key configured", providerID)
+	}
+
+	modelID := strings.TrimSpace(request.GetModel())
+	if modelID == "" {
+		defaultModel, err := ai.DefaultChatModel(provider.Type)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		}
+		modelID = defaultModel
+	}
+
+	chatModel, err := agentpkg.NewChatModel(provider, chat.ApplyOptions(nil))
+	if err != nil {
+		return nil, status.Errorf(codes.FailedPrecondition, "failed to build chat model: %v", err)
+	}
+
+	probeCtx, cancel := context.WithTimeout(ctx, testAIProviderProbeTimeout)
+	defer cancel()
+	resp, err := chatModel.Generate(probeCtx, chat.Request{
+		Model:  modelID,
+		System: "You are a connectivity probe. Reply with the single word: ok",
+		Messages: []chat.Message{
+			{Role: chat.RoleUser, Content: "ping"},
+		},
+	})
+	if err != nil {
+		// Surface the underlying error verbatim so the admin can act on it
+		// (e.g. 401, unknown model, unreachable host) without a round trip.
+		return &v1pb.TestAIProviderResponse{
+			Ok:    false,
+			Error: err.Error(),
+		}, nil
+	}
+	return &v1pb.TestAIProviderResponse{
+		Ok:    true,
+		Reply: strings.TrimSpace(resp.Text),
+	}, nil
 }
 
 func (*APIV1Service) transcribeViaSTT(

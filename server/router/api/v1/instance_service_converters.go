@@ -340,6 +340,7 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 	aiSetting := &v1pb.InstanceSetting_AISetting{
 		Providers:     make([]*v1pb.InstanceSetting_AIProviderConfig, 0, len(setting.Providers)),
 		Transcription: convertTranscriptionConfigFromStore(setting.GetTranscription()),
+		Agents:        make([]*v1pb.InstanceSetting_AgentConfig, 0, len(setting.GetAgents())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -355,6 +356,22 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 			ApiKeyHint: maskAPIKey(apiKey),
 		})
 	}
+	for _, agent := range setting.GetAgents() {
+		if agent == nil {
+			continue
+		}
+		aiSetting.Agents = append(aiSetting.Agents, &v1pb.InstanceSetting_AgentConfig{
+			Id:            agent.GetId(),
+			Name:          agent.GetName(),
+			ProviderId:    agent.GetProviderId(),
+			Model:         agent.GetModel(),
+			PersonaPrompt: agent.GetPersonaPrompt(),
+			SystemPrompt:  agent.GetSystemPrompt(),
+			Enabled:       agent.GetEnabled(),
+			DelayMinutes:  agent.GetDelayMinutes(),
+			MaxLength:     agent.GetMaxLength(),
+		})
+	}
 	return aiSetting
 }
 
@@ -366,6 +383,7 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 	aiSetting := &storepb.InstanceAISetting{
 		Providers:     make([]*storepb.AIProviderConfig, 0, len(setting.Providers)),
 		Transcription: convertTranscriptionConfigToStore(setting.GetTranscription()),
+		Agents:        make([]*storepb.AIAgentConfig, 0, len(setting.GetAgents())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -377,6 +395,22 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 			Type:     storepb.AIProviderType(provider.GetType()),
 			Endpoint: provider.GetEndpoint(),
 			ApiKey:   provider.GetApiKey(),
+		})
+	}
+	for _, agent := range setting.GetAgents() {
+		if agent == nil {
+			continue
+		}
+		aiSetting.Agents = append(aiSetting.Agents, &storepb.AIAgentConfig{
+			Id:            agent.GetId(),
+			Name:          agent.GetName(),
+			ProviderId:    agent.GetProviderId(),
+			Model:         agent.GetModel(),
+			PersonaPrompt: agent.GetPersonaPrompt(),
+			SystemPrompt:  agent.GetSystemPrompt(),
+			Enabled:       agent.GetEnabled(),
+			DelayMinutes:  agent.GetDelayMinutes(),
+			MaxLength:     agent.GetMaxLength(),
 		})
 	}
 	return aiSetting
