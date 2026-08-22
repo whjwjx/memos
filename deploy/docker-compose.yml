@@ -1,0 +1,26 @@
+services:
+  memos:
+    build:
+      context: .
+      dockerfile: Dockerfile.runtime
+    image: memos-ai:local
+    container_name: memos
+    restart: unless-stopped
+    # 不对外暴露端口，仅通过 vps-gateway (proxy-net) 反代
+    expose:
+      - "5230"
+    volumes:
+      # SQLite 数据持久化到宿主 ~/.memos
+      - ~/.memos:/var/opt/memos
+    environment:
+      - MEMOS_DATA=/var/opt/memos
+      - TZ=Asia/Shanghai
+      # 开启匿名公开访问：等价于 --instance-url。设为此值后 AllowAnonymous()=true，
+      # 匿名用户可读 Visibility=PUBLIC 的 memo。删除本行重启即退回 private 模式。
+      - MEMOS_INSTANCE_URL=https://memos.huajiang.wang
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    external: true

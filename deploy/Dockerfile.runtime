@@ -1,0 +1,20 @@
+# 极简运行时镜像：仅拷贝预编译的 linux 二进制，几秒 build，不吃内存
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata wget
+
+WORKDIR /usr/local/memos
+
+COPY memos-linux /usr/local/memos/memos
+RUN chmod +x /usr/local/memos/memos
+COPY dist /usr/local/memos/server/router/frontend/dist
+
+# memos 数据目录（运行时挂载卷）
+ENV MEMOS_DATA=/.memos
+VOLUME ["/.memos"]
+
+EXPOSE 5230
+
+# 监听所有网卡，便于 nginx 反代
+ENTRYPOINT ["/usr/local/memos/memos"]
+CMD ["--port", "5230", "--data", "/.memos"]

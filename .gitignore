@@ -22,3 +22,12 @@ dist/
 # when --config.store-dir is set without an existing store; it contains a
 # symlink back to the workspace.
 .pnpm-store/
+
+# Frontend test coverage output (Vitest + @vitest/coverage-v8).
+web/coverage/
+
+# Local compiled binary (built for deployment, not source).
+memos-linux
+
+# Personal docs (deployment-specific, not part of upstream source).
+docs-wang/
