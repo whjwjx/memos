@@ -120,6 +120,7 @@
     }
   },
   "calendar": {
+    "active-hours": "Active hours",
     "drag-to-schedule": "Drag to a date on the calendar to schedule it",
     "month": "Month",
     "next-month": "Next month",
@@ -763,6 +764,14 @@
       "save-media-metadata-description": "For future uploads, save available camera, capture time, location, image dimensions, and basic video details. Anyone who can view the attachment can receive this metadata. Existing attachments are unchanged.",
       "theme-description": "Applies the selected theme immediately on this device.",
       "theme": "Theme",
+      "calendar-day-end": "Calendar end time",
+      "calendar-day-range": "Active hours",
+      "calendar-day-range-description": "Set the daily start and end times shown in the week view. Hours outside this range are hidden.",
+      "calendar-day-start": "Calendar start time",
+      "calendar-adjusted": "The other time was adjusted automatically to keep the end later than the start.",
+      "calendar-description": "Choose the time range shown in the calendar week view. Hours outside it (e.g. sleep time) are hidden.",
+      "calendar-invalid-range": "End time must be later than start time.",
+      "calendar-title": "Calendar",
       "uploads-privacy-description": "Control privacy-sensitive information submitted with uploaded media.",
       "uploads-privacy-title": "Uploads & privacy"
     },

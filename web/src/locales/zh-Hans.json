@@ -54,6 +54,7 @@
     "deploy-link": "部署你的 Memos"
   },
   "calendar": {
+    "active-hours": "活跃时段",
     "drag-to-schedule": "拖拽到日历上以安排时间",
     "month": "月",
     "next-month": "下个月",
@@ -565,6 +566,14 @@
       "theme-description": "立即在当前设备上应用所选主题。",
       "theme": "主题",
       "label": "偏好设置",
+      "calendar-day-end": "日历结束时间",
+      "calendar-day-range": "活跃时段",
+      "calendar-day-range-description": "设置周视图显示的每天开始与结束时间，区间外的时间将隐藏。",
+      "calendar-day-start": "日历开始时间",
+      "calendar-adjusted": "已自动调整另一个时间，以保持结束晚于开始。",
+      "calendar-description": "选择日历周视图显示的时间范围，区间外（如睡眠时间）将被隐藏。",
+      "calendar-invalid-range": "结束时间必须晚于开始时间。",
+      "calendar-title": "日历",
       "uploads-privacy-description": "控制上传媒体时提交的隐私敏感信息。",
       "uploads-privacy-title": "上传与隐私"
     },

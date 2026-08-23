@@ -1,16 +1,21 @@
 import { create } from "@bufbuild/protobuf";
 import { DurationSchema, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import dayjs from "dayjs";
-import { CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon } from "lucide-react";
 import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
 import { useTodayDate, useWeekdayLabels } from "@/components/ActivityCalendar/hooks";
+import ActiveHoursSetting from "@/components/CalendarView/ActiveHoursSetting";
 import { getWeekStart } from "@/components/CalendarView/drag-utils";
 import { stripMarkdown, WeekView } from "@/components/CalendarView/WeekView";
 import { loadMemoEditor } from "@/components/MemoEditor/loader";
 import type { MemoEditorProps } from "@/components/MemoEditor/types";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAuth } from "@/contexts/AuthContext";
 import { useGeneralSetting } from "@/hooks/useInstanceQueries";
+import useMediaQuery from "@/hooks/useMediaQuery";
 import { useInfiniteMemos, useUpdateMemo } from "@/hooks/useMemoQueries";
+import { useUpdateUserGeneralSetting } from "@/hooks/useUserQueries";
 import i18n from "@/i18n";
 import { addMonths, formatMonth } from "@/lib/calendar-utils";
 import { cn } from "@/lib/utils";
@@ -62,6 +67,14 @@ const CalendarPage = () => {
   const weekdayLabels = useWeekdayLabels();
   const { data: generalSetting } = useGeneralSetting();
   const weekStartOffset = generalSetting?.weekStartDayOffset ?? 0;
+  // 手机端仅查看：未排期 todo 面板与拖拽排期只对桌面端可用。
+  const isDesktop = useMediaQuery("md");
+
+  // 用户偏好的活跃时段：周视图只渲染该区间，区间外（如睡眠时间）隐藏。
+  const { currentUser, userGeneralSetting, refetchSettings } = useAuth();
+  const { mutate: updateUserGeneralSetting } = useUpdateUserGeneralSetting(currentUser?.name);
+  const dayStartMin = userGeneralSetting?.calendarDayStart ?? 0;
+  const dayEndMin = userGeneralSetting?.calendarDayEnd ?? 1440;
 
   const [view, setView] = useState<CalendarView>("month");
   const [month, setMonth] = useState<string>(() => formatMonth(new Date()));
@@ -95,7 +108,7 @@ const CalendarPage = () => {
     fetchNextPage: fetchTodoPage,
     hasNextPage: todoHasNextPage,
     isFetching: todoIsFetching,
-  } = useInfiniteMemos({ filter: TODO_MEMOS_FILTER });
+  } = useInfiniteMemos({ filter: TODO_MEMOS_FILTER }, { enabled: isDesktop });
 
   useEffect(() => {
     if (todoHasNextPage && !todoIsFetching) {
@@ -125,6 +138,28 @@ const CalendarPage = () => {
       .then(({ default: MemoEditor }) => setEditorComponent(() => MemoEditor))
       .catch(() => undefined);
   }, []);
+
+  // 保存活跃时段偏好（周视图快捷设置与偏好设置页共用同一存储）。
+  const handleActiveHoursChange = useCallback(
+    (patch: { calendarDayStart?: number; calendarDayEnd?: number }) => {
+      const updateMask: string[] = [];
+      if (patch.calendarDayStart !== undefined) {
+        updateMask.push("calendar_day_start");
+      }
+      if (patch.calendarDayEnd !== undefined) {
+        updateMask.push("calendar_day_end");
+      }
+      updateUserGeneralSetting(
+        { generalSetting: patch, updateMask },
+        {
+          onSuccess: () => {
+            refetchSettings();
+          },
+        },
+      );
+    },
+    [updateUserGeneralSetting, refetchSettings],
+  );
 
   const scheduleItemsByDate = useMemo(() => {
     const map = new Map<string, ScheduledItem[]>();
@@ -213,6 +248,28 @@ const CalendarPage = () => {
           <h2 className="ml-1 text-lg font-semibold">{view === "month" ? monthTitle : weekTitle}</h2>
         </div>
         <div className="flex items-center gap-2">
+          {view === "week" && (
+            <Popover>
+              <PopoverTrigger render={<Button variant="outline" size="sm" aria-label={t("calendar.active-hours")} />}>
+                <ClockIcon className="size-4" />
+              </PopoverTrigger>
+              <PopoverContent className="w-72" side="bottom" align="end">
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">{t("setting.preference.calendar-title")}</p>
+                  <p className="text-xs text-muted-foreground">{t("setting.preference.calendar-description")}</p>
+                  <ActiveHoursSetting
+                    dayStartMin={dayStartMin}
+                    dayEndMin={dayEndMin}
+                    onStartChange={(calendarDayStart) => handleActiveHoursChange({ calendarDayStart })}
+                    onEndChange={(calendarDayEnd) => handleActiveHoursChange({ calendarDayEnd })}
+                    onRangeChange={(dayStartMin, dayEndMin) =>
+                      handleActiveHoursChange({ calendarDayStart: dayStartMin, calendarDayEnd: dayEndMin })
+                    }
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           <Button variant="outline" size="sm" onClick={handleToday}>
             {t("common.today")}
           </Button>
@@ -268,7 +325,10 @@ const CalendarPage = () => {
                       event.preventDefault();
                       const memoName = event.dataTransfer.getData("text/memo-name");
                       if (memoName) {
-                        handleUpdateSchedule(memoName, { scheduledTime: cell.date.startOf("day").toDate() });
+                        // 落到活跃时段开始（而非 00:00），保证切到周视图后任务可见。
+                        handleUpdateSchedule(memoName, {
+                          scheduledTime: cell.date.startOf("day").add(dayStartMin, "minute").toDate(),
+                        });
                       }
                     }}
                     className={cn(
@@ -324,12 +384,14 @@ const CalendarPage = () => {
                 onUpdateSchedule={handleUpdateSchedule}
                 onDropTodo={(memoName, targetTime) => handleUpdateSchedule(memoName, { scheduledTime: targetTime })}
                 onOpenMemoEditor={openMemoEditor}
+                dayStartMin={dayStartMin}
+                dayEndMin={dayEndMin}
               />
             </div>
           )}
         </div>
 
-        <aside className="flex w-full shrink-0 flex-col gap-2 rounded-lg border bg-card p-3 md:w-64">
+        <aside className="hidden w-full shrink-0 flex-col gap-2 rounded-lg border bg-card p-3 md:flex md:w-64">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
             <CheckSquareIcon className="size-4 text-muted-foreground" />
             {t("calendar.no-time-todos")}
