@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
@@ -263,6 +264,15 @@ message Memo {
   // Optional. The location of the memo.
   optional Location location = 18 [(google.api.field_behavior) = OPTIONAL];
 
+  // Optional. The scheduled time of the memo. When set, the memo appears on
+  // the calendar at this time. A memo with a scheduled time is treated as a
+  // schedule (todo) item.
+  optional google.protobuf.Timestamp scheduled_time = 19 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The scheduled duration of the memo in seconds. When unset, the
+  // memo is treated as a point event. Must be positive when set.
+  optional google.protobuf.Duration scheduled_duration = 20 [(google.api.field_behavior) = OPTIONAL];
+
   // Computed properties of a memo.
   message Property {
     bool has_link = 1;
@@ -322,13 +332,16 @@ message ListMemosRequest {
   // Optional. A CEL expression to filter memos. Combine terms with && and ||.
   // Available fields:
   //   content (string), creator (string, e.g. "users/1"),
-  //   created_ts / updated_ts (timestamp), pinned (bool),
+  //   created_ts / updated_ts / scheduled_ts (timestamp), pinned (bool),
   //   visibility (string: PRIVATE | PROTECTED | PUBLIC),
   //   tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
   //   has_task_list / has_link / has_code / has_incomplete_tasks (bool),
   //   has_location (bool; true when the memo has a location attached).
-  // Note: the time fields here are created_ts / updated_ts, which differ from
-  // the create_time / update_time names used by order_by.
+  //   scheduled_ts supports null comparison, e.g. `scheduled_ts != null` to
+  //   match memos that have a scheduled time.
+  // Note: the time fields here are created_ts / updated_ts / scheduled_ts,
+  // which differ from the create_time / update_time / scheduled_time names
+  // used by order_by.
   // Examples:
   //   pinned == true && visibility == "PUBLIC"
   //   tags.exists(t, t == "urgent")

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
@@ -48,6 +49,12 @@ func (s *APIV1Service) convertMemoFromStoreWithCreators(ctx context.Context, mem
 		memoMessage.Tags = memo.Payload.Tags
 		memoMessage.Property = convertMemoPropertyFromStore(memo.Payload.Property)
 		memoMessage.Location = convertLocationFromStore(memo.Payload.Location)
+	}
+	if memo.ScheduledTime != nil {
+		memoMessage.ScheduledTime = timestamppb.New(time.Unix(*memo.ScheduledTime, 0))
+	}
+	if memo.ScheduledDuration != nil {
+		memoMessage.ScheduledDuration = durationpb.New(time.Duration(*memo.ScheduledDuration) * time.Second)
 	}
 
 	if memo.ParentUID != nil {

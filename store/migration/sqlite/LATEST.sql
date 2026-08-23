@@ -40,7 +40,9 @@ CREATE TABLE memo (
   content TEXT NOT NULL DEFAULT '',
   visibility TEXT NOT NULL CHECK (visibility IN ('PUBLIC', 'PROTECTED', 'PRIVATE')) DEFAULT 'PRIVATE',
   pinned INTEGER NOT NULL CHECK (pinned IN (0, 1)) DEFAULT 0,
-  payload TEXT NOT NULL DEFAULT '{}'
+  payload TEXT NOT NULL DEFAULT '{}',
+  scheduled_time BIGINT DEFAULT NULL,
+  scheduled_duration BIGINT DEFAULT NULL
 );
 
 -- memo_relation

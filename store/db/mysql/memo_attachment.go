@@ -138,6 +138,16 @@ func applyMemoUpdate(ctx context.Context, executor memoUpdateExecer, update *sto
 	if v := update.Pinned; v != nil {
 		set, args = append(set, "`pinned` = ?"), append(args, *v)
 	}
+	if update.ClearScheduledTime {
+		set = append(set, "`scheduled_time` = NULL")
+	} else if v := update.ScheduledTime; v != nil {
+		set, args = append(set, "`scheduled_time` = ?"), append(args, *v)
+	}
+	if update.ClearScheduledDuration {
+		set = append(set, "`scheduled_duration` = NULL")
+	} else if v := update.ScheduledDuration; v != nil {
+		set, args = append(set, "`scheduled_duration` = ?"), append(args, *v)
+	}
 	if v := update.Payload; v != nil {
 		payload, err := protojson.Marshal(v)
 		if err != nil {

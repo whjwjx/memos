@@ -39,7 +39,9 @@ CREATE TABLE memo (
   content TEXT NOT NULL,
   visibility TEXT NOT NULL DEFAULT 'PRIVATE',
   pinned BOOLEAN NOT NULL DEFAULT FALSE,
-  payload JSONB NOT NULL DEFAULT '{}'
+  payload JSONB NOT NULL DEFAULT '{}',
+  scheduled_time BIGINT DEFAULT NULL,
+  scheduled_duration BIGINT DEFAULT NULL
 );
 
 -- memo_relation

@@ -636,7 +636,7 @@ paths:
                     type: string
                 - name: filter
                   in: query
-                  description: "Optional. A CEL expression to filter memos. Combine terms with && and ||.\r\n Available fields:\r\n   content (string), creator (string, e.g. \"users/1\"),\r\n   created_ts / updated_ts (timestamp), pinned (bool),\r\n   visibility (string: PRIVATE | PROTECTED | PUBLIC),\r\n   tags (list<string>; match with `\"work\" in tags`, not `tag == \"work\"`),\r\n   has_task_list / has_link / has_code / has_incomplete_tasks (bool),\r\n   has_location (bool; true when the memo has a location attached).\r\n Note: the time fields here are created_ts / updated_ts, which differ from\r\n the create_time / update_time names used by order_by.\r\n Examples:\r\n   pinned == true && visibility == \"PUBLIC\"\r\n   tags.exists(t, t == \"urgent\")\r\n   content.contains(\"roadmap\") && created_ts > now - duration(\"168h\")"
+                  description: "Optional. A CEL expression to filter memos. Combine terms with && and ||.\r\n Available fields:\r\n   content (string), creator (string, e.g. \"users/1\"),\r\n   created_ts / updated_ts / scheduled_ts (timestamp), pinned (bool),\r\n   visibility (string: PRIVATE | PROTECTED | PUBLIC),\r\n   tags (list<string>; match with `\"work\" in tags`, not `tag == \"work\"`),\r\n   has_task_list / has_link / has_code / has_incomplete_tasks (bool),\r\n   has_location (bool; true when the memo has a location attached).\r\n   scheduled_ts supports null comparison, e.g. `scheduled_ts != null` to\r\n   match memos that have a scheduled time.\r\n Note: the time fields here are created_ts / updated_ts / scheduled_ts,\r\n which differ from the create_time / update_time / scheduled_time names\r\n used by order_by.\r\n Examples:\r\n   pinned == true && visibility == \"PUBLIC\"\r\n   tags.exists(t, t == \"urgent\")\r\n   content.contains(\"roadmap\") && created_ts > now - duration(\"168h\")"
                   schema:
                     type: string
                 - name: showDeleted
@@ -1010,7 +1010,7 @@ paths:
         post:
             tags:
                 - MemoService
-            description: "UpsertMemoReaction adds or updates the authenticated user's reaction on a\r\n memo. The reaction's content_id is the memo's resource name (memos/{memo})."
+            description: UpsertMemoReaction adds or updates the authenticated user's reaction on a memo.
             operationId: MemoService_UpsertMemoReaction
             parameters:
                 - name: memo
@@ -3258,6 +3258,14 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Location'
                     description: Optional. The location of the memo.
+                scheduledTime:
+                    type: string
+                    description: "Optional. The scheduled time of the memo. When set, the memo appears on\r\n the calendar at this time. A memo with a scheduled time is treated as a\r\n schedule (todo) item."
+                    format: date-time
+                scheduledDuration:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: "Optional. The scheduled duration of the memo in seconds. When unset, the\r\n memo is treated as a point event. Must be positive when set."
         MemoRelation:
             required:
                 - memo
@@ -3462,7 +3470,6 @@ components:
                     format: double
         Reaction:
             required:
-                - contentId
                 - reactionType
             type: object
             properties:
@@ -3474,9 +3481,6 @@ components:
                     readOnly: true
                     type: string
                     description: "The resource name of the creator.\r\n Format: users/{user}"
-                contentId:
-                    type: string
-                    description: "The resource name of the content.\r\n For memo reactions, this should be the memo's resource name.\r\n Format: memos/{memo}"
                 reactionType:
                     type: string
                     description: "Required. The type of reaction (e.g., \"\U0001F44D\", \"❤️\", \"\U0001F604\")."
@@ -3485,6 +3489,7 @@ components:
                     type: string
                     description: Output only. The creation timestamp.
                     format: date-time
+            description: Reaction is a reaction attached to a memo.
         RefreshTokenRequest:
             type: object
             properties: {}
