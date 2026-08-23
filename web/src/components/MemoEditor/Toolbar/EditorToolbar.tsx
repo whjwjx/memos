@@ -7,6 +7,7 @@ import { validationService } from "../services";
 import { useEditorContext, useEditorSelector } from "../state";
 import type { EditorToolbarProps } from "../types";
 import InsertMenu from "./InsertMenu";
+import ScheduleSelector from "./ScheduleSelector";
 import VisibilitySelector from "./VisibilitySelector";
 
 export const EditorToolbar: FC<EditorToolbarProps> = ({
@@ -30,6 +31,8 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
   const isUploading = useEditorSelector((s) => s.ui.isLoading.uploading);
   const location = useEditorSelector((s) => s.metadata.location);
   const visibility = useEditorSelector((s) => s.metadata.visibility);
+  const scheduledTime = useEditorSelector((s) => s.metadata.scheduledTime);
+  const scheduledDuration = useEditorSelector((s) => s.metadata.scheduledDuration);
   const blockedMessage = valid
     ? undefined
     : blockedReason
@@ -48,6 +51,10 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
     dispatch(actions.setMetadata({ visibility: next }));
   };
 
+  const handleScheduleChange = (next?: Date, nextDuration?: number) => {
+    dispatch(actions.setMetadata({ scheduledTime: next, scheduledDuration: nextDuration }));
+  };
+
   return (
     <div className="w-full flex flex-row justify-between items-center mb-2">
       <div className="flex flex-row justify-start items-center gap-1">
@@ -64,6 +71,7 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
           onInsertImages={onInsertImages}
         />
         <VisibilitySelector value={visibility} onChange={handleVisibilityChange} />
+        <ScheduleSelector value={scheduledTime} duration={scheduledDuration} onChange={handleScheduleChange} />
       </div>
 
       <div className="flex flex-row justify-end items-center gap-2">

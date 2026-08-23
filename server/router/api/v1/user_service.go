@@ -471,9 +471,11 @@ func getDeleteUserAttachmentStorageSetting(ctx context.Context, stores *store.St
 
 func getDefaultUserGeneralSetting() *v1pb.UserSetting_GeneralSetting {
 	return &v1pb.UserSetting_GeneralSetting{
-		Locale:         "en",
-		MemoVisibility: "PRIVATE",
-		Theme:          "",
+		Locale:            "en",
+		MemoVisibility:    "PRIVATE",
+		Theme:             "",
+		CalendarDayStart:  0,
+		CalendarDayEnd:    1440,
 	}
 }
 

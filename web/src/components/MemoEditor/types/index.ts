@@ -9,6 +9,7 @@ export type {
   FocusModeOverlayProps,
   InsertMenuProps,
   MemoEditorProps,
+  ScheduleSelectorProps,
   VisibilitySelectorProps,
 } from "./components";
 export type { EditorController } from "./editorController";

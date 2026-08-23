@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { FieldMaskSchema, timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { DurationSchema, FieldMaskSchema, timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { isEqual } from "lodash-es";
 import { memoServiceClient } from "@/connect";
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
@@ -47,6 +47,18 @@ function buildUpdateMask(
   if (!isEqual(state.metadata.location, prevMemo.location)) {
     mask.add("location");
     patch.location = state.metadata.location;
+  }
+  const prevScheduledTime = prevMemo.scheduledTime ? timestampDate(prevMemo.scheduledTime) : undefined;
+  if (!isEqual(state.metadata.scheduledTime, prevScheduledTime)) {
+    mask.add("scheduled_time");
+    patch.scheduledTime = state.metadata.scheduledTime ? timestampFromDate(state.metadata.scheduledTime) : undefined;
+  }
+  const prevScheduledDuration = prevMemo.scheduledDuration ? Number(prevMemo.scheduledDuration.seconds) : undefined;
+  if (!isEqual(state.metadata.scheduledDuration, prevScheduledDuration)) {
+    mask.add("scheduled_duration");
+    patch.scheduledDuration = state.metadata.scheduledDuration
+      ? create(DurationSchema, { seconds: BigInt(state.metadata.scheduledDuration) })
+      : undefined;
   }
 
   // Auto-update timestamp if content changed
@@ -108,6 +120,10 @@ export const memoService = {
       attachments: toAttachmentReferences(allAttachments),
       relations: state.metadata.relations,
       location: state.metadata.location,
+      scheduledTime: state.metadata.scheduledTime ? timestampFromDate(state.metadata.scheduledTime) : undefined,
+      scheduledDuration: state.metadata.scheduledDuration
+        ? create(DurationSchema, { seconds: BigInt(state.metadata.scheduledDuration) })
+        : undefined,
       createTime: state.timestamps.createTime ? timestampFromDate(state.timestamps.createTime) : undefined,
       updateTime: state.timestamps.updateTime ? timestampFromDate(state.timestamps.updateTime) : undefined,
     });
@@ -135,6 +151,8 @@ export const memoService = {
         attachments: memo.attachments,
         relations: memo.relations,
         location: memo.location,
+        scheduledTime: memo.scheduledTime ? timestampDate(memo.scheduledTime) : undefined,
+        scheduledDuration: memo.scheduledDuration ? Number(memo.scheduledDuration.seconds) : undefined,
       },
       timestamps: {
         createTime: memo.createTime ? timestampDate(memo.createTime) : undefined,

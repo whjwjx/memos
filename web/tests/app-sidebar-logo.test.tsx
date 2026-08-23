@@ -148,7 +148,7 @@ describe("App sidebar logo", () => {
     expect(logo).toHaveAttribute("href", "/");
     fireEvent.click(screen.getByRole("button", { name: "editor.new-memo" }));
     expect(globalEditorState.openEditor).toHaveBeenCalledOnce();
-    expect(screen.queryByText("common.calendar")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "common.calendar" })).toHaveAttribute("href", "/calendar");
   });
 
   it("hides Compose when the composer reports it is not available", () => {

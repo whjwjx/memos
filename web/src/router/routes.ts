@@ -2,6 +2,7 @@ export const ROUTES = {
   HOME: "/",
   ABOUT: "/about",
   ATTACHMENTS: "/attachments",
+  CALENDAR: "/calendar",
   INBOX: "/inbox",
   ARCHIVED: "/archived",
   VIEWS: "/views",

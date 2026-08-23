@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   ArrowRightIcon,
   BellIcon,
+  CalendarDaysIcon,
   ChevronDownIcon,
   EarthIcon,
   FileAudioIcon,
@@ -497,6 +498,13 @@ const GlobalNavigation = () => {
 
   const items: GlobalNavItem[] = currentUser
     ? [
+        {
+          id: "calendar",
+          label: t("common.calendar"),
+          path: ROUTES.CALENDAR,
+          icon: CalendarDaysIcon,
+          active: location.pathname === ROUTES.CALENDAR,
+        },
         {
           id: "attachments",
           label: t("common.attachments"),

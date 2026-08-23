@@ -16,6 +16,7 @@ const mockState = vi.hoisted(() => ({
   toggleBlurVisibility: vi.fn(),
 }));
 
+vi.mock("@/i18n", () => ({ default: { language: "en" } }));
 vi.mock("@/utils/i18n", () => ({
   useTranslate: () => (key: string) => key,
 }));

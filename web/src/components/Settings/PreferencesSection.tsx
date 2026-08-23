@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { useMemo } from "react";
+import ActiveHoursSetting from "@/components/CalendarView/ActiveHoursSetting";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,6 +81,17 @@ const PreferencesSection = () => {
     );
   };
 
+  const handleCalendarRangeChange = (calendarDayStart: number, calendarDayEnd: number) => {
+    updateUserGeneralSetting(
+      { generalSetting: { calendarDayStart, calendarDayEnd }, updateMask: ["calendar_day_start", "calendar_day_end"] },
+      {
+        onSuccess: () => {
+          refetchSettings();
+        },
+      },
+    );
+  };
+
   // Provide default values if setting is not loaded yet
   const setting: UserSetting_GeneralSetting =
     generalSetting ||
@@ -152,6 +164,42 @@ const PreferencesSection = () => {
               checked={setting.saveMediaMetadata}
               disabled={isUpdatingGeneralSetting}
               onCheckedChange={handleSaveMediaMetadataChange}
+            />
+          </SettingListItem>
+        </SettingList>
+      </SettingGroup>
+
+      <SettingGroup title={t("setting.preference.calendar-title")} description={t("setting.preference.calendar-description")} showSeparator>
+        <SettingList>
+          <SettingListItem
+            label={t("setting.preference.calendar-day-range")}
+            description={t("setting.preference.calendar-day-range-description")}
+          >
+            <ActiveHoursSetting
+              dayStartMin={setting.calendarDayStart ?? 0}
+              dayEndMin={setting.calendarDayEnd ?? 1440}
+              disabled={isUpdatingGeneralSetting}
+              onStartChange={(calendarDayStart) =>
+                updateUserGeneralSetting(
+                  { generalSetting: { calendarDayStart }, updateMask: ["calendar_day_start"] },
+                  {
+                    onSuccess: () => {
+                      refetchSettings();
+                    },
+                  },
+                )
+              }
+              onEndChange={(calendarDayEnd) =>
+                updateUserGeneralSetting(
+                  { generalSetting: { calendarDayEnd }, updateMask: ["calendar_day_end"] },
+                  {
+                    onSuccess: () => {
+                      refetchSettings();
+                    },
+                  },
+                )
+              }
+              onRangeChange={handleCalendarRangeChange}
             />
           </SettingListItem>
         </SettingList>

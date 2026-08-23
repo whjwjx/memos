@@ -50,6 +50,10 @@ type Memo struct {
 	Pinned     bool
 	Payload    *storepb.MemoPayload
 
+	// Schedule fields. Both are Unix epoch seconds and nullable; nil means unset.
+	ScheduledTime     *int64
+	ScheduledDuration *int64
+
 	// Composed fields
 	ParentUID *string
 }
@@ -100,6 +104,14 @@ type UpdateMemo struct {
 	Visibility *Visibility
 	Pinned     *bool
 	Payload    *storepb.MemoPayload
+
+	// Schedule fields. ScheduledTime/ScheduledDuration are set when non-nil.
+	// ClearScheduledTime/ClearScheduledDuration force the column to NULL (clear
+	// the schedule) and take precedence over the corresponding value pointer.
+	ScheduledTime          *int64
+	ScheduledDuration      *int64
+	ClearScheduledTime     bool
+	ClearScheduledDuration bool
 }
 
 type DeleteMemo struct {

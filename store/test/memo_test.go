@@ -476,3 +476,75 @@ func TestMemoWithPayload(t *testing.T) {
 
 	ts.Close()
 }
+
+func TestMemoScheduledFields(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ts := NewTestingStore(ctx, t)
+	user, err := createTestingHostUser(ctx, ts)
+	require.NoError(t, err)
+
+	scheduledTime := int64(1755900000)
+	scheduledDuration := int64(3600)
+
+	// Create a memo with schedule.
+	memo, err := ts.CreateMemo(ctx, &store.Memo{
+		UID:               "scheduled-memo",
+		CreatorID:         user.ID,
+		Content:           "scheduled content",
+		Visibility:        store.Public,
+		ScheduledTime:     &scheduledTime,
+		ScheduledDuration: &scheduledDuration,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, memo.ScheduledTime)
+	require.Equal(t, scheduledTime, *memo.ScheduledTime)
+	require.NotNil(t, memo.ScheduledDuration)
+	require.Equal(t, scheduledDuration, *memo.ScheduledDuration)
+
+	// Read back via GetMemo.
+	got, err := ts.GetMemo(ctx, &store.FindMemo{ID: &memo.ID})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.NotNil(t, got.ScheduledTime)
+	require.Equal(t, scheduledTime, *got.ScheduledTime)
+	require.NotNil(t, got.ScheduledDuration)
+	require.Equal(t, scheduledDuration, *got.ScheduledDuration)
+
+	// Read back via ListMemos.
+	memoList, err := ts.ListMemos(ctx, &store.FindMemo{CreatorID: &user.ID})
+	require.NoError(t, err)
+	require.Len(t, memoList, 1)
+	require.NotNil(t, memoList[0].ScheduledTime)
+	require.Equal(t, scheduledTime, *memoList[0].ScheduledTime)
+
+	// Update the schedule.
+	newTime := int64(1755986400)
+	newDuration := int64(1800)
+	err = ts.UpdateMemo(ctx, &store.UpdateMemo{
+		ID:                memo.ID,
+		ScheduledTime:     &newTime,
+		ScheduledDuration: &newDuration,
+	})
+	require.NoError(t, err)
+	got, err = ts.GetMemo(ctx, &store.FindMemo{ID: &memo.ID})
+	require.NoError(t, err)
+	require.NotNil(t, got.ScheduledTime)
+	require.Equal(t, newTime, *got.ScheduledTime)
+	require.NotNil(t, got.ScheduledDuration)
+	require.Equal(t, newDuration, *got.ScheduledDuration)
+
+	// Clear the schedule.
+	err = ts.UpdateMemo(ctx, &store.UpdateMemo{
+		ID:                     memo.ID,
+		ClearScheduledTime:     true,
+		ClearScheduledDuration: true,
+	})
+	require.NoError(t, err)
+	got, err = ts.GetMemo(ctx, &store.FindMemo{ID: &memo.ID})
+	require.NoError(t, err)
+	require.Nil(t, got.ScheduledTime)
+	require.Nil(t, got.ScheduledDuration)
+
+	ts.Close()
+}

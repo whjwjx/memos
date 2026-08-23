@@ -12,6 +12,7 @@ import { MemoReactionListView } from "../../MemoReactionListView";
 import { useMemoHandlers } from "../hooks";
 import { useMemoViewContext } from "../MemoViewContext";
 import type { MemoBodyProps } from "../types";
+import MemoScheduleDisplay from "./MemoScheduleDisplay";
 
 const BlurOverlay: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
   const t = useTranslate();
@@ -53,6 +54,7 @@ const MemoBody: React.FC<MemoBodyProps> = ({ compact }) => {
       >
         {/* Compact bounds the whole body — attachments included — behind one Show more.
             Reactions stay outside so they never hide under the fade. */}
+        <MemoScheduleDisplay />
         <ClampedSection enabled={Boolean(compact)}>
           <MemoContent
             memoName={memo.name}

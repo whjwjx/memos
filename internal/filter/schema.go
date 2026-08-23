@@ -150,6 +150,18 @@ func NewSchema() Schema {
 				DialectSQLite:   "%s",
 			},
 		},
+		"scheduled_ts": {
+			Name:   "scheduled_ts",
+			Kind:   FieldKindScalar,
+			Type:   FieldTypeTimestamp,
+			Column: Column{Table: "memo", Name: "scheduled_time"},
+			// scheduled_time is stored as BIGINT (epoch) across all three dialects.
+			Expressions: map[DialectName]string{
+				DialectMySQL:    "%s",
+				DialectPostgres: "%s",
+				DialectSQLite:   "%s",
+			},
+		},
 		"pinned": {
 			Name:        "pinned",
 			Kind:        FieldKindBoolColumn,
@@ -248,6 +260,7 @@ func NewSchema() Schema {
 		cel.Variable("creator_id", cel.IntType),
 		cel.Variable("created_ts", cel.TimestampType),
 		cel.Variable("updated_ts", cel.TimestampType),
+		cel.Variable("scheduled_ts", cel.TimestampType),
 		cel.Variable("pinned", cel.BoolType),
 		cel.Variable("tag", cel.StringType),
 		cel.Variable("tags", cel.ListType(cel.StringType)),

@@ -17,6 +17,7 @@ const AdminSignIn = lazyWithReload(() => import("@/pages/AdminSignIn"));
 const About = lazyWithReload(() => import("@/pages/About"));
 const Archived = lazyWithReload(() => import("@/pages/Archived"));
 const AuthCallback = lazyWithReload(() => import("@/pages/AuthCallback"));
+const Calendar = lazyWithReload(() => import("@/pages/Calendar"));
 const Explore = lazyWithReload(() => import("@/pages/Explore"));
 const Home = lazyWithReload(() => import("@/pages/Home"));
 const Inboxes = lazyWithReload(() => import("@/pages/Inboxes"));
@@ -106,6 +107,7 @@ export const routeConfig: RouteObject[] = [
                 element: <RequireFullInitializationRoute />,
                 children: [
                   { path: Routes.ATTACHMENTS, element: <Attachments /> },
+                  { path: Routes.CALENDAR, element: <Calendar /> },
                   { path: Routes.INBOX, element: <Inboxes /> },
                   { path: Routes.SETTING, element: <Setting /> },
                 ],

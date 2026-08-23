@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -33,6 +34,14 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 	if create.UpdatedTs != 0 {
 		fields = append(fields, "updated_ts")
 		args = append(args, create.UpdatedTs)
+	}
+	if create.ScheduledTime != nil {
+		fields = append(fields, "scheduled_time")
+		args = append(args, *create.ScheduledTime)
+	}
+	if create.ScheduledDuration != nil {
+		fields = append(fields, "scheduled_duration")
+		args = append(args, *create.ScheduledDuration)
 	}
 
 	stmt := "INSERT INTO memo (" + strings.Join(fields, ", ") + ") VALUES (" + placeholders(len(args)) + ") RETURNING id, created_ts, updated_ts, row_status"
@@ -123,6 +132,8 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		`memo.visibility AS visibility`,
 		`memo.pinned AS pinned`,
 		`memo.payload AS payload`,
+		`memo.scheduled_time AS scheduled_time`,
+		`memo.scheduled_duration AS scheduled_duration`,
 		`CASE WHEN parent_memo.uid IS NOT NULL THEN parent_memo.uid ELSE NULL END AS parent_uid`,
 	}
 	if !find.ExcludeContent {
@@ -153,6 +164,8 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 	for rows.Next() {
 		var memo store.Memo
 		var payloadBytes []byte
+		var scheduledTime sql.NullInt64
+		var scheduledDuration sql.NullInt64
 		dests := []any{
 			&memo.ID,
 			&memo.UID,
@@ -163,6 +176,8 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 			&memo.Visibility,
 			&memo.Pinned,
 			&payloadBytes,
+			&scheduledTime,
+			&scheduledDuration,
 			&memo.ParentUID,
 		}
 		if !find.ExcludeContent {
@@ -176,6 +191,12 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 			return nil, errors.Wrap(err, "failed to unmarshal payload")
 		}
 		memo.Payload = payload
+		if scheduledTime.Valid {
+			memo.ScheduledTime = &scheduledTime.Int64
+		}
+		if scheduledDuration.Valid {
+			memo.ScheduledDuration = &scheduledDuration.Int64
+		}
 		list = append(list, &memo)
 	}
 

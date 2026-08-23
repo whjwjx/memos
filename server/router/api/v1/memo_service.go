@@ -143,6 +143,17 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	if request.Memo.Location != nil {
 		create.Payload.Location = convertLocationToStore(request.Memo.Location)
 	}
+	if request.Memo.ScheduledTime != nil && request.Memo.ScheduledTime.IsValid() {
+		scheduledTs := request.Memo.ScheduledTime.AsTime().Unix()
+		create.ScheduledTime = &scheduledTs
+	}
+	if request.Memo.ScheduledDuration != nil {
+		scheduledDuration := request.Memo.ScheduledDuration.Seconds
+		if scheduledDuration <= 0 {
+			return nil, status.Errorf(codes.InvalidArgument, "scheduled_duration must be positive")
+		}
+		create.ScheduledDuration = &scheduledDuration
+	}
 
 	preparedAttachments, err := s.prepareMemoAttachments(ctx, user, create, request.Memo.Attachments)
 	if err != nil {
@@ -535,6 +546,26 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 			update.UpdatedTs = &updatedTs
 		} else if path == "display_time" {
 			return nil, status.Errorf(codes.InvalidArgument, "display_time is not supported")
+		} else if path == "scheduled_time" {
+			if request.Memo.ScheduledTime == nil {
+				update.ClearScheduledTime = true
+			} else {
+				if !request.Memo.ScheduledTime.IsValid() {
+					return nil, status.Errorf(codes.InvalidArgument, "scheduled_time is invalid")
+				}
+				scheduledTs := request.Memo.ScheduledTime.AsTime().Unix()
+				update.ScheduledTime = &scheduledTs
+			}
+		} else if path == "scheduled_duration" {
+			if request.Memo.ScheduledDuration == nil {
+				update.ClearScheduledDuration = true
+			} else {
+				scheduledDuration := request.Memo.ScheduledDuration.Seconds
+				if scheduledDuration <= 0 {
+					return nil, status.Errorf(codes.InvalidArgument, "scheduled_duration must be positive")
+				}
+				update.ScheduledDuration = &scheduledDuration
+			}
 		} else if path == "location" {
 			if nextMemo.Payload == nil {
 				nextMemo.Payload = &storepb.MemoPayload{}

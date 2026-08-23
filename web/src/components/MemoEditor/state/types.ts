@@ -14,6 +14,10 @@ export interface EditorState {
     attachments: Attachment[];
     relations: MemoRelation[];
     location?: Location;
+    /** Scheduled start time of the memo; presence means the memo is a schedule item. */
+    scheduledTime?: Date;
+    /** Scheduled duration in seconds; undefined means a point event. */
+    scheduledDuration?: number;
   };
   ui: {
     isFocusMode: boolean;
@@ -57,6 +61,8 @@ const defaultState: EditorState = {
     attachments: [],
     relations: [],
     location: undefined,
+    scheduledTime: undefined,
+    scheduledDuration: undefined,
   },
   ui: {
     isFocusMode: false,

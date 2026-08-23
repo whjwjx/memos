@@ -458,6 +458,12 @@ message UserSetting {
     string theme = 4 [(google.api.field_behavior) = OPTIONAL];
     // Whether the official client should save metadata from future media uploads.
     bool save_media_metadata = 5 [(google.api.field_behavior) = OPTIONAL];
+    // The start of the calendar day in minutes from midnight.
+    // Hours before this are hidden in the calendar week view. Defaults to 0.
+    int32 calendar_day_start = 6 [(google.api.field_behavior) = OPTIONAL];
+    // The end of the calendar day in minutes from midnight.
+    // Hours after this are hidden in the calendar week view. Defaults to 1440.
+    int32 calendar_day_end = 7 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // Tag metadata for user-specific display rules.

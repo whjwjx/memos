@@ -39,7 +39,9 @@ CREATE TABLE `memo` (
   `content` TEXT NOT NULL,
   `visibility` VARCHAR(256) NOT NULL DEFAULT 'PRIVATE',
   `pinned` BOOLEAN NOT NULL DEFAULT FALSE,
-  `payload` JSON NOT NULL
+  `payload` JSON NOT NULL,
+  `scheduled_time` BIGINT DEFAULT NULL,
+  `scheduled_duration` BIGINT DEFAULT NULL
 );
 
 -- memo_relation

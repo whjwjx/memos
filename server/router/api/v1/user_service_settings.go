@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -110,9 +111,21 @@ func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.Upda
 				updatedGeneral.Locale = incomingGeneral.Locale
 			case "save_media_metadata":
 				updatedGeneral.SaveMediaMetadata = incomingGeneral.SaveMediaMetadata
+			case "calendar_day_start":
+				updatedGeneral.CalendarDayStart = incomingGeneral.CalendarDayStart
+			case "calendar_day_end":
+				updatedGeneral.CalendarDayEnd = incomingGeneral.CalendarDayEnd
 			default:
 				// Ignore unsupported fields.
 			}
+		}
+
+		// Treat an unset day end (legacy settings predating the field) as 24:00.
+		if updatedGeneral.CalendarDayEnd == 0 {
+			updatedGeneral.CalendarDayEnd = 1440
+		}
+		if err := validateCalendarDayRange(updatedGeneral.CalendarDayStart, updatedGeneral.CalendarDayEnd); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid calendar day range: %v", err)
 		}
 
 		updatedSetting = &v1pb.UserSetting{
@@ -221,6 +234,13 @@ func (s *APIV1Service) ListUserSettings(ctx context.Context, request *v1pb.ListU
 	}
 
 	return response, nil
+}
+
+func validateCalendarDayRange(dayStart int32, dayEnd int32) error {
+	if dayStart < 0 || dayEnd < 0 || dayEnd > 1440 || dayStart >= dayEnd {
+		return errors.New("day start must be earlier than day end, both within 0-1440")
+	}
+	return nil
 }
 
 func (s *APIV1Service) authorizeUserResourceAccess(ctx context.Context, userID int32, allowAdmin bool) (*store.User, error) {

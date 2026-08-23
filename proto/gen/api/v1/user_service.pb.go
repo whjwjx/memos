@@ -3000,8 +3000,14 @@ type UserSetting_GeneralSetting struct {
 	Theme string `protobuf:"bytes,4,opt,name=theme,proto3" json:"theme,omitempty"`
 	// Whether the official client should save metadata from future media uploads.
 	SaveMediaMetadata bool `protobuf:"varint,5,opt,name=save_media_metadata,json=saveMediaMetadata,proto3" json:"save_media_metadata,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The start of the calendar day in minutes from midnight.
+	// Hours before this are hidden in the calendar week view. Defaults to 0.
+	CalendarDayStart int32 `protobuf:"varint,6,opt,name=calendar_day_start,json=calendarDayStart,proto3" json:"calendar_day_start,omitempty"`
+	// The end of the calendar day in minutes from midnight.
+	// Hours after this are hidden in the calendar week view. Defaults to 1440.
+	CalendarDayEnd int32 `protobuf:"varint,7,opt,name=calendar_day_end,json=calendarDayEnd,proto3" json:"calendar_day_end,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UserSetting_GeneralSetting) Reset() {
@@ -3060,6 +3066,20 @@ func (x *UserSetting_GeneralSetting) GetSaveMediaMetadata() bool {
 		return x.SaveMediaMetadata
 	}
 	return false
+}
+
+func (x *UserSetting_GeneralSetting) GetCalendarDayStart() int32 {
+	if x != nil {
+		return x.CalendarDayStart
+	}
+	return 0
+}
+
+func (x *UserSetting_GeneralSetting) GetCalendarDayEnd() int32 {
+	if x != nil {
+		return x.CalendarDayEnd
+	}
+	return 0
 }
 
 // Tag metadata for user-specific display rules.
@@ -3446,17 +3466,19 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x13.memos.api.v1.StateB\x03\xe0A\x01R\x05state\x12\x1b\n" +
 	"\x06filter\x18\x02 \x01(\tB\x03\xe0A\x01R\x06filter\"I\n" +
 	"\x18ListAllUserStatsResponse\x12-\n" +
-	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\xf1\a\n" +
+	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\xd3\b\n" +
 	"\vUserSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12S\n" +
 	"\x0fgeneral_setting\x18\x02 \x01(\v2(.memos.api.v1.UserSetting.GeneralSettingH\x00R\x0egeneralSetting\x12V\n" +
 	"\x10webhooks_setting\x18\x05 \x01(\v2).memos.api.v1.UserSetting.WebhooksSettingH\x00R\x0fwebhooksSetting\x12J\n" +
-	"\ftags_setting\x18\x06 \x01(\v2%.memos.api.v1.UserSetting.TagsSettingH\x00R\vtagsSetting\x1a\xab\x01\n" +
+	"\ftags_setting\x18\x06 \x01(\v2%.memos.api.v1.UserSetting.TagsSettingH\x00R\vtagsSetting\x1a\x8d\x02\n" +
 	"\x0eGeneralSetting\x12\x1b\n" +
 	"\x06locale\x18\x01 \x01(\tB\x03\xe0A\x01R\x06locale\x12,\n" +
 	"\x0fmemo_visibility\x18\x03 \x01(\tB\x03\xe0A\x01R\x0ememoVisibility\x12\x19\n" +
 	"\x05theme\x18\x04 \x01(\tB\x03\xe0A\x01R\x05theme\x123\n" +
-	"\x13save_media_metadata\x18\x05 \x01(\bB\x03\xe0A\x01R\x11saveMediaMetadata\x1ay\n" +
+	"\x13save_media_metadata\x18\x05 \x01(\bB\x03\xe0A\x01R\x11saveMediaMetadata\x121\n" +
+	"\x12calendar_day_start\x18\x06 \x01(\x05B\x03\xe0A\x01R\x10calendarDayStart\x12-\n" +
+	"\x10calendar_day_end\x18\a \x01(\x05B\x03\xe0A\x01R\x0ecalendarDayEnd\x1ay\n" +
 	"\vTagMetadata\x12B\n" +
 	"\x10background_color\x18\x01 \x01(\v2\x12.google.type.ColorB\x03\xe0A\x01R\x0fbackgroundColor\x12&\n" +
 	"\fblur_content\x18\x02 \x01(\bB\x03\xe0A\x01R\vblurContent\x1a\xb7\x01\n" +
