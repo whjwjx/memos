@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/usememos/memos/store"
 )
 
@@ -108,7 +109,7 @@ func (d *DB) UpdateMemoTagTask(ctx context.Context, update *store.UpdateMemoTagT
 		set, args = append(set, "`due_at` = ?"), append(args, *update.DueAt)
 	}
 	if len(set) == 0 {
-		return fmt.Errorf("no fields to update in UpdateMemoTagTask")
+		return errors.New("no fields to update in UpdateMemoTagTask")
 	}
 	set = append(set, "`updated_ts` = UNIX_TIMESTAMP()")
 	args = append(args, update.ID)
