@@ -5,13 +5,15 @@ services:
       dockerfile: Dockerfile.runtime
     image: memos-ai:local
     container_name: memos
+    # 覆盖 Dockerfile 默认 CMD(--data /.memos 匿名卷)，让数据落到下方挂载的宿主目录
+    command: ["--port", "5230", "--data", "/var/opt/memos"]
     restart: unless-stopped
     # 不对外暴露端口，仅通过 vps-gateway (proxy-net) 反代
     expose:
       - "5230"
     volumes:
       # SQLite 数据持久化到宿主 ~/.memos
-      - ~/.memos:/var/opt/memos
+      - /root/.memos:/var/opt/memos
     environment:
       - MEMOS_DATA=/var/opt/memos
       - TZ=Asia/Shanghai
