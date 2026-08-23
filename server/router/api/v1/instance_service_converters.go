@@ -341,6 +341,7 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 		Providers:     make([]*v1pb.InstanceSetting_AIProviderConfig, 0, len(setting.Providers)),
 		Transcription: convertTranscriptionConfigFromStore(setting.GetTranscription()),
 		Agents:        make([]*v1pb.InstanceSetting_AgentConfig, 0, len(setting.GetAgents())),
+		Taggers:       make([]*v1pb.InstanceSetting_TaggerConfig, 0, len(setting.GetTaggers())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -372,6 +373,20 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 			MaxLength:     agent.GetMaxLength(),
 		})
 	}
+	for _, tagger := range setting.GetTaggers() {
+		if tagger == nil {
+			continue
+		}
+		aiSetting.Taggers = append(aiSetting.Taggers, &v1pb.InstanceSetting_TaggerConfig{
+			Id:         tagger.GetId(),
+			Name:       tagger.GetName(),
+			ProviderId: tagger.GetProviderId(),
+			Model:      tagger.GetModel(),
+			Prompt:     tagger.GetPrompt(),
+			Enabled:    tagger.GetEnabled(),
+			MaxTags:    tagger.GetMaxTags(),
+		})
+	}
 	return aiSetting
 }
 
@@ -384,6 +399,7 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 		Providers:     make([]*storepb.AIProviderConfig, 0, len(setting.Providers)),
 		Transcription: convertTranscriptionConfigToStore(setting.GetTranscription()),
 		Agents:        make([]*storepb.AIAgentConfig, 0, len(setting.GetAgents())),
+		Taggers:       make([]*storepb.TaggerConfig, 0, len(setting.GetTaggers())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -411,6 +427,20 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 			Enabled:       agent.GetEnabled(),
 			DelayMinutes:  agent.GetDelayMinutes(),
 			MaxLength:     agent.GetMaxLength(),
+		})
+	}
+	for _, tagger := range setting.GetTaggers() {
+		if tagger == nil {
+			continue
+		}
+		aiSetting.Taggers = append(aiSetting.Taggers, &storepb.TaggerConfig{
+			Id:         tagger.GetId(),
+			Name:       tagger.GetName(),
+			ProviderId: tagger.GetProviderId(),
+			Model:      tagger.GetModel(),
+			Prompt:     tagger.GetPrompt(),
+			Enabled:    tagger.GetEnabled(),
+			MaxTags:    tagger.GetMaxTags(),
 		})
 	}
 	return aiSetting

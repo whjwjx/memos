@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
@@ -11,9 +12,11 @@ import {
   ListChecksIcon,
   ListRestartIcon,
   MoreVerticalIcon,
+  SparklesIcon,
   TrashIcon,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +28,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { memoServiceClient } from "@/connect";
+import { useInstance } from "@/contexts/InstanceContext";
 import { State } from "@/types/proto/api/v1/common_pb";
+import { AutoTagMemoRequestSchema } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import { useMemoActionHandlers } from "./hooks";
 import type { MemoActionMenuProps } from "./types";
@@ -33,6 +39,7 @@ import type { MemoActionMenuProps } from "./types";
 const MemoActionMenu = (props: MemoActionMenuProps) => {
   const { memo, readonly } = props;
   const t = useTranslate();
+  const { aiSetting } = useInstance();
 
   // Dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -42,6 +49,17 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
   const isArchived = memo.state === State.ARCHIVED;
   const canMutateTasks = !readonly && !isArchived && Boolean(memo.property?.hasTaskList);
   const hasOpenTasks = Boolean(memo.property?.hasIncompleteTasks);
+  // The AI auto-tagging action is shown only when at least one tagger is enabled.
+  const hasEnabledTagger = aiSetting.taggers.some((tagger) => tagger.enabled && tagger.providerId);
+
+  const handleAutoTag = async () => {
+    try {
+      await memoServiceClient.autoTagMemo(create(AutoTagMemoRequestSchema, { name: memo.name }));
+      toast.success(t("memo.ai-tag-queued"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   // Action handlers
   const {
@@ -79,6 +97,12 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
               <Edit3Icon className="w-4 h-auto" />
               {t("common.edit")}
             </DropdownMenuItem>
+            {hasEnabledTagger && (
+              <DropdownMenuItem onClick={handleAutoTag}>
+                <SparklesIcon className="w-4 h-auto" />
+                {t("memo.ai-tag")}
+              </DropdownMenuItem>
+            )}
           </>
         )}
 

@@ -193,6 +193,13 @@ message InstanceAISetting {
   // Each agent is backed by a provider and a personality prompt. When empty,
   // the agent-reply feature is disabled.
   repeated AIAgentConfig agents = 3;
+
+  // taggers is the list of AI auto-tagging rules. A tagger is the tagging
+  // capability instance of the Agent system: it is backed by a provider and a
+  // tagging prompt, and applies #tags to memos. Configured instance-wide by an
+  // admin; regular users only consume them. When empty, the auto-tagging
+  // feature is disabled.
+  repeated TaggerConfig taggers = 4;
 }
 
 // AIAgentConfig describes an AI persona that posts comment-style replies to
@@ -223,6 +230,31 @@ message AIAgentConfig {
   // max_length caps the generated reply length (in characters) sent to the
   // model as a soft limit. 0 means the model default is used.
   int32 max_length = 9;
+}
+
+// TaggerConfig describes an AI auto-tagging rule. It is the tagging capability
+// instance of the Agent system: an admin configures taggers instance-wide and
+// regular users only consume them (their memos get auto-tagged). Tagging is
+// additive — applied tags are appended to the memo content and never overwrite
+// user-authored tags.
+message TaggerConfig {
+  // id is the stable identifier of the tagger (uuid).
+  string id = 1;
+  // name is the human-readable name shown in the admin UI.
+  string name = 2;
+  // provider_id references an entry in InstanceAISetting.providers[].id.
+  // Empty string means the tagger is disabled.
+  string provider_id = 3;
+  // model is the provider-specific text-generation model identifier.
+  // Empty string falls back to the engine default.
+  string model = 4;
+  // prompt is the tagging spec: the candidate tag list and selection rules.
+  // This is where the tag taxonomy is delivered to the AI.
+  string prompt = 5;
+  // enabled toggles whether the tagger acts on new or triggered memos.
+  bool enabled = 6;
+  // max_tags caps how many tags are applied per memo (default 3, 0 = default).
+  int32 max_tags = 7;
 }
 
 message AIProviderConfig {

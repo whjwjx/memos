@@ -185,6 +185,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	// the memo is itself an agent reply comment to avoid an infinite loop.
 	if !isAgentSchedulingSuppressed(ctx) {
 		s.scheduleAgentRepliesForMemo(ctx, memo.ID)
+		s.scheduleAutoTagForMemo(ctx, memo.ID)
 	}
 
 	attachments := []*store.Attachment{}
@@ -450,6 +451,57 @@ func (s *APIV1Service) GetMemo(ctx context.Context, request *v1pb.GetMemoRequest
 		memoMessage.Visibility = convertVisibilityFromStore(parent.Visibility)
 	}
 	return memoMessage, nil
+}
+
+// AutoTagMemo enqueues AI auto-tagging tasks for a memo. Callers must be the
+// memo creator or an admin. When no tagger is enabled instance-wide the request
+// is rejected so the client can hide the action.
+func (s *APIV1Service) AutoTagMemo(ctx context.Context, request *v1pb.AutoTagMemoRequest) (*v1pb.AutoTagMemoResponse, error) {
+	memoUID, err := ExtractMemoUIDFromName(request.Name)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
+	}
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get memo: %v", err)
+	}
+	if memo == nil {
+		return nil, status.Errorf(codes.NotFound, "memo not found")
+	}
+
+	user, err := s.fetchCurrentUser(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get current user")
+	}
+	if user == nil {
+		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
+	}
+	// Only the creator or admin may trigger tagging on a memo.
+	if memo.CreatorID != user.ID && !isSuperUser(user) {
+		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
+	}
+
+	setting, err := s.Store.GetInstanceAISetting(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get instance AI setting: %v", err)
+	}
+	hasEnabledTagger := false
+	if setting != nil {
+		for _, tagger := range setting.GetTaggers() {
+			if tagger.GetEnabled() && tagger.GetProviderId() != "" {
+				hasEnabledTagger = true
+				break
+			}
+		}
+	}
+	if !hasEnabledTagger {
+		return nil, status.Errorf(codes.FailedPrecondition, "AI auto-tagging is not enabled")
+	}
+
+	// Queue tasks for all enabled taggers (best-effort, like creation-time
+	// scheduling). The poller applies them shortly after.
+	s.scheduleAutoTagForMemo(ctx, memo.ID)
+	return &v1pb.AutoTagMemoResponse{}, nil
 }
 
 // UpdateMemo updates an existing memo.

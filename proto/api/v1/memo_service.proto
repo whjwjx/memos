@@ -87,6 +87,17 @@ service MemoService {
     };
     option (google.api.method_signature) = "name,comment";
   }
+  // AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by
+  // every enabled tagger configured instance-wide. Requires authentication as
+  // the memo creator, or admin privileges. No-op (rejected) when no tagger is
+  // enabled, or when the memo is readonly/archived.
+  rpc AutoTagMemo(AutoTagMemoRequest) returns (AutoTagMemoResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/{name=memos/*}:autoTag"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
+  }
   // ListMemoComments lists comments for a memo.
   rpc ListMemoComments(ListMemoCommentsRequest) returns (ListMemoCommentsResponse) {
     option (google.api.http) = {get: "/api/v1/{name=memos/*}/comments"};
@@ -504,6 +515,17 @@ message CreateMemoCommentRequest {
   // Optional. The comment ID to use.
   string comment_id = 3 [(google.api.field_behavior) = OPTIONAL];
 }
+
+message AutoTagMemoRequest {
+  // Required. The resource name of the memo to auto-tag.
+  // Format: memos/{memo}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "memos.api.v1/Memo"}
+  ];
+}
+
+message AutoTagMemoResponse {}
 
 message ListMemoCommentsRequest {
   // Required. The resource name of the memo.

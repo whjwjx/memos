@@ -1218,6 +1218,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/memos/{memo}:autoTag:
+        post:
+            tags:
+                - MemoService
+            description: "AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by\r\n every enabled tagger configured instance-wide. Requires authentication as\r\n the memo creator, or admin privileges. No-op (rejected) when no tagger is\r\n enabled, or when the memo is readonly/archived."
+            operationId: MemoService_AutoTagMemo
+            parameters:
+                - name: memo
+                  in: path
+                  description: The memo id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AutoTagMemoRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AutoTagMemoResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/shares/{shareToken}/memo:
         get:
             tags:
@@ -2319,6 +2351,17 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/MediaMetadata'
                     description: Optional. Immutable normalized media metadata explicitly supplied by the client at creation time.
+        AutoTagMemoRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: "Required. The resource name of the memo to auto-tag.\r\n Format: memos/{memo}"
+        AutoTagMemoResponse:
+            type: object
+            properties: {}
         BatchDeleteAttachmentsRequest:
             required:
                 - names
@@ -2745,6 +2788,11 @@ components:
                     items:
                         $ref: '#/components/schemas/InstanceSetting_AgentConfig'
                     description: agents is the list of AI agents that can automatically reply to memos.
+                taggers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/InstanceSetting_TaggerConfig'
+                    description: "taggers is the list of AI auto-tagging rules. A tagger is the tagging\r\n capability instance of the Agent system, applied instance-wide by an\r\n admin. When empty, the auto-tagging feature is disabled."
             description: AI provider configuration settings.
         InstanceSetting_AgentConfig:
             type: object
@@ -2893,6 +2941,32 @@ components:
                     type: boolean
                     description: Whether memos with this tag should have their content blurred.
             description: Metadata for a tag.
+        InstanceSetting_TaggerConfig:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: id is the stable identifier of the tagger (uuid).
+                name:
+                    type: string
+                    description: name is the human-readable name shown in the admin UI.
+                providerId:
+                    type: string
+                    description: provider_id references an entry in AISetting.providers[].id.
+                model:
+                    type: string
+                    description: model is the provider-specific text-generation model identifier.
+                prompt:
+                    type: string
+                    description: 'prompt is the tagging spec: the candidate tag list and selection rules.'
+                enabled:
+                    type: boolean
+                    description: enabled toggles whether the tagger acts on new or triggered memos.
+                maxTags:
+                    type: integer
+                    description: max_tags caps how many tags are applied per memo (default 3, 0 = default).
+                    format: int32
+            description: "TaggerConfig describes an AI auto-tagging rule. It is the tagging\r\n capability instance of the Agent system, configured instance-wide by an\r\n admin; regular users only consume them. Configured taggers apply #tags to\r\n memos additively without overwriting user-authored tags."
         InstanceSetting_TagsSetting:
             type: object
             properties:

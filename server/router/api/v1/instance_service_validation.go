@@ -90,6 +90,44 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 	if err := preparePersistedAgentConfigs(setting, existing, existingProviders); err != nil {
 		return err
 	}
+	if err := preparePersistedTaggerConfigs(setting, existingProviders); err != nil {
+		return err
+	}
+	return nil
+}
+
+func preparePersistedTaggerConfigs(setting *storepb.InstanceAISetting, existingProviders map[string]*storepb.AIProviderConfig) error {
+	taggerIDs := map[string]bool{}
+	for _, tagger := range setting.GetTaggers() {
+		if tagger == nil {
+			return errors.New("tagger cannot be nil")
+		}
+
+		tagger.Id = strings.TrimSpace(tagger.Id)
+		if tagger.Id == "" {
+			tagger.Id = shortuuid.New()
+		}
+		if taggerIDs[tagger.Id] {
+			return errors.Errorf("duplicate tagger ID %q", tagger.Id)
+		}
+		taggerIDs[tagger.Id] = true
+
+		tagger.Name = strings.TrimSpace(tagger.Name)
+		if tagger.Name == "" {
+			return errors.New("tagger name is required")
+		}
+
+		tagger.ProviderId = strings.TrimSpace(tagger.ProviderId)
+		if tagger.ProviderId != "" {
+			if _, ok := existingProviders[tagger.ProviderId]; !ok {
+				return errors.Errorf("tagger %q references unknown provider_id %q", tagger.Id, tagger.ProviderId)
+			}
+		}
+
+		if tagger.MaxTags < 0 {
+			return errors.Errorf("tagger %q max_tags must be >= 0", tagger.Id)
+		}
+	}
 	return nil
 }
 

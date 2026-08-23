@@ -90,4 +90,9 @@ type Driver interface {
 	UpsertAgentReplyTask(ctx context.Context, create *CreateAgentReplyTask) (*AgentReplyTask, error)
 	ListAgentReplyTasks(ctx context.Context, find *FindAgentReplyTask) ([]*AgentReplyTask, error)
 	UpdateAgentReplyTask(ctx context.Context, update *UpdateAgentReplyTask) error
+
+	// MemoTagTask model related methods.
+	UpsertMemoTagTask(ctx context.Context, create *CreateMemoTagTask) (*MemoTagTask, error)
+	ListMemoTagTasks(ctx context.Context, find *FindMemoTagTask) ([]*MemoTagTask, error)
+	UpdateMemoTagTask(ctx context.Context, update *UpdateMemoTagTask) error
 }

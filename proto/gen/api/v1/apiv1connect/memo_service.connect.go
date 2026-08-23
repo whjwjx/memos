@@ -59,6 +59,8 @@ const (
 	// MemoServiceCreateMemoCommentProcedure is the fully-qualified name of the MemoService's
 	// CreateMemoComment RPC.
 	MemoServiceCreateMemoCommentProcedure = "/memos.api.v1.MemoService/CreateMemoComment"
+	// MemoServiceAutoTagMemoProcedure is the fully-qualified name of the MemoService's AutoTagMemo RPC.
+	MemoServiceAutoTagMemoProcedure = "/memos.api.v1.MemoService/AutoTagMemo"
 	// MemoServiceListMemoCommentsProcedure is the fully-qualified name of the MemoService's
 	// ListMemoComments RPC.
 	MemoServiceListMemoCommentsProcedure = "/memos.api.v1.MemoService/ListMemoComments"
@@ -119,6 +121,11 @@ type MemoServiceClient interface {
 	ListMemoRelations(context.Context, *connect.Request[v1.ListMemoRelationsRequest]) (*connect.Response[v1.ListMemoRelationsResponse], error)
 	// CreateMemoComment creates a comment for a memo.
 	CreateMemoComment(context.Context, *connect.Request[v1.CreateMemoCommentRequest]) (*connect.Response[v1.Memo], error)
+	// AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by
+	// every enabled tagger configured instance-wide. Requires authentication as
+	// the memo creator, or admin privileges. No-op (rejected) when no tagger is
+	// enabled, or when the memo is readonly/archived.
+	AutoTagMemo(context.Context, *connect.Request[v1.AutoTagMemoRequest]) (*connect.Response[v1.AutoTagMemoResponse], error)
 	// ListMemoComments lists comments for a memo.
 	ListMemoComments(context.Context, *connect.Request[v1.ListMemoCommentsRequest]) (*connect.Response[v1.ListMemoCommentsResponse], error)
 	// ListMemoReactions lists reactions for a memo.
@@ -213,6 +220,12 @@ func NewMemoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(memoServiceMethods.ByName("CreateMemoComment")),
 			connect.WithClientOptions(opts...),
 		),
+		autoTagMemo: connect.NewClient[v1.AutoTagMemoRequest, v1.AutoTagMemoResponse](
+			httpClient,
+			baseURL+MemoServiceAutoTagMemoProcedure,
+			connect.WithSchema(memoServiceMethods.ByName("AutoTagMemo")),
+			connect.WithClientOptions(opts...),
+		),
 		listMemoComments: connect.NewClient[v1.ListMemoCommentsRequest, v1.ListMemoCommentsResponse](
 			httpClient,
 			baseURL+MemoServiceListMemoCommentsProcedure,
@@ -288,6 +301,7 @@ type memoServiceClient struct {
 	setMemoRelations     *connect.Client[v1.SetMemoRelationsRequest, emptypb.Empty]
 	listMemoRelations    *connect.Client[v1.ListMemoRelationsRequest, v1.ListMemoRelationsResponse]
 	createMemoComment    *connect.Client[v1.CreateMemoCommentRequest, v1.Memo]
+	autoTagMemo          *connect.Client[v1.AutoTagMemoRequest, v1.AutoTagMemoResponse]
 	listMemoComments     *connect.Client[v1.ListMemoCommentsRequest, v1.ListMemoCommentsResponse]
 	listMemoReactions    *connect.Client[v1.ListMemoReactionsRequest, v1.ListMemoReactionsResponse]
 	upsertMemoReaction   *connect.Client[v1.UpsertMemoReactionRequest, v1.Reaction]
@@ -348,6 +362,11 @@ func (c *memoServiceClient) ListMemoRelations(ctx context.Context, req *connect.
 // CreateMemoComment calls memos.api.v1.MemoService.CreateMemoComment.
 func (c *memoServiceClient) CreateMemoComment(ctx context.Context, req *connect.Request[v1.CreateMemoCommentRequest]) (*connect.Response[v1.Memo], error) {
 	return c.createMemoComment.CallUnary(ctx, req)
+}
+
+// AutoTagMemo calls memos.api.v1.MemoService.AutoTagMemo.
+func (c *memoServiceClient) AutoTagMemo(ctx context.Context, req *connect.Request[v1.AutoTagMemoRequest]) (*connect.Response[v1.AutoTagMemoResponse], error) {
+	return c.autoTagMemo.CallUnary(ctx, req)
 }
 
 // ListMemoComments calls memos.api.v1.MemoService.ListMemoComments.
@@ -428,6 +447,11 @@ type MemoServiceHandler interface {
 	ListMemoRelations(context.Context, *connect.Request[v1.ListMemoRelationsRequest]) (*connect.Response[v1.ListMemoRelationsResponse], error)
 	// CreateMemoComment creates a comment for a memo.
 	CreateMemoComment(context.Context, *connect.Request[v1.CreateMemoCommentRequest]) (*connect.Response[v1.Memo], error)
+	// AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by
+	// every enabled tagger configured instance-wide. Requires authentication as
+	// the memo creator, or admin privileges. No-op (rejected) when no tagger is
+	// enabled, or when the memo is readonly/archived.
+	AutoTagMemo(context.Context, *connect.Request[v1.AutoTagMemoRequest]) (*connect.Response[v1.AutoTagMemoResponse], error)
 	// ListMemoComments lists comments for a memo.
 	ListMemoComments(context.Context, *connect.Request[v1.ListMemoCommentsRequest]) (*connect.Response[v1.ListMemoCommentsResponse], error)
 	// ListMemoReactions lists reactions for a memo.
@@ -518,6 +542,12 @@ func NewMemoServiceHandler(svc MemoServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(memoServiceMethods.ByName("CreateMemoComment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	memoServiceAutoTagMemoHandler := connect.NewUnaryHandler(
+		MemoServiceAutoTagMemoProcedure,
+		svc.AutoTagMemo,
+		connect.WithSchema(memoServiceMethods.ByName("AutoTagMemo")),
+		connect.WithHandlerOptions(opts...),
+	)
 	memoServiceListMemoCommentsHandler := connect.NewUnaryHandler(
 		MemoServiceListMemoCommentsProcedure,
 		svc.ListMemoComments,
@@ -600,6 +630,8 @@ func NewMemoServiceHandler(svc MemoServiceHandler, opts ...connect.HandlerOption
 			memoServiceListMemoRelationsHandler.ServeHTTP(w, r)
 		case MemoServiceCreateMemoCommentProcedure:
 			memoServiceCreateMemoCommentHandler.ServeHTTP(w, r)
+		case MemoServiceAutoTagMemoProcedure:
+			memoServiceAutoTagMemoHandler.ServeHTTP(w, r)
 		case MemoServiceListMemoCommentsProcedure:
 			memoServiceListMemoCommentsHandler.ServeHTTP(w, r)
 		case MemoServiceListMemoReactionsProcedure:
@@ -667,6 +699,10 @@ func (UnimplementedMemoServiceHandler) ListMemoRelations(context.Context, *conne
 
 func (UnimplementedMemoServiceHandler) CreateMemoComment(context.Context, *connect.Request[v1.CreateMemoCommentRequest]) (*connect.Response[v1.Memo], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.CreateMemoComment is not implemented"))
+}
+
+func (UnimplementedMemoServiceHandler) AutoTagMemo(context.Context, *connect.Request[v1.AutoTagMemoRequest]) (*connect.Response[v1.AutoTagMemoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.AutoTagMemo is not implemented"))
 }
 
 func (UnimplementedMemoServiceHandler) ListMemoComments(context.Context, *connect.Request[v1.ListMemoCommentsRequest]) (*connect.Response[v1.ListMemoCommentsResponse], error) {

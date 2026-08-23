@@ -383,6 +383,14 @@ func (s *ConnectServiceHandler) CreateMemoComment(ctx context.Context, req *conn
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) AutoTagMemo(ctx context.Context, req *connect.Request[v1pb.AutoTagMemoRequest]) (*connect.Response[v1pb.AutoTagMemoResponse], error) {
+	resp, err := s.APIV1Service.AutoTagMemo(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 func (s *ConnectServiceHandler) ListMemoComments(ctx context.Context, req *connect.Request[v1pb.ListMemoCommentsRequest]) (*connect.Response[v1pb.ListMemoCommentsResponse], error) {
 	resp, err := s.APIV1Service.ListMemoComments(ctx, req.Msg)
 	if err != nil {
