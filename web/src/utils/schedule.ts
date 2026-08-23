@@ -7,6 +7,11 @@ export interface ScheduleTimeRange {
   end?: Date;
 }
 
+export interface ScheduledItem {
+  memo: Memo;
+  range: ScheduleTimeRange;
+}
+
 export const getScheduleTimeRange = (memo: Memo): ScheduleTimeRange | undefined => {
   if (!memo.scheduledTime) {
     return undefined;
