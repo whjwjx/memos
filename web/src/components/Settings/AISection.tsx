@@ -4,7 +4,6 @@ import { MoreVerticalIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { v4 as uuidv4 } from "uuid";
-import { aiServiceClient } from "@/connect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { aiServiceClient } from "@/connect";
 import { useInstance } from "@/contexts/InstanceContext";
+import { TestAIProviderRequestSchema } from "@/types/proto/api/v1/ai_service_pb";
 import {
   InstanceSetting_AgentConfig,
   InstanceSetting_AgentConfigSchema,
@@ -22,11 +23,12 @@ import {
   InstanceSetting_AIProviderType,
   InstanceSetting_AISettingSchema,
   InstanceSetting_Key,
+  InstanceSetting_TaggerConfig,
+  InstanceSetting_TaggerConfigSchema,
   InstanceSetting_TranscriptionConfig,
   InstanceSetting_TranscriptionConfigSchema,
   InstanceSettingSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
-import { TestAIProviderRequestSchema } from "@/types/proto/api/v1/ai_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import SettingGroup from "./SettingGroup";
 import { SettingPanel } from "./SettingList";
@@ -137,6 +139,47 @@ const toAgentConfig = (agent: LocalAgent) =>
     maxLength: agent.maxLength,
   });
 
+type LocalTagger = {
+  id: string;
+  name: string;
+  providerId: string;
+  model: string;
+  prompt: string;
+  enabled: boolean;
+  maxTags: number;
+};
+
+const toLocalTagger = (tagger: InstanceSetting_TaggerConfig): LocalTagger => ({
+  id: tagger.id,
+  name: tagger.name,
+  providerId: tagger.providerId,
+  model: tagger.model,
+  prompt: tagger.prompt,
+  enabled: tagger.enabled,
+  maxTags: tagger.maxTags,
+});
+
+const newTagger = (): LocalTagger => ({
+  id: uuidv4(),
+  name: "",
+  providerId: "",
+  model: "",
+  prompt: "",
+  enabled: false,
+  maxTags: 3,
+});
+
+const toTaggerConfig = (tagger: LocalTagger) =>
+  create(InstanceSetting_TaggerConfigSchema, {
+    id: tagger.id,
+    name: tagger.name.trim(),
+    providerId: tagger.providerId,
+    model: tagger.model.trim(),
+    prompt: tagger.prompt,
+    enabled: tagger.enabled,
+    maxTags: tagger.maxTags,
+  });
+
 const toProviderConfig = (provider: LocalAIProvider) =>
   create(InstanceSetting_AIProviderConfigSchema, {
     id: provider.id,
@@ -161,10 +204,13 @@ const AISection = () => {
   const [providers, setProviders] = useState<LocalAIProvider[]>(() => originalSetting.providers.map(toLocalProvider));
   const [transcription, setTranscription] = useState<LocalTranscription>(() => toLocalTranscription(originalSetting.transcription));
   const [agents, setAgents] = useState<LocalAgent[]>(() => originalSetting.agents.map(toLocalAgent));
+  const [taggers, setTaggers] = useState<LocalTagger[]>(() => originalSetting.taggers.map(toLocalTagger));
   const [editingProvider, setEditingProvider] = useState<LocalAIProvider | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<LocalAIProvider | undefined>();
   const [editingAgent, setEditingAgent] = useState<LocalAgent | undefined>();
   const [deleteAgentTarget, setDeleteAgentTarget] = useState<LocalAgent | undefined>();
+  const [editingTagger, setEditingTagger] = useState<LocalTagger | undefined>();
+  const [deleteTaggerTarget, setDeleteTaggerTarget] = useState<LocalTagger | undefined>();
 
   useEffect(() => {
     setProviders(originalSetting.providers.map(toLocalProvider));
@@ -173,6 +219,10 @@ const AISection = () => {
   useEffect(() => {
     setAgents(originalSetting.agents.map(toLocalAgent));
   }, [originalSetting.agents]);
+
+  useEffect(() => {
+    setTaggers(originalSetting.taggers.map(toLocalTagger));
+  }, [originalSetting.taggers]);
 
   // Only re-sync the transcription draft when the server-side content actually
   // changes — not on every originalSetting identity change. This prevents
@@ -196,12 +246,14 @@ const AISection = () => {
   );
 
   // Persists the AI setting using a specific providers list, transcription
-  // value, and agents list. Provider/transcription operations pass the current
-  // agents so an in-progress agent draft is never accidentally committed.
+  // value, agents list, and taggers list. Provider/transcription/agent
+  // operations pass the current taggers so an in-progress tagger draft is never
+  // accidentally committed.
   const persistAISetting = async (
     nextProviders: LocalAIProvider[],
     nextTranscription: InstanceSetting_TranscriptionConfig | undefined,
     nextAgents: LocalAgent[],
+    nextTaggers: LocalTagger[],
     errorContext: string,
   ) => {
     return saveInstanceSetting({
@@ -214,6 +266,7 @@ const AISection = () => {
             providers: nextProviders.map(toProviderConfig),
             transcription: nextTranscription,
             agents: nextAgents.map(toAgentConfig),
+            taggers: nextTaggers.map(toTaggerConfig),
           }),
         },
       }),
@@ -248,7 +301,7 @@ const AISection = () => {
       ? providers.map((item) => (item.id === normalizedProvider.id ? normalizedProvider : item))
       : [...providers, normalizedProvider];
 
-    const ok = await persistAISetting(nextProviders, originalSetting.transcription, agents, "Update AI provider");
+    const ok = await persistAISetting(nextProviders, originalSetting.transcription, agents, taggers, "Update AI provider");
     if (!ok) return;
     setProviders(nextProviders);
     setEditingProvider(undefined);
@@ -268,7 +321,7 @@ const AISection = () => {
         ? create(InstanceSetting_TranscriptionConfigSchema, {})
         : persistedTranscription;
 
-    const ok = await persistAISetting(nextProviders, nextTranscription, agents, "Delete AI provider");
+    const ok = await persistAISetting(nextProviders, nextTranscription, agents, taggers, "Delete AI provider");
     if (!ok) return;
     setProviders(nextProviders);
     if (transcription.providerId === target.id) {
@@ -282,7 +335,7 @@ const AISection = () => {
       toast.error(t("setting.ai.transcription-empty-providers"));
       return;
     }
-    await persistAISetting(providers, toTranscriptionConfig(transcription), agents, "Update transcription");
+    await persistAISetting(providers, toTranscriptionConfig(transcription), agents, taggers, "Update transcription");
   };
 
   const handleCreateAgent = () => {
@@ -312,7 +365,7 @@ const AISection = () => {
       ? agents.map((item) => (item.id === normalizedAgent.id ? normalizedAgent : item))
       : [...agents, normalizedAgent];
 
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, "Update AI agent");
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, "Update AI agent");
     if (!ok) return;
     setAgents(nextAgents);
     setEditingAgent(undefined);
@@ -320,7 +373,7 @@ const AISection = () => {
 
   const handleToggleAgent = async (agent: LocalAgent) => {
     const nextAgents = agents.map((item) => (item.id === agent.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, "Toggle AI agent");
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, "Toggle AI agent");
     if (!ok) return;
     setAgents(nextAgents);
   };
@@ -329,10 +382,60 @@ const AISection = () => {
     if (!deleteAgentTarget) return;
     const target = deleteAgentTarget;
     const nextAgents = agents.filter((agent) => agent.id !== target.id);
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, "Delete AI agent");
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, "Delete AI agent");
     if (!ok) return;
     setAgents(nextAgents);
     setDeleteAgentTarget(undefined);
+  };
+
+  const handleCreateTagger = () => {
+    setEditingTagger(newTagger());
+  };
+
+  const handleEditTagger = (tagger: LocalTagger) => {
+    setEditingTagger({ ...tagger });
+  };
+
+  const handleSaveTagger = async (tagger: LocalTagger) => {
+    const name = tagger.name.trim();
+    const enabled = tagger.enabled;
+
+    if (!name) {
+      toast.error(t("setting.ai.tagger-name-required"));
+      return;
+    }
+    if (enabled && !tagger.providerId) {
+      toast.error(t("setting.ai.tagger-provider-required"));
+      return;
+    }
+
+    const normalizedTagger = { ...tagger, name };
+    const exists = taggers.some((item) => item.id === normalizedTagger.id);
+    const nextTaggers = exists
+      ? taggers.map((item) => (item.id === normalizedTagger.id ? normalizedTagger : item))
+      : [...taggers, normalizedTagger];
+
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, "Update AI tagger");
+    if (!ok) return;
+    setTaggers(nextTaggers);
+    setEditingTagger(undefined);
+  };
+
+  const handleToggleTagger = async (tagger: LocalTagger) => {
+    const nextTaggers = taggers.map((item) => (item.id === tagger.id ? { ...item, enabled: !item.enabled } : item));
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, "Toggle AI tagger");
+    if (!ok) return;
+    setTaggers(nextTaggers);
+  };
+
+  const handleDeleteTagger = async () => {
+    if (!deleteTaggerTarget) return;
+    const target = deleteTaggerTarget;
+    const nextTaggers = taggers.filter((tagger) => tagger.id !== target.id);
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, "Delete AI tagger");
+    if (!ok) return;
+    setTaggers(nextTaggers);
+    setDeleteTaggerTarget(undefined);
   };
 
   return (
@@ -509,6 +612,75 @@ const AISection = () => {
         />
       </SettingGroup>
 
+      <SettingGroup
+        title={t("setting.ai.taggers-title")}
+        description={t("setting.ai.taggers-description")}
+        showSeparator
+        actions={
+          <Button onClick={handleCreateTagger}>
+            <PlusIcon className="w-4 h-4 mr-2" />
+            {t("setting.ai.add-tagger")}
+          </Button>
+        }
+      >
+        <SettingTable
+          columns={[
+            {
+              key: "name",
+              header: t("common.name"),
+              render: (_, tagger: LocalTagger) => (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-foreground">{tagger.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{tagger.id}</span>
+                </div>
+              ),
+            },
+            {
+              key: "providerId",
+              header: t("setting.ai.tagger-provider"),
+              render: (_, tagger: LocalTagger) => {
+                const provider = providers.find((item) => item.id === tagger.providerId);
+                return <span>{provider ? provider.title || provider.id : "-"}</span>;
+              },
+            },
+            {
+              key: "enabled",
+              header: t("setting.ai.tagger-enabled"),
+              render: (_, tagger: LocalTagger) => (
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={tagger.enabled}
+                  onChange={() => handleToggleTagger(tagger)}
+                  aria-label={t("setting.ai.tagger-toggle-aria", { name: tagger.name })}
+                />
+              ),
+            },
+            {
+              key: "actions",
+              header: "",
+              className: "text-right",
+              render: (_, tagger: LocalTagger) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                    <MoreVerticalIcon className="w-4 h-auto" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={2}>
+                    <DropdownMenuItem onClick={() => handleEditTagger(tagger)}>{t("common.edit")}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setDeleteTaggerTarget(tagger)} className="text-destructive focus:text-destructive">
+                      {t("common.delete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ),
+            },
+          ]}
+          data={taggers}
+          emptyMessage={t("setting.ai.no-taggers")}
+          getRowKey={(tagger) => tagger.id}
+        />
+      </SettingGroup>
+
       <AIProviderDialog
         provider={editingProvider}
         onOpenChange={(open) => !open && setEditingProvider(undefined)}
@@ -539,6 +711,23 @@ const AISection = () => {
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}
         onConfirm={handleDeleteAgent}
+        confirmVariant="destructive"
+      />
+
+      <AITaggerDialog
+        tagger={editingTagger}
+        providers={providers}
+        onOpenChange={(open) => !open && setEditingTagger(undefined)}
+        onSave={handleSaveTagger}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTaggerTarget}
+        onOpenChange={(open) => !open && setDeleteTaggerTarget(undefined)}
+        title={deleteTaggerTarget ? t("setting.ai.delete-tagger", { name: deleteTaggerTarget.name }) : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={handleDeleteTagger}
         confirmVariant="destructive"
       />
     </SettingSection>
@@ -932,6 +1121,138 @@ const getDefaultEndpointPlaceholder = (type: InstanceSetting_AIProviderType) => 
     default:
       return "";
   }
+};
+
+interface AITaggerDialogProps {
+  tagger?: LocalTagger;
+  providers: LocalAIProvider[];
+  onOpenChange: (open: boolean) => void;
+  onSave: (tagger: LocalTagger) => void;
+}
+
+const AITaggerDialog = ({ tagger, providers, onOpenChange, onSave }: AITaggerDialogProps) => {
+  const t = useTranslate();
+  const [draft, setDraft] = useState<LocalTagger>(() => tagger ?? newTagger());
+
+  useEffect(() => {
+    setDraft(tagger ?? newTagger());
+  }, [tagger]);
+
+  const updateDraft = (partial: Partial<LocalTagger>) => {
+    setDraft((prev) => ({ ...prev, ...partial }));
+  };
+
+  const providerOptions = useMemo(
+    () => [
+      { value: "__none__", label: t("setting.ai.tagger-no-provider") },
+      ...providers.map((provider) => ({ value: provider.id, label: provider.title || provider.id })),
+    ],
+    [providers, t],
+  );
+
+  const placeholderForProvider = (provider: LocalAIProvider | undefined) => {
+    if (!provider) return "";
+    return provider.type === InstanceSetting_AIProviderType.GEMINI
+      ? t("setting.ai.transcription-model-placeholder-gemini")
+      : t("setting.ai.transcription-model-placeholder-openai");
+  };
+
+  const handleSave = () => {
+    onSave(draft);
+  };
+
+  return (
+    <Dialog open={!!tagger} onOpenChange={onOpenChange}>
+      <DialogContent size="2xl">
+        <DialogHeader>
+          <DialogTitle>{t("setting.ai.edit-tagger")}</DialogTitle>
+          <DialogDescription>{t("setting.ai.tagger-dialog-description")}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.tagger-name")}</Label>
+            <Input
+              value={draft.name}
+              onChange={(e) => updateDraft({ name: e.target.value })}
+              placeholder={t("setting.ai.tagger-name-placeholder")}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.tagger-provider")}</Label>
+            <Select
+              value={draft.providerId || "__none__"}
+              items={providerOptions}
+              onValueChange={(value) => updateDraft({ providerId: value === "__none__" ? "" : value })}
+              disabled={providers.length === 0}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {providerOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {providers.length === 0 && <p className="text-xs text-muted-foreground">{t("setting.ai.tagger-empty-providers")}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.tagger-model")}</Label>
+            <Input
+              value={draft.model}
+              onChange={(e) => updateDraft({ model: e.target.value })}
+              placeholder={placeholderForProvider(providers.find((item) => item.id === draft.providerId))}
+              disabled={!draft.providerId}
+              maxLength={256}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.tagger-max-tags")}</Label>
+            <Input type="number" min={0} value={draft.maxTags} onChange={(e) => updateDraft({ maxTags: Number(e.target.value) || 0 })} />
+            <p className="text-xs text-muted-foreground">{t("setting.ai.tagger-max-tags-help")}</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.tagger-enabled")}</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={draft.enabled}
+                onChange={(e) => updateDraft({ enabled: e.target.checked })}
+              />
+              <span className="text-xs text-muted-foreground">{t("setting.ai.tagger-enabled-help")}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label>{t("setting.ai.tagger-prompt")}</Label>
+            <Textarea
+              value={draft.prompt}
+              onChange={(e) => updateDraft({ prompt: e.target.value })}
+              placeholder={t("setting.ai.tagger-prompt-placeholder")}
+              rows={6}
+              maxLength={4096}
+            />
+            <p className="text-xs text-muted-foreground">{t("setting.ai.tagger-prompt-help")}</p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={handleSave}>{t("common.save")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 export default AISection;

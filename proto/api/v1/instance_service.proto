@@ -297,6 +297,11 @@ message InstanceSetting {
 
     // agents is the list of AI agents that can automatically reply to memos.
     repeated AgentConfig agents = 3;
+
+    // taggers is the list of AI auto-tagging rules. A tagger is the tagging
+    // capability instance of the Agent system, applied instance-wide by an
+    // admin. When empty, the auto-tagging feature is disabled.
+    repeated TaggerConfig taggers = 4;
   }
 
   // AgentConfig describes an AI persona that posts comment-style replies to
@@ -321,6 +326,27 @@ message InstanceSetting {
     int32 delay_minutes = 8;
     // max_length caps the generated reply length (in characters).
     int32 max_length = 9;
+  }
+
+  // TaggerConfig describes an AI auto-tagging rule. It is the tagging
+  // capability instance of the Agent system, configured instance-wide by an
+  // admin; regular users only consume them. Configured taggers apply #tags to
+  // memos additively without overwriting user-authored tags.
+  message TaggerConfig {
+    // id is the stable identifier of the tagger (uuid).
+    string id = 1;
+    // name is the human-readable name shown in the admin UI.
+    string name = 2;
+    // provider_id references an entry in AISetting.providers[].id.
+    string provider_id = 3;
+    // model is the provider-specific text-generation model identifier.
+    string model = 4;
+    // prompt is the tagging spec: the candidate tag list and selection rules.
+    string prompt = 5;
+    // enabled toggles whether the tagger acts on new or triggered memos.
+    bool enabled = 6;
+    // max_tags caps how many tags are applied per memo (default 3, 0 = default).
+    int32 max_tags = 7;
   }
 
   // AIProviderConfig represents one callable AI provider connection.

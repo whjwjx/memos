@@ -81,6 +81,7 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		Schedule: agentReplyScanInterval,
 		Handler: func(ctx context.Context) error {
 			service.processDueAgentReplies(ctx)
+			service.processDueMemoTagTasks(ctx)
 			return nil
 		},
 	}

@@ -30,6 +30,7 @@ const (
 	MemoService_SetMemoRelations_FullMethodName     = "/memos.api.v1.MemoService/SetMemoRelations"
 	MemoService_ListMemoRelations_FullMethodName    = "/memos.api.v1.MemoService/ListMemoRelations"
 	MemoService_CreateMemoComment_FullMethodName    = "/memos.api.v1.MemoService/CreateMemoComment"
+	MemoService_AutoTagMemo_FullMethodName          = "/memos.api.v1.MemoService/AutoTagMemo"
 	MemoService_ListMemoComments_FullMethodName     = "/memos.api.v1.MemoService/ListMemoComments"
 	MemoService_ListMemoReactions_FullMethodName    = "/memos.api.v1.MemoService/ListMemoReactions"
 	MemoService_UpsertMemoReaction_FullMethodName   = "/memos.api.v1.MemoService/UpsertMemoReaction"
@@ -72,6 +73,11 @@ type MemoServiceClient interface {
 	ListMemoRelations(ctx context.Context, in *ListMemoRelationsRequest, opts ...grpc.CallOption) (*ListMemoRelationsResponse, error)
 	// CreateMemoComment creates a comment for a memo.
 	CreateMemoComment(ctx context.Context, in *CreateMemoCommentRequest, opts ...grpc.CallOption) (*Memo, error)
+	// AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by
+	// every enabled tagger configured instance-wide. Requires authentication as
+	// the memo creator, or admin privileges. No-op (rejected) when no tagger is
+	// enabled, or when the memo is readonly/archived.
+	AutoTagMemo(ctx context.Context, in *AutoTagMemoRequest, opts ...grpc.CallOption) (*AutoTagMemoResponse, error)
 	// ListMemoComments lists comments for a memo.
 	ListMemoComments(ctx context.Context, in *ListMemoCommentsRequest, opts ...grpc.CallOption) (*ListMemoCommentsResponse, error)
 	// ListMemoReactions lists reactions for a memo.
@@ -197,6 +203,16 @@ func (c *memoServiceClient) CreateMemoComment(ctx context.Context, in *CreateMem
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Memo)
 	err := c.cc.Invoke(ctx, MemoService_CreateMemoComment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoServiceClient) AutoTagMemo(ctx context.Context, in *AutoTagMemoRequest, opts ...grpc.CallOption) (*AutoTagMemoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AutoTagMemoResponse)
+	err := c.cc.Invoke(ctx, MemoService_AutoTagMemo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +349,11 @@ type MemoServiceServer interface {
 	ListMemoRelations(context.Context, *ListMemoRelationsRequest) (*ListMemoRelationsResponse, error)
 	// CreateMemoComment creates a comment for a memo.
 	CreateMemoComment(context.Context, *CreateMemoCommentRequest) (*Memo, error)
+	// AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by
+	// every enabled tagger configured instance-wide. Requires authentication as
+	// the memo creator, or admin privileges. No-op (rejected) when no tagger is
+	// enabled, or when the memo is readonly/archived.
+	AutoTagMemo(context.Context, *AutoTagMemoRequest) (*AutoTagMemoResponse, error)
 	// ListMemoComments lists comments for a memo.
 	ListMemoComments(context.Context, *ListMemoCommentsRequest) (*ListMemoCommentsResponse, error)
 	// ListMemoReactions lists reactions for a memo.
@@ -393,6 +414,9 @@ func (UnimplementedMemoServiceServer) ListMemoRelations(context.Context, *ListMe
 }
 func (UnimplementedMemoServiceServer) CreateMemoComment(context.Context, *CreateMemoCommentRequest) (*Memo, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateMemoComment not implemented")
+}
+func (UnimplementedMemoServiceServer) AutoTagMemo(context.Context, *AutoTagMemoRequest) (*AutoTagMemoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AutoTagMemo not implemented")
 }
 func (UnimplementedMemoServiceServer) ListMemoComments(context.Context, *ListMemoCommentsRequest) (*ListMemoCommentsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMemoComments not implemented")
@@ -625,6 +649,24 @@ func _MemoService_CreateMemoComment_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MemoService_AutoTagMemo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AutoTagMemoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoServiceServer).AutoTagMemo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoService_AutoTagMemo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoServiceServer).AutoTagMemo(ctx, req.(*AutoTagMemoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MemoService_ListMemoComments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListMemoCommentsRequest)
 	if err := dec(in); err != nil {
@@ -851,6 +893,10 @@ var MemoService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateMemoComment",
 			Handler:    _MemoService_CreateMemoComment_Handler,
+		},
+		{
+			MethodName: "AutoTagMemo",
+			Handler:    _MemoService_AutoTagMemo_Handler,
 		},
 		{
 			MethodName: "ListMemoComments",

@@ -140,3 +140,18 @@ CREATE TABLE `agent_reply_task` (
 );
 
 CREATE INDEX `idx_agent_reply_task_status_due` ON `agent_reply_task`(`status`, `due_at`);
+
+-- memo_tag_task
+CREATE TABLE `memo_tag_task` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `memo_id` INT NOT NULL,
+  `tagger_id` VARCHAR(256) NOT NULL,
+  `status` VARCHAR(256) NOT NULL DEFAULT 'PENDING',
+  `due_at` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `updated_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  UNIQUE (`memo_id`, `tagger_id`),
+  FOREIGN KEY (`memo_id`) REFERENCES `memo`(`id`) ON DELETE CASCADE
+);
+
+CREATE INDEX `idx_memo_tag_task_status_due` ON `memo_tag_task`(`status`, `due_at`);
