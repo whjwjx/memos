@@ -1,24 +1,33 @@
+import { create } from "@bufbuild/protobuf";
+import { DurationSchema, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import dayjs from "dayjs";
-import { ChevronLeftIcon, ChevronRightIcon, LoaderCircleIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
 import { useTodayDate, useWeekdayLabels } from "@/components/ActivityCalendar/hooks";
-import { MemoView } from "@/components/MemoView";
+import { getWeekStart } from "@/components/CalendarView/drag-utils";
+import { stripMarkdown, WeekView } from "@/components/CalendarView/WeekView";
+import { loadMemoEditor } from "@/components/MemoEditor/loader";
+import type { MemoEditorProps } from "@/components/MemoEditor/types";
 import { Button } from "@/components/ui/button";
 import { useGeneralSetting } from "@/hooks/useInstanceQueries";
-import { useInfiniteMemos } from "@/hooks/useMemoQueries";
+import { useInfiniteMemos, useUpdateMemo } from "@/hooks/useMemoQueries";
 import i18n from "@/i18n";
 import { addMonths, formatMonth } from "@/lib/calendar-utils";
 import { cn } from "@/lib/utils";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
-import { formatScheduleTooltip, getScheduleTimeRange, type ScheduleTimeRange } from "@/utils/schedule";
+import { formatScheduleTooltip, getScheduleTimeRange, type ScheduledItem } from "@/utils/schedule";
 
 // 只请求设置了排程时间的 memo。scheduled_ts 在 CEL 中是 Timestamp 类型，
 // 用 `> timestamp("1970-01-01T00:00:00Z")` 表达"已设置"（NULL 在 SQL 比较中会被排除）。
 const SCHEDULED_MEMOS_FILTER = 'scheduled_ts > timestamp("1970-01-01T00:00:00Z")';
+// 有未完成任务但还没安排时间的 todo，供拖拽到日历上排期。
+const TODO_MEMOS_FILTER = "has_incomplete_tasks == true && scheduled_ts == null";
 
 // 月视图格子最多展示的排程块数量，超出部分折叠为 "+N"。
 const MAX_BLOCKS_PER_CELL = 3;
+
+type CalendarView = "month" | "week";
 
 interface CalendarDayCell {
   iso: string;
@@ -40,11 +49,6 @@ const buildMonthMatrix = (month: string, weekStartOffset: number): CalendarDayCe
   });
 };
 
-interface ScheduledItem {
-  memo: Memo;
-  range: ScheduleTimeRange;
-}
-
 const createTimeFormatter = (language: string): Intl.DateTimeFormat =>
   new Intl.DateTimeFormat(language, {
     hour: "numeric",
@@ -59,11 +63,13 @@ const CalendarPage = () => {
   const { data: generalSetting } = useGeneralSetting();
   const weekStartOffset = generalSetting?.weekStartDayOffset ?? 0;
 
+  const [view, setView] = useState<CalendarView>("month");
   const [month, setMonth] = useState<string>(() => formatMonth(new Date()));
-  const [selectedDate, setSelectedDate] = useState<string>(todayDate);
+  const [weekStart, setWeekStart] = useState<dayjs.Dayjs>(() => getWeekStart(dayjs(), weekStartOffset));
+  const [EditorComponent, setEditorComponent] = useState<ComponentType<MemoEditorProps>>();
+  const [editMemo, setEditMemo] = useState<Memo | null>(null);
 
   const { data, fetchNextPage, hasNextPage, isFetching } = useInfiniteMemos({ filter: SCHEDULED_MEMOS_FILTER });
-
   // 排程 memo 数量通常有限，自动拉取剩余分页以确保完整。
   useEffect(() => {
     if (hasNextPage && !isFetching) {
@@ -71,31 +77,78 @@ const CalendarPage = () => {
     }
   }, [fetchNextPage, hasNextPage, isFetching]);
 
-  const scheduledMemos = useMemo(
-    () => (data?.pages.flatMap((page) => page.memos) ?? []).filter((memo) => memo.scheduledTime),
-    [data],
+  const scheduledMemos = useMemo(() => (data?.pages.flatMap((page) => page.memos) ?? []).filter((memo) => memo.scheduledTime), [data]);
+
+  const scheduleItems = useMemo<ScheduledItem[]>(() => {
+    const items: ScheduledItem[] = [];
+    for (const memo of scheduledMemos) {
+      const range = getScheduleTimeRange(memo);
+      if (range) {
+        items.push({ memo, range });
+      }
+    }
+    return items;
+  }, [scheduledMemos]);
+
+  const {
+    data: todoData,
+    fetchNextPage: fetchTodoPage,
+    hasNextPage: todoHasNextPage,
+    isFetching: todoIsFetching,
+  } = useInfiniteMemos({ filter: TODO_MEMOS_FILTER });
+
+  useEffect(() => {
+    if (todoHasNextPage && !todoIsFetching) {
+      void fetchTodoPage();
+    }
+  }, [fetchTodoPage, todoHasNextPage, todoIsFetching]);
+
+  const todoMemos = useMemo(() => todoData?.pages.flatMap((page) => page.memos) ?? [], [todoData]);
+
+  const { mutate: updateMemo } = useUpdateMemo();
+  const handleUpdateSchedule = useCallback(
+    (memoName: string, patch: { scheduledTime: Date; scheduledDuration?: number }) => {
+      const update: Partial<Memo> = { name: memoName, scheduledTime: timestampFromDate(patch.scheduledTime) };
+      const updateMask = ["scheduled_time"];
+      if (patch.scheduledDuration !== undefined) {
+        update.scheduledDuration = create(DurationSchema, { seconds: BigInt(patch.scheduledDuration) });
+        updateMask.push("scheduled_duration");
+      }
+      updateMemo({ update, updateMask });
+    },
+    [updateMemo],
   );
+
+  const openMemoEditor = useCallback((memo: Memo) => {
+    setEditMemo(memo);
+    void loadMemoEditor()
+      .then(({ default: MemoEditor }) => setEditorComponent(() => MemoEditor))
+      .catch(() => undefined);
+  }, []);
 
   const scheduleItemsByDate = useMemo(() => {
     const map = new Map<string, ScheduledItem[]>();
-    for (const memo of scheduledMemos) {
-      const range = getScheduleTimeRange(memo);
-      if (!range) {
-        continue;
-      }
-      const iso = dayjs(range.start).format("YYYY-MM-DD");
+    for (const item of scheduleItems) {
+      const iso = dayjs(item.range.start).format("YYYY-MM-DD");
       const group = map.get(iso) ?? [];
-      group.push({ memo, range });
+      group.push(item);
       map.set(iso, group);
     }
     for (const group of map.values()) {
       group.sort((a, b) => a.range.start.getTime() - b.range.start.getTime());
     }
     return map;
-  }, [scheduledMemos]);
+  }, [scheduleItems]);
 
   const monthCells = useMemo(() => buildMonthMatrix(month, weekStartOffset), [month, weekStartOffset]);
-  const selectedItems = selectedDate ? (scheduleItemsByDate.get(selectedDate) ?? []) : [];
+
+  // useWeekdayLabels 固定从周日开始，按用户偏好的周起始日旋转表头以对齐网格。
+  const rotatedWeekdayLabels = useMemo(
+    () => [...weekdayLabels.slice(weekStartOffset), ...weekdayLabels.slice(0, weekStartOffset)],
+    [weekdayLabels, weekStartOffset],
+  );
+
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => weekStart.add(index, "day")), [weekStart]);
 
   const timeFormatter = useMemo(() => createTimeFormatter(i18n.language), [i18n.language]);
 
@@ -104,25 +157,39 @@ const CalendarPage = () => {
     [month, i18n.language],
   );
 
-  const selectedDateTitle = useMemo(
-    () =>
-      new Intl.DateTimeFormat(i18n.language, { weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(
-        dayjs(selectedDate).toDate(),
-      ),
-    [selectedDate, i18n.language],
-  );
+  const weekTitle = useMemo(() => {
+    const weekEnd = weekStart.add(6, "day");
+    const dateFormat = new Intl.DateTimeFormat(i18n.language, { year: "numeric", month: "short", day: "numeric" });
+    return `${dateFormat.format(weekStart.toDate())} – ${dateFormat.format(weekEnd.toDate())}`;
+  }, [weekStart, i18n.language]);
 
-  // useWeekdayLabels 固定从周日开始，按用户偏好的周起始日旋转表头以对齐网格。
-  const rotatedWeekdayLabels = useMemo(
-    () => [...weekdayLabels.slice(weekStartOffset), ...weekdayLabels.slice(0, weekStartOffset)],
-    [weekdayLabels, weekStartOffset],
-  );
-
-  const handleSelectDate = (iso: string, date: dayjs.Dayjs) => {
-    setSelectedDate(iso);
-    if (date.format("YYYY-MM") !== month) {
-      setMonth(date.format("YYYY-MM"));
+  const handleNavigate = (delta: number) => {
+    if (view === "month") {
+      setMonth((prev) => addMonths(prev, delta));
+    } else {
+      setWeekStart((prev) => prev.add(delta * 7, "day"));
     }
+  };
+
+  const handleViewChange = (next: CalendarView) => {
+    if (next === "week") {
+      setWeekStart(getWeekStart(dayjs(), weekStartOffset));
+    }
+    setView(next);
+  };
+
+  const handleToday = () => {
+    if (view === "month") {
+      setMonth(formatMonth(new Date()));
+    } else {
+      setWeekStart(getWeekStart(dayjs(), weekStartOffset));
+    }
+  };
+
+  // 月视图点某天 → 切换到周视图（以该天所在周为锚点）。
+  const handleSelectDate = (iso: string) => {
+    setWeekStart(getWeekStart(dayjs(iso), weekStartOffset));
+    setView("week");
   };
 
   const formatBlockText = (item: ScheduledItem): string => {
@@ -134,105 +201,159 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 py-4">
-      <header className="flex items-center justify-between gap-2">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t("calendar.previous-month")}
-            onClick={() => setMonth(addMonths(month, -1))}
-          >
+          <Button variant="ghost" size="icon-sm" aria-label={t("calendar.previous-month")} onClick={() => handleNavigate(-1)}>
             <ChevronLeftIcon className="size-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t("calendar.next-month")}
-            onClick={() => setMonth(addMonths(month, 1))}
-          >
+          <Button variant="ghost" size="icon-sm" aria-label={t("calendar.next-month")} onClick={() => handleNavigate(1)}>
             <ChevronRightIcon className="size-4" />
           </Button>
-          <h2 className="ml-1 text-lg font-semibold">{monthTitle}</h2>
+          <h2 className="ml-1 text-lg font-semibold">{view === "month" ? monthTitle : weekTitle}</h2>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setMonth(formatMonth(new Date()));
-            setSelectedDate(todayDate);
-          }}
-        >
-          {t("common.today")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleToday}>
+            {t("common.today")}
+          </Button>
+          <div className="flex overflow-hidden rounded-md border">
+            {(["month", "week"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={cn(
+                  "px-3 py-1.5 text-sm",
+                  view === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent",
+                )}
+                onClick={() => handleViewChange(value)}
+              >
+                {t(`calendar.${value}`)}
+              </button>
+            ))}
+          </div>
+        </div>
       </header>
 
-      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border bg-border">
-        {rotatedWeekdayLabels.map((label) => (
-          <div key={label} className="bg-card px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
-            {label}
-          </div>
-        ))}
-        {monthCells.map((cell) => {
-          const items = scheduleItemsByDate.get(cell.iso) ?? [];
-          const isToday = cell.iso === todayDate;
-          const isSelected = cell.iso === selectedDate;
-          return (
-            <button
-              key={cell.iso}
-              type="button"
-              aria-label={cell.date.format("YYYY-MM-DD")}
-              onClick={() => handleSelectDate(cell.iso, cell.date)}
-              className={cn(
-                "flex min-h-16 flex-col items-stretch gap-0.5 bg-card p-1 text-left transition-colors hover:bg-accent/50",
-                !cell.isCurrentMonth && "bg-muted/30",
-                isSelected && "ring-1 ring-inset ring-primary",
-              )}
-            >
-              <span
-                className={cn(
-                  "px-1 text-xs",
-                  !cell.isCurrentMonth && "text-muted-foreground",
-                  isToday && "font-bold text-primary",
-                )}
-              >
-                {cell.date.date()}
-              </span>
-              {items.slice(0, MAX_BLOCKS_PER_CELL).map((item) => (
-                <span
-                  key={item.memo.name}
-                  title={formatScheduleTooltip(item.range, i18n.language)}
-                  className="truncate rounded bg-primary/10 px-1 py-0.5 text-[10px] leading-3 text-primary"
-                >
-                  {formatBlockText(item)}
-                </span>
-              ))}
-              {items.length > MAX_BLOCKS_PER_CELL && (
-                <span className="px-1 text-[10px] leading-3 text-muted-foreground">
-                  +{items.length - MAX_BLOCKS_PER_CELL}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {editMemo && EditorComponent && (
+        <EditorComponent
+          autoFocus
+          className="mb-2"
+          cacheKey={`calendar-editor-${editMemo.name}`}
+          memo={editMemo}
+          onConfirm={() => setEditMemo(null)}
+          onCancel={() => setEditMemo(null)}
+        />
+      )}
 
-      <section className="flex flex-col gap-3">
-        <h3 className="text-base font-semibold">{selectedDateTitle}</h3>
-        {isFetching && selectedItems.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <LoaderCircleIcon className="size-5 animate-spin" />
-          </div>
-        ) : selectedItems.length === 0 ? (
-          <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-            {t("calendar.no-schedules")}
-          </div>
-        ) : (
-          selectedItems.map(({ memo }) => (
-            <MemoView key={memo.name} memo={memo} compact showCreator={false} showVisibility={false} />
-          ))
-        )}
-      </section>
+      <div className="flex flex-col gap-4 md:flex-row">
+        <div className="min-w-0 flex-1">
+          {view === "month" ? (
+            <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border bg-border">
+              {rotatedWeekdayLabels.map((label) => (
+                <div key={label} className="bg-card px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
+                  {label}
+                </div>
+              ))}
+              {monthCells.map((cell) => {
+                const items = scheduleItemsByDate.get(cell.iso) ?? [];
+                const isToday = cell.iso === todayDate;
+                return (
+                  <button
+                    key={cell.iso}
+                    type="button"
+                    aria-label={cell.date.format("YYYY-MM-DD")}
+                    onClick={() => handleSelectDate(cell.iso)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const memoName = event.dataTransfer.getData("text/memo-name");
+                      if (memoName) {
+                        handleUpdateSchedule(memoName, { scheduledTime: cell.date.startOf("day").toDate() });
+                      }
+                    }}
+                    className={cn(
+                      "flex min-h-16 flex-col items-stretch gap-0.5 bg-card p-1 text-left transition-colors hover:bg-accent/50",
+                      !cell.isCurrentMonth && "bg-muted/30",
+                    )}
+                  >
+                    <span
+                      className={cn("px-1 text-xs", !cell.isCurrentMonth && "text-muted-foreground", isToday && "font-bold text-primary")}
+                    >
+                      {cell.date.date()}
+                    </span>
+                    {items.slice(0, MAX_BLOCKS_PER_CELL).map((item) => (
+                      <span
+                        key={item.memo.name}
+                        title={formatScheduleTooltip(item.range, i18n.language)}
+                        className="truncate rounded bg-primary/10 px-1 py-0.5 text-[10px] leading-3 text-primary"
+                      >
+                        {formatBlockText(item)}
+                      </span>
+                    ))}
+                    {items.length > MAX_BLOCKS_PER_CELL && (
+                      <span className="px-1 text-[10px] leading-3 text-muted-foreground">+{items.length - MAX_BLOCKS_PER_CELL}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-[3rem_1fr] overflow-hidden rounded-lg border bg-card">
+                <div className="border-r" />
+                <div className="grid grid-cols-7">
+                  {weekDays.map((day, index) => {
+                    const isToday = day.format("YYYY-MM-DD") === todayDate;
+                    return (
+                      <div
+                        key={day.format("YYYY-MM-DD")}
+                        className={cn("flex flex-col items-center gap-0.5 border-l py-2 first:border-l-0", isToday && "text-primary")}
+                      >
+                        <span className="text-xs text-muted-foreground">{rotatedWeekdayLabels[index]}</span>
+                        <span className={cn("text-sm font-semibold", isToday && "rounded-full bg-primary px-1.5 text-primary-foreground")}>
+                          {day.date()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <WeekView
+                weekStart={weekStart}
+                scheduleItems={scheduleItems}
+                onUpdateSchedule={handleUpdateSchedule}
+                onDropTodo={(memoName, targetTime) => handleUpdateSchedule(memoName, { scheduledTime: targetTime })}
+                onOpenMemoEditor={openMemoEditor}
+              />
+            </div>
+          )}
+        </div>
+
+        <aside className="flex w-full shrink-0 flex-col gap-2 rounded-lg border bg-card p-3 md:w-64">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            <CheckSquareIcon className="size-4 text-muted-foreground" />
+            {t("calendar.no-time-todos")}
+          </h3>
+          {todoMemos.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("calendar.no-todos")}</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {todoMemos.map((memo) => (
+                <div
+                  key={memo.name}
+                  draggable
+                  title={t("calendar.drag-to-schedule")}
+                  onDragStart={(event) => event.dataTransfer.setData("text/memo-name", memo.name)}
+                  onDoubleClick={() => openMemoEditor(memo)}
+                  className="cursor-grab rounded-md border border-border/60 bg-background px-2 py-1.5 text-xs active:cursor-grabbing"
+                >
+                  <div className="line-clamp-2 text-foreground">{stripMarkdown(memo.content)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
+      </div>
     </div>
   );
 };

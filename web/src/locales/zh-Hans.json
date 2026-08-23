@@ -54,9 +54,14 @@
     "deploy-link": "部署你的 Memos"
   },
   "calendar": {
+    "drag-to-schedule": "拖拽到日历上以安排时间",
+    "month": "月",
     "next-month": "下个月",
     "no-schedules": "暂无排程",
-    "previous-month": "上个月"
+    "no-time-todos": "无时间 todo",
+    "no-todos": "暂无待办",
+    "previous-month": "上个月",
+    "week": "周"
   },
   "common": {
     "about": "关于",
