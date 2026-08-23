@@ -47,6 +47,10 @@ message GeneralUserSetting {
   string theme = 3;
   // Whether the official client should save metadata from future media uploads.
   bool save_media_metadata = 4;
+  // The active day start minute (0-1439) for calendar views. 0 = 00:00.
+  int32 calendar_day_start = 5;
+  // The active day end minute (1-1440) for calendar views. 1440 = 24:00.
+  int32 calendar_day_end = 6;
 }
 
 message UserTagMetadata {

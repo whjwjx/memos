@@ -191,6 +191,8 @@ func convertUserSettingFromStore(storeSetting *storepb.UserSetting, user *store.
 					MemoVisibility:    general.MemoVisibility,
 					Theme:             general.Theme,
 					SaveMediaMetadata: general.SaveMediaMetadata,
+					CalendarDayStart:  general.CalendarDayStart,
+					CalendarDayEnd:    general.CalendarDayEnd,
 				},
 			}
 		} else {
@@ -245,6 +247,8 @@ func convertUserSettingToStore(apiSetting *v1pb.UserSetting, userID int32, key s
 					MemoVisibility:    general.MemoVisibility,
 					Theme:             general.Theme,
 					SaveMediaMetadata: general.SaveMediaMetadata,
+					CalendarDayStart:  general.CalendarDayStart,
+					CalendarDayEnd:    general.CalendarDayEnd,
 				},
 			}
 		} else {

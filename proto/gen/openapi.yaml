@@ -3883,6 +3883,14 @@ components:
                 saveMediaMetadata:
                     type: boolean
                     description: Whether the official client should save metadata from future media uploads.
+                calendarDayStart:
+                    type: integer
+                    description: "The start of the calendar day in minutes from midnight.\r\n Hours before this are hidden in the calendar week view. Defaults to 0."
+                    format: int32
+                calendarDayEnd:
+                    type: integer
+                    description: "The end of the calendar day in minutes from midnight.\r\n Hours after this are hidden in the calendar week view. Defaults to 1440."
+                    format: int32
             description: General user settings configuration.
         UserSetting_TagMetadata:
             type: object
