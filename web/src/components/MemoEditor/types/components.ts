@@ -97,3 +97,10 @@ export interface VisibilitySelectorProps {
   /** "compact" renders a 13px trigger that blends into dense surfaces like the memo detail rail. */
   size?: "default" | "compact";
 }
+
+export interface ScheduleSelectorProps {
+  value?: Date;
+  duration?: number;
+  onChange: (scheduledTime?: Date, scheduledDuration?: number) => void;
+  onOpenChange?: (open: boolean) => void;
+}

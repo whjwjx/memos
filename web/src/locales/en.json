@@ -119,6 +119,11 @@
       "title": "Unlinked uploads"
     }
   },
+  "calendar": {
+    "next-month": "Next month",
+    "no-schedules": "No scheduled memos",
+    "previous-month": "Previous month"
+  },
   "common": {
     "about": "About",
     "actions": "Actions",
@@ -435,6 +440,14 @@
       "protected-description": "Visible to signed-in users",
       "public": "Public",
       "public-description": "Visible to everyone"
+    },
+    "schedule": {
+      "clear": "Clear schedule",
+      "duration": "Duration",
+      "set": "Schedule",
+      "time": "Time",
+      "today": "Today",
+      "tomorrow": "Tomorrow"
     }
   },
   "message": {

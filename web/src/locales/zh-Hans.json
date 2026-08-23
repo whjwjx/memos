@@ -53,6 +53,11 @@
     "banner-title": "Memos 演示站",
     "deploy-link": "部署你的 Memos"
   },
+  "calendar": {
+    "next-month": "下个月",
+    "no-schedules": "暂无排程",
+    "previous-month": "上个月"
+  },
   "common": {
     "about": "关于",
     "actions": "操作",
@@ -319,6 +324,14 @@
       "protected-description": "对登录用户可见",
       "public": "公开",
       "public-description": "对所有人可见"
+    },
+    "schedule": {
+      "clear": "清除日程",
+      "duration": "时长",
+      "set": "日程",
+      "time": "时间",
+      "today": "今天",
+      "tomorrow": "明天"
     },
     "outline": "概要",
     "share": {
