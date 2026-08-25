@@ -51,6 +51,13 @@ message GeneralUserSetting {
   int32 calendar_day_start = 5;
   // The active day end minute (1-1440) for calendar views. 1440 = 24:00.
   int32 calendar_day_end = 6;
+  // Whether to show the first few comments under each memo in the feed.
+  // When false, memo cards in the list no longer render the comment preview.
+  // Defaults to true.
+  bool show_comment_preview = 7;
+  // Whether the memo card comment count indicator is only shown on hover.
+  // When true, the indicator is hidden until the card is hovered. Defaults to false (always shown).
+  bool comment_indicator_on_hover = 8;
 }
 
 message UserTagMetadata {

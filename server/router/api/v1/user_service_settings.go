@@ -115,6 +115,10 @@ func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.Upda
 				updatedGeneral.CalendarDayStart = incomingGeneral.CalendarDayStart
 			case "calendar_day_end":
 				updatedGeneral.CalendarDayEnd = incomingGeneral.CalendarDayEnd
+			case "show_comment_preview":
+				updatedGeneral.ShowCommentPreview = incomingGeneral.ShowCommentPreview
+			case "comment_indicator_on_hover":
+				updatedGeneral.CommentIndicatorOnHover = incomingGeneral.CommentIndicatorOnHover
 			default:
 				// Ignore unsupported fields.
 			}

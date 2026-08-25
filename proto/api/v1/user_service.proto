@@ -464,6 +464,13 @@ message UserSetting {
     // The end of the calendar day in minutes from midnight.
     // Hours after this are hidden in the calendar week view. Defaults to 1440.
     int32 calendar_day_end = 7 [(google.api.field_behavior) = OPTIONAL];
+    // Whether to show the first few comments under each memo in the feed.
+    // When false, memo cards in the list no longer render the comment preview.
+    // Defaults to true.
+    bool show_comment_preview = 8 [(google.api.field_behavior) = OPTIONAL];
+    // Whether the memo card comment count indicator is only shown on hover.
+    // When true, the indicator is hidden until the card is hovered. Defaults to false (always shown).
+    bool comment_indicator_on_hover = 9 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // Tag metadata for user-specific display rules.

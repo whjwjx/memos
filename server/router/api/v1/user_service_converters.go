@@ -193,6 +193,8 @@ func convertUserSettingFromStore(storeSetting *storepb.UserSetting, user *store.
 					SaveMediaMetadata: general.SaveMediaMetadata,
 					CalendarDayStart:  general.CalendarDayStart,
 					CalendarDayEnd:    general.CalendarDayEnd,
+					ShowCommentPreview: general.ShowCommentPreview,
+					CommentIndicatorOnHover: general.CommentIndicatorOnHover,
 				},
 			}
 		} else {
@@ -249,6 +251,8 @@ func convertUserSettingToStore(apiSetting *v1pb.UserSetting, userID int32, key s
 					SaveMediaMetadata: general.SaveMediaMetadata,
 					CalendarDayStart:  general.CalendarDayStart,
 					CalendarDayEnd:    general.CalendarDayEnd,
+					ShowCommentPreview: general.ShowCommentPreview,
+					CommentIndicatorOnHover: general.CommentIndicatorOnHover,
 				},
 			}
 		} else {
