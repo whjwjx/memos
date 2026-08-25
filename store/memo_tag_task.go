@@ -39,6 +39,11 @@ type CreateMemoTagTask struct {
 	MemoID   int32
 	TaggerID string
 	DueAt    int64
+	// Force re-arms a finished (DONE/FAILED) task back to PENDING. Used by the
+	// manual AutoTagMemo action so a user can re-tag a memo after removing the
+	// previously applied tags. When false, an existing completed task keeps its
+	// status (idempotent scheduling on memo creation).
+	Force bool
 }
 
 // FindMemoTagTask filters queued auto-tagging tasks.

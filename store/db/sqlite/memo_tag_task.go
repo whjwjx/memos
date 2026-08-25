@@ -10,6 +10,13 @@ import (
 )
 
 func (d *DB) UpsertMemoTagTask(ctx context.Context, create *store.CreateMemoTagTask) (*store.MemoTagTask, error) {
+	// SQLite's excluded.* can only reference real table columns, so the force
+	// flag is applied in Go: when force is set we unconditionally re-arm the
+	// task to PENDING on conflict, otherwise a finished task keeps its status.
+	statusExpr := "CASE WHEN memo_tag_task.status = 'PENDING' THEN 'PENDING' ELSE memo_tag_task.status END"
+	if create.Force {
+		statusExpr = "'PENDING'"
+	}
 	stmt := `
 		INSERT INTO memo_tag_task (
 			memo_id, tagger_id, status, due_at
@@ -18,7 +25,7 @@ func (d *DB) UpsertMemoTagTask(ctx context.Context, create *store.CreateMemoTagT
 		ON CONFLICT(memo_id, tagger_id) DO UPDATE
 		SET
 			due_at = excluded.due_at,
-			status = CASE WHEN memo_tag_task.status = 'PENDING' THEN 'PENDING' ELSE memo_tag_task.status END,
+			status = ` + statusExpr + `,
 			updated_ts = strftime('%s', 'now')
 		RETURNING
 			id, memo_id, tagger_id, status, due_at, created_ts, updated_ts
