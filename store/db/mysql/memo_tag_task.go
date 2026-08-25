@@ -10,6 +10,12 @@ import (
 )
 
 func (d *DB) UpsertMemoTagTask(ctx context.Context, create *store.CreateMemoTagTask) (*store.MemoTagTask, error) {
+	statusUpdate := "`updated_ts` = UNIX_TIMESTAMP()"
+	if create.Force {
+		// Re-arm a finished task: force it back to PENDING so the poller
+		// re-tags the memo (used by the manual AutoTagMemo action).
+		statusUpdate = "`status` = 'PENDING', `updated_ts` = UNIX_TIMESTAMP()"
+	}
 	stmt := `
 		INSERT INTO ` + "`memo_tag_task`" + ` (
 			` + "`memo_id`" + `, ` + "`tagger_id`" + `, ` + "`status`" + `, ` + "`due_at`" + `
@@ -17,7 +23,7 @@ func (d *DB) UpsertMemoTagTask(ctx context.Context, create *store.CreateMemoTagT
 		VALUES (?, ?, 'PENDING', ?)
 		ON DUPLICATE KEY UPDATE
 			` + "`due_at`" + ` = VALUES(` + "`due_at`" + `),
-			` + "`updated_ts`" + ` = UNIX_TIMESTAMP()
+			` + statusUpdate + `
 	`
 	if _, err := d.db.ExecContext(ctx, stmt, create.MemoID, create.TaggerID, create.DueAt); err != nil {
 		return nil, err

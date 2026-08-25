@@ -64,7 +64,7 @@ func TestScheduleAutoTagForMemoSchedulesForUntaggedMemo(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := &APIV1Service{Store: s}
-	svc.scheduleAutoTagForMemo(ctx, memo.ID)
+	svc.scheduleAutoTagForMemo(ctx, memo.ID, false)
 
 	tasks, err := s.ListMemoTagTasks(ctx, &store.FindMemoTagTask{MemoID: &memo.ID})
 	require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestScheduleAutoTagForMemoSkipsTaggedMemo(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := &APIV1Service{Store: s}
-	svc.scheduleAutoTagForMemo(ctx, memo.ID)
+	svc.scheduleAutoTagForMemo(ctx, memo.ID, false)
 
 	tasks, err := s.ListMemoTagTasks(ctx, &store.FindMemoTagTask{MemoID: &memo.ID})
 	require.NoError(t, err)
@@ -116,9 +116,58 @@ func TestScheduleAutoTagForMemoSkipsDisabledTagger(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := &APIV1Service{Store: s}
-	svc.scheduleAutoTagForMemo(ctx, memo.ID)
+	svc.scheduleAutoTagForMemo(ctx, memo.ID, false)
 
 	tasks, err := s.ListMemoTagTasks(ctx, &store.FindMemoTagTask{MemoID: &memo.ID})
 	require.NoError(t, err)
 	require.Len(t, tasks, 0, "disabled / provider-less taggers must not be scheduled")
+}
+
+// TestScheduleAutoTagForMemoForceReArmsCompletedTask covers the manual re-tag
+// path: a memo whose task was already DONE (tags applied and later removed) must
+// be re-scheduled to PENDING when force=true. Without force, the DONE task would
+// be left untouched and the memo never re-tagged.
+func TestScheduleAutoTagForMemoForceReArmsCompletedTask(t *testing.T) {
+	s, cleanup := newTaggerTestStore(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	upsertTaggerSetting(t, s,
+		&storepb.TaggerConfig{Id: "tagger-1", Name: "T1", ProviderId: "prov-1", Enabled: true, Prompt: "candidates: work, life", MaxTags: 3},
+	)
+
+	memo, err := s.CreateMemo(ctx, &store.Memo{
+		UID:        "done-then-removed",
+		CreatorID:  1,
+		Content:    "needs re-tag",
+		Visibility: store.Public,
+		Payload:    &storepb.MemoPayload{Tags: []string{}},
+	})
+	require.NoError(t, err)
+
+	// 1) First (non-forced) schedule creates a PENDING task.
+	svc := &APIV1Service{Store: s}
+	svc.scheduleAutoTagForMemo(ctx, memo.ID, false)
+	tasks, err := s.ListMemoTagTasks(ctx, &store.FindMemoTagTask{MemoID: &memo.ID})
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	require.Equal(t, store.MemoTagTaskPending, tasks[0].Status)
+
+	// 2) Simulate the poller finishing the task.
+	done := store.MemoTagTaskDone
+	require.NoError(t, s.UpdateMemoTagTask(ctx, &store.UpdateMemoTagTask{ID: tasks[0].ID, Status: &done}))
+
+	// 3) Non-forced re-schedule must NOT re-arm the completed task.
+	svc.scheduleAutoTagForMemo(ctx, memo.ID, false)
+	tasks, err = s.ListMemoTagTasks(ctx, &store.FindMemoTagTask{MemoID: &memo.ID})
+	require.NoError(t, err)
+	require.Len(t, tasks, 1, "still one row per (memo, tagger)")
+	require.Equal(t, store.MemoTagTaskDone, tasks[0].Status, "non-forced keeps DONE")
+
+	// 4) Forced re-schedule (manual AutoTagMemo) re-arms to PENDING.
+	svc.scheduleAutoTagForMemo(ctx, memo.ID, true)
+	tasks, err = s.ListMemoTagTasks(ctx, &store.FindMemoTagTask{MemoID: &memo.ID})
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	require.Equal(t, store.MemoTagTaskPending, tasks[0].Status, "force re-arms the completed task to PENDING")
 }

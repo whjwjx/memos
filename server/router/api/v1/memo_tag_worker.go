@@ -24,7 +24,12 @@ import (
 // isAgentSchedulingSuppressed, so agent replies / tagger runs never trigger one
 // another) and from the manual AutoTagMemo RPC. One row per (memo_id, tagger_id)
 // keeps tagging idempotent: a memo is tagged at most once per tagger.
-func (s *APIV1Service) scheduleAutoTagForMemo(ctx context.Context, memoID int32) {
+//
+// force re-arms an already-completed (DONE/FAILED) task back to PENDING so the
+// user can re-tag a memo after removing the tags a previous run applied. When
+// force is false, an existing finished task keeps its status (idempotent
+// scheduling on memo creation).
+func (s *APIV1Service) scheduleAutoTagForMemo(ctx context.Context, memoID int32, force bool) {
 	setting, err := s.Store.GetInstanceAISetting(ctx)
 	if err != nil {
 		slog.Warn("Failed to load instance AI setting for auto-tagging", slog.Any("err", err))
@@ -34,10 +39,14 @@ func (s *APIV1Service) scheduleAutoTagForMemo(ctx context.Context, memoID int32)
 		return
 	}
 	// Only auto-tag memos that don't already have any tags, to avoid re-tagging
-	// on every edit / re-trigger beyond what the user intends.
-	if memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ID: &memoID}); err == nil && memo != nil {
-		if len(memo.Payload.GetTags()) > 0 {
-			return
+	// on every edit / re-trigger beyond what the user intends. A forced re-tag
+	// (manual AutoTagMemo) skips this guard so a user can re-apply tags they
+	// removed.
+	if !force {
+		if memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ID: &memoID}); err == nil && memo != nil {
+			if len(memo.Payload.GetTags()) > 0 {
+				return
+			}
 		}
 	}
 
@@ -50,6 +59,7 @@ func (s *APIV1Service) scheduleAutoTagForMemo(ctx context.Context, memoID int32)
 			MemoID:   memoID,
 			TaggerID: tagger.GetId(),
 			DueAt:    now,
+			Force:    force,
 		}); err != nil {
 			slog.Warn("Failed to schedule memo tag task",
 				slog.Int("memo_id", int(memoID)),

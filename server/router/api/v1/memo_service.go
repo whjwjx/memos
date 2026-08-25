@@ -185,7 +185,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	// the memo is itself an agent reply comment to avoid an infinite loop.
 	if !isAgentSchedulingSuppressed(ctx) {
 		s.scheduleAgentRepliesForMemo(ctx, memo.ID)
-		s.scheduleAutoTagForMemo(ctx, memo.ID)
+		s.scheduleAutoTagForMemo(ctx, memo.ID, false)
 	}
 
 	attachments := []*store.Attachment{}
@@ -498,9 +498,10 @@ func (s *APIV1Service) AutoTagMemo(ctx context.Context, request *v1pb.AutoTagMem
 		return nil, status.Errorf(codes.FailedPrecondition, "AI auto-tagging is not enabled")
 	}
 
-	// Queue tasks for all enabled taggers (best-effort, like creation-time
-	// scheduling). The poller applies them shortly after.
-	s.scheduleAutoTagForMemo(ctx, memo.ID)
+	// Queue tasks for all enabled taggers. force=true re-arms any completed
+	// task so a memo can be re-tagged after the user removed the earlier tags.
+	// The poller applies them shortly after.
+	s.scheduleAutoTagForMemo(ctx, memo.ID, true)
 	return &v1pb.AutoTagMemoResponse{}, nil
 }
 
