@@ -146,6 +146,38 @@ const PreferencesSection = () => {
               </SelectContent>
             </Select>
           </SettingListItem>
+          <SettingListItem
+            label={t("setting.preference.show-comment-preview")}
+            description={t("setting.preference.show-comment-preview-description")}
+          >
+            <Switch
+              aria-label={t("setting.preference.show-comment-preview")}
+              checked={setting.showCommentPreview}
+              disabled={isUpdatingGeneralSetting}
+              onCheckedChange={(showCommentPreview) =>
+                updateUserGeneralSetting(
+                  { generalSetting: { showCommentPreview }, updateMask: ["show_comment_preview"] },
+                  { onSuccess: () => refetchSettings() },
+                )
+              }
+            />
+          </SettingListItem>
+          <SettingListItem
+            label={t("setting.preference.comment-indicator-on-hover")}
+            description={t("setting.preference.comment-indicator-on-hover-description")}
+          >
+            <Switch
+              aria-label={t("setting.preference.comment-indicator-on-hover")}
+              checked={setting.commentIndicatorOnHover}
+              disabled={isUpdatingGeneralSetting}
+              onCheckedChange={(commentIndicatorOnHover) =>
+                updateUserGeneralSetting(
+                  { generalSetting: { commentIndicatorOnHover }, updateMask: ["comment_indicator_on_hover"] },
+                  { onSuccess: () => refetchSettings() },
+                )
+              }
+            />
+          </SettingListItem>
         </SettingList>
       </SettingGroup>
 

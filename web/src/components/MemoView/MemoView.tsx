@@ -27,7 +27,7 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
   const [cardWidth, setCardWidth] = useState(0);
 
   const currentUser = useCurrentUser();
-  const { userTagsSetting } = useAuth();
+  const { userTagsSetting, userGeneralSetting } = useAuth();
   const creator = useResolvedUser(memoData.creator, { enabled: Boolean(showCreator || props.shareImageDialogOpen) });
   const isArchived = memoData.state === State.ARCHIVED;
   const readonly = memoData.creator !== currentUser?.name && !isSuperUser(currentUser);
@@ -52,7 +52,8 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
 
   const location = useLocation();
   const isInMemoDetailPage = location.pathname.startsWith(`/${memoData.name}`) || location.pathname.startsWith("/memos/shares/");
-  const showCommentPreview = !isInMemoDetailPage && computeCommentAmount(memoData) > 0;
+  const commentAmount = computeCommentAmount(memoData);
+  const showCommentPreview = !isInMemoDetailPage && commentAmount > 0 && (userGeneralSetting?.showCommentPreview ?? true);
 
   // The card width is only needed by the share-image dialog. Keep feed cards
   // free of a permanent ResizeObserver and measure only while that dialog is open.

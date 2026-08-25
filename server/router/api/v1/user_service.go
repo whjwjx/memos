@@ -476,6 +476,7 @@ func getDefaultUserGeneralSetting() *v1pb.UserSetting_GeneralSetting {
 		Theme:             "",
 		CalendarDayStart:  0,
 		CalendarDayEnd:    1440,
+		ShowCommentPreview: true,
 	}
 }
 

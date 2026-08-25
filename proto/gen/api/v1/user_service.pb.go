@@ -3006,8 +3006,15 @@ type UserSetting_GeneralSetting struct {
 	// The end of the calendar day in minutes from midnight.
 	// Hours after this are hidden in the calendar week view. Defaults to 1440.
 	CalendarDayEnd int32 `protobuf:"varint,7,opt,name=calendar_day_end,json=calendarDayEnd,proto3" json:"calendar_day_end,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Whether to show the first few comments under each memo in the feed.
+	// When false, memo cards in the list no longer render the comment preview.
+	// Defaults to true.
+	ShowCommentPreview bool `protobuf:"varint,8,opt,name=show_comment_preview,json=showCommentPreview,proto3" json:"show_comment_preview,omitempty"`
+	// Whether the memo card comment count indicator is only shown on hover.
+	// When true, the indicator is hidden until the card is hovered. Defaults to false (always shown).
+	CommentIndicatorOnHover bool `protobuf:"varint,9,opt,name=comment_indicator_on_hover,json=commentIndicatorOnHover,proto3" json:"comment_indicator_on_hover,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *UserSetting_GeneralSetting) Reset() {
@@ -3080,6 +3087,20 @@ func (x *UserSetting_GeneralSetting) GetCalendarDayEnd() int32 {
 		return x.CalendarDayEnd
 	}
 	return 0
+}
+
+func (x *UserSetting_GeneralSetting) GetShowCommentPreview() bool {
+	if x != nil {
+		return x.ShowCommentPreview
+	}
+	return false
+}
+
+func (x *UserSetting_GeneralSetting) GetCommentIndicatorOnHover() bool {
+	if x != nil {
+		return x.CommentIndicatorOnHover
+	}
+	return false
 }
 
 // Tag metadata for user-specific display rules.
@@ -3466,19 +3487,21 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x13.memos.api.v1.StateB\x03\xe0A\x01R\x05state\x12\x1b\n" +
 	"\x06filter\x18\x02 \x01(\tB\x03\xe0A\x01R\x06filter\"I\n" +
 	"\x18ListAllUserStatsResponse\x12-\n" +
-	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\xd3\b\n" +
+	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\xcc\t\n" +
 	"\vUserSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12S\n" +
 	"\x0fgeneral_setting\x18\x02 \x01(\v2(.memos.api.v1.UserSetting.GeneralSettingH\x00R\x0egeneralSetting\x12V\n" +
 	"\x10webhooks_setting\x18\x05 \x01(\v2).memos.api.v1.UserSetting.WebhooksSettingH\x00R\x0fwebhooksSetting\x12J\n" +
-	"\ftags_setting\x18\x06 \x01(\v2%.memos.api.v1.UserSetting.TagsSettingH\x00R\vtagsSetting\x1a\x8d\x02\n" +
+	"\ftags_setting\x18\x06 \x01(\v2%.memos.api.v1.UserSetting.TagsSettingH\x00R\vtagsSetting\x1a\x86\x03\n" +
 	"\x0eGeneralSetting\x12\x1b\n" +
 	"\x06locale\x18\x01 \x01(\tB\x03\xe0A\x01R\x06locale\x12,\n" +
 	"\x0fmemo_visibility\x18\x03 \x01(\tB\x03\xe0A\x01R\x0ememoVisibility\x12\x19\n" +
 	"\x05theme\x18\x04 \x01(\tB\x03\xe0A\x01R\x05theme\x123\n" +
 	"\x13save_media_metadata\x18\x05 \x01(\bB\x03\xe0A\x01R\x11saveMediaMetadata\x121\n" +
 	"\x12calendar_day_start\x18\x06 \x01(\x05B\x03\xe0A\x01R\x10calendarDayStart\x12-\n" +
-	"\x10calendar_day_end\x18\a \x01(\x05B\x03\xe0A\x01R\x0ecalendarDayEnd\x1ay\n" +
+	"\x10calendar_day_end\x18\a \x01(\x05B\x03\xe0A\x01R\x0ecalendarDayEnd\x125\n" +
+	"\x14show_comment_preview\x18\b \x01(\bB\x03\xe0A\x01R\x12showCommentPreview\x12@\n" +
+	"\x1acomment_indicator_on_hover\x18\t \x01(\bB\x03\xe0A\x01R\x17commentIndicatorOnHover\x1ay\n" +
 	"\vTagMetadata\x12B\n" +
 	"\x10background_color\x18\x01 \x01(\v2\x12.google.type.ColorB\x03\xe0A\x01R\x0fbackgroundColor\x12&\n" +
 	"\fblur_content\x18\x02 \x01(\bB\x03\xe0A\x01R\vblurContent\x1a\xb7\x01\n" +

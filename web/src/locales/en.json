@@ -354,6 +354,7 @@
       "self": "Comments",
       "write-a-comment": "Write a comment"
     },
+    "comments-count": "{{count}} comments",
     "copy-content": "Copy Content",
     "copy-link": "Copy Link",
     "ai-tag": "AI tags",
@@ -798,7 +799,11 @@
       "calendar-invalid-range": "End time must be later than start time.",
       "calendar-title": "Calendar",
       "uploads-privacy-description": "Control privacy-sensitive information submitted with uploaded media.",
-      "uploads-privacy-title": "Uploads & privacy"
+      "uploads-privacy-title": "Uploads & privacy",
+      "show-comment-preview": "Show comment previews on memo cards",
+      "show-comment-preview-description": "Display the first few comments under each memo in the feed. Turn off to keep the feed focused on memos.",
+      "comment-indicator-on-hover": "Show comment count on hover",
+      "comment-indicator-on-hover-description": "Only reveal the comment count indicator when hovering a memo card. When off, it is always visible."
     },
     "memo-view": {
       "delete-confirm": "Are you sure you want to delete view `{{title}}`?",

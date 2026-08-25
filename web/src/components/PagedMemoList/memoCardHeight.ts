@@ -8,6 +8,8 @@ import { buildAttachmentVisualItems } from "@/utils/media-item";
 
 interface EstimateMemoCardHeightOptions {
   columnWidth: number;
+  /** Whether memo cards render the comment preview in the feed. When false the comment preview height is skipped, matching MemoView. Defaults to true. */
+  showCommentPreview?: boolean;
 }
 
 const CARD_VERTICAL_PADDING = 24;
@@ -97,15 +99,16 @@ const estimateCommentPreviewHeight = (memo: Memo): number => {
   return COMMENT_PREVIEW_VERTICAL_PADDING + COMMENT_PREVIEW_HEADER_HEIGHT + visibleCommentCount * COMMENT_PREVIEW_ROW_HEIGHT;
 };
 
-export const estimateMemoCardHeight = (memo: Memo, { columnWidth }: EstimateMemoCardHeightOptions): number => {
+export const estimateMemoCardHeight = (memo: Memo, { columnWidth, showCommentPreview = true }: EstimateMemoCardHeightOptions): number => {
   const content = memo.content ?? "";
   const contentHeight = estimateWrappedTextHeight(content, columnWidth) + countMarkdownImages(content) * MARKDOWN_IMAGE_HEIGHT;
   const attachmentHeight = estimateAttachmentSectionHeight(filterInlineManagedAttachments(content, memo.attachments ?? []), columnWidth);
   const bodyHeight = contentHeight + attachmentHeight + (contentHeight > 0 && attachmentHeight > 0 ? CARD_SECTION_GAP : 0);
   const compactBodyHeight = bodyHeight > CLAMP_TRIGGER_HEIGHT_PX ? CLAMP_PREVIEW_HEIGHT_PX + SHOW_MORE_BUTTON_HEIGHT : bodyHeight;
   const reactionHeight = (memo.reactions ?? []).length > 0 ? CARD_SECTION_GAP + REACTION_ROW_HEIGHT : 0;
+  const commentPreviewHeight = showCommentPreview ? estimateCommentPreviewHeight(memo) : 0;
 
   return (
-    CARD_VERTICAL_PADDING + CARD_HEADER_HEIGHT + CARD_SECTION_GAP + compactBodyHeight + reactionHeight + estimateCommentPreviewHeight(memo)
+    CARD_VERTICAL_PADDING + CARD_HEADER_HEIGHT + CARD_SECTION_GAP + compactBodyHeight + reactionHeight + commentPreviewHeight
   );
 };

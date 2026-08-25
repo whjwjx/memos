@@ -113,7 +113,7 @@ function useAutoFetchWhenNotScrollable({
 
 const PagedMemoList = (props: Props) => {
   const t = useTranslate();
-  const { isUserSettingsInitialized } = useAuth();
+  const { isUserSettingsInitialized, userGeneralSetting } = useAuth();
   const { filters } = useMemoFilterContext();
   const { maxColumns, compactMode } = useView();
   // maxColumns is a ceiling: 1 = single reading column, 0 = as many as fit. The single
@@ -258,7 +258,9 @@ const PagedMemoList = (props: Props) => {
                 items={displayMemoList}
                 getKey={getMemoKey}
                 renderItem={(memo) => props.renderer(memo, { compact: effectiveCompact })}
-                estimateHeight={estimateMemoCardHeight}
+                estimateHeight={(memo, context) =>
+                  estimateMemoCardHeight(memo, { ...context, showCommentPreview: userGeneralSetting?.showCommentPreview ?? true })
+                }
                 leading={gridLeading}
                 priorityKey={priorityKey}
                 maxColumns={maxColumns}
