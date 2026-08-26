@@ -188,19 +188,38 @@ const toTaggerConfig = (tagger: LocalTagger) =>
 // is fixed server-side; admin may only toggle enable and mark confirmation. Keys
 // must match internal/ai/tools registry names. `description` is an i18n key
 // resolved with t() at render time.
-const toolRegistry: { name: string; descriptionKey: string; adminOnly: boolean; defaultRequiresConfirmation: boolean }[] = [
-  { name: "search_memos", descriptionKey: "setting.ai.tool-search-memos", adminOnly: false, defaultRequiresConfirmation: false },
-  { name: "get_comments", descriptionKey: "setting.ai.tool-get-comments", adminOnly: false, defaultRequiresConfirmation: false },
+// Mirrors the tools actually registered by the backend (internal/ai/tools
+// NewRegistry). Only tools present here can be toggled; read-only/query tools
+// default to no confirmation while mutating ones (delete_memo, auto_tag,
+// agent_reply, manage_settings) default to requiring it.
+// confirmEditable=false marks tools whose confirmation is fixed: read-only
+// tools never require confirmation, so the toggle is disabled in the UI.
+const toolRegistry: {
+  name: string;
+  descriptionKey: string;
+  adminOnly: boolean;
+  defaultRequiresConfirmation: boolean;
+  confirmEditable?: boolean;
+}[] = [
+  {
+    name: "search_memos",
+    descriptionKey: "setting.ai.tool-search-memos",
+    adminOnly: false,
+    defaultRequiresConfirmation: false,
+    confirmEditable: false,
+  },
+  {
+    name: "get_comments",
+    descriptionKey: "setting.ai.tool-get-comments",
+    adminOnly: false,
+    defaultRequiresConfirmation: false,
+    confirmEditable: false,
+  },
+  { name: "create_memo", descriptionKey: "setting.ai.tool-create-memo", adminOnly: false, defaultRequiresConfirmation: false },
   { name: "manage_settings", descriptionKey: "setting.ai.tool-manage-settings", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "create_memo", descriptionKey: "setting.ai.tool-create-memo", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "summarize_requirements", descriptionKey: "setting.ai.tool-summarize-requirements", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "agent_reply", descriptionKey: "setting.ai.tool-agent-reply", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "auto_tag", descriptionKey: "setting.ai.tool-auto-tag", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "query_queue", descriptionKey: "setting.ai.tool-query-queue", adminOnly: true, defaultRequiresConfirmation: false },
-  { name: "query_my_data", descriptionKey: "setting.ai.tool-query-my-data", adminOnly: false, defaultRequiresConfirmation: false },
-  { name: "query_db", descriptionKey: "setting.ai.tool-query-db", adminOnly: true, defaultRequiresConfirmation: false },
-  { name: "get_logs", descriptionKey: "setting.ai.tool-get-logs", adminOnly: true, defaultRequiresConfirmation: false },
-  { name: "project_status", descriptionKey: "setting.ai.tool-project-status", adminOnly: true, defaultRequiresConfirmation: false },
+  { name: "agent_reply", descriptionKey: "setting.ai.tool-agent-reply", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "delete_memo", descriptionKey: "setting.ai.tool-delete-memo", adminOnly: false, defaultRequiresConfirmation: true },
 ];
 
 type LocalChatAgent = {
@@ -250,11 +269,16 @@ type LocalTool = {
   requiresConfirmation: boolean;
 };
 
-const toLocalTool = (name: string, tool: InstanceSetting_ToolConfig | undefined): LocalTool => ({
-  name,
-  enabled: tool?.enabled ?? false,
-  requiresConfirmation: tool?.requiresConfirmation ?? false,
-});
+const toLocalTool = (name: string, tool: InstanceSetting_ToolConfig | undefined): LocalTool => {
+  const def = toolRegistry.find((t) => t.name === name);
+  return {
+    name,
+    enabled: tool?.enabled ?? false,
+    // Read-only tools never require confirmation; the toggle is locked off.
+    requiresConfirmation:
+      def?.confirmEditable === false ? false : (tool?.requiresConfirmation ?? def?.defaultRequiresConfirmation ?? false),
+  };
+};
 
 const toToolConfig = (tool: LocalTool) =>
   create(InstanceSetting_ToolConfigSchema, {
@@ -418,7 +442,15 @@ const AISection = () => {
       ? providers.map((item) => (item.id === normalizedProvider.id ? normalizedProvider : item))
       : [...providers, normalizedProvider];
 
-    const ok = await persistAISetting(nextProviders, originalSetting.transcription, agents, taggers, chatAgents, tools, "Update AI provider");
+    const ok = await persistAISetting(
+      nextProviders,
+      originalSetting.transcription,
+      agents,
+      taggers,
+      chatAgents,
+      tools,
+      "Update AI provider",
+    );
     if (!ok) return;
     setProviders(nextProviders);
     setEditingProvider(undefined);
@@ -587,7 +619,15 @@ const AISection = () => {
       ? chatAgents.map((item) => (item.id === normalizedAgent.id ? normalizedAgent : item))
       : [...chatAgents, normalizedAgent];
 
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, nextChatAgents, tools, "Update chat agent");
+    const ok = await persistAISetting(
+      providers,
+      originalSetting.transcription,
+      agents,
+      taggers,
+      nextChatAgents,
+      tools,
+      "Update chat agent",
+    );
     if (!ok) return;
     setChatAgents(nextChatAgents);
     setEditingChatAgent(undefined);
@@ -595,7 +635,15 @@ const AISection = () => {
 
   const handleToggleChatAgent = async (agent: LocalChatAgent) => {
     const nextChatAgents = chatAgents.map((item) => (item.id === agent.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, nextChatAgents, tools, "Toggle chat agent");
+    const ok = await persistAISetting(
+      providers,
+      originalSetting.transcription,
+      agents,
+      taggers,
+      nextChatAgents,
+      tools,
+      "Toggle chat agent",
+    );
     if (!ok) return;
     setChatAgents(nextChatAgents);
   };
@@ -604,7 +652,15 @@ const AISection = () => {
     if (!deleteChatAgentTarget) return;
     const target = deleteChatAgentTarget;
     const nextChatAgents = chatAgents.filter((agent) => agent.id !== target.id);
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, nextChatAgents, tools, "Delete chat agent");
+    const ok = await persistAISetting(
+      providers,
+      originalSetting.transcription,
+      agents,
+      taggers,
+      nextChatAgents,
+      tools,
+      "Delete chat agent",
+    );
     if (!ok) return;
     setChatAgents(nextChatAgents);
     setDeleteChatAgentTarget(undefined);
@@ -619,7 +675,15 @@ const AISection = () => {
 
   const handleToggleToolConfirmation = async (tool: LocalTool) => {
     const nextTools = tools.map((item) => (item.name === tool.name ? { ...item, requiresConfirmation: !item.requiresConfirmation } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, chatAgents, nextTools, "Toggle chat tool confirmation");
+    const ok = await persistAISetting(
+      providers,
+      originalSetting.transcription,
+      agents,
+      taggers,
+      chatAgents,
+      nextTools,
+      "Toggle chat tool confirmation",
+    );
     if (!ok) return;
     setTools(nextTools);
   };
@@ -930,10 +994,7 @@ const AISection = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" sideOffset={2}>
                     <DropdownMenuItem onClick={() => handleEditChatAgent(agent)}>{t("common.edit")}</DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setDeleteChatAgentTarget(agent)}
-                      className="text-destructive focus:text-destructive"
-                    >
+                    <DropdownMenuItem onClick={() => setDeleteChatAgentTarget(agent)} className="text-destructive focus:text-destructive">
                       {t("common.delete")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -947,11 +1008,7 @@ const AISection = () => {
         />
       </SettingGroup>
 
-      <SettingGroup
-        title={t("setting.ai.chat-tools-title")}
-        description={t("setting.ai.chat-tools-description")}
-        showSeparator
-      >
+      <SettingGroup title={t("setting.ai.chat-tools-title")} description={t("setting.ai.chat-tools-description")} showSeparator>
         <SettingTable
           columns={[
             {
@@ -991,15 +1048,20 @@ const AISection = () => {
             {
               key: "requiresConfirmation",
               header: t("setting.ai.chat-tool-confirm"),
-              render: (_, tool: LocalTool) => (
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={tool.requiresConfirmation}
-                  onChange={() => handleToggleToolConfirmation(tool)}
-                  aria-label={t("setting.ai.chat-tool-confirm-toggle-aria", { name: tool.name })}
-                />
-              ),
+              render: (_, tool: LocalTool) => {
+                const meta = toolRegistry.find((item) => item.name === tool.name);
+                const locked = meta?.confirmEditable === false;
+                return (
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary disabled:cursor-not-allowed disabled:opacity-40"
+                    checked={locked ? false : tool.requiresConfirmation}
+                    disabled={locked}
+                    onChange={() => handleToggleToolConfirmation(tool)}
+                    aria-label={t("setting.ai.chat-tool-confirm-toggle-aria", { name: tool.name })}
+                  />
+                );
+              },
             },
           ]}
           data={tools}

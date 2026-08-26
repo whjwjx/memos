@@ -718,14 +718,9 @@
       "tool-get-comments": "Read comments under a memo.",
       "tool-manage-settings": "Change user or instance settings (needs confirmation).",
       "tool-create-memo": "Create a new memo (needs confirmation).",
-      "tool-summarize-requirements": "Cluster recent memos into a summary memo (needs confirmation).",
       "tool-agent-reply": "Trigger an AI comment on a memo (needs confirmation).",
       "tool-auto-tag": "Auto-tag a memo (needs confirmation).",
-      "tool-query-queue": "List agent reply / tagging queue status (admin).",
-      "tool-query-my-data": "Read-only query over the user's own data with row-level filtering.",
-      "tool-query-db": "Full read/write query over business tables (admin, needs confirmation).",
-      "tool-get-logs": "Read instance logs (admin).",
-      "tool-project-status": "Show instance memo/user/queue counts (admin)."
+      "tool-delete-memo": "Permanently delete a memo (needs confirmation)."
     },
     "instance": {
       "access-description": "Control sign-up, authentication, profile editing, and calendar defaults for this instance.",
@@ -1104,5 +1099,18 @@
     "select-visibility": "Visibility",
     "tags": "Tags",
     "upload-attachment": "Upload Attachment(s)"
+  },
+  "aiChat": {
+    "title": "AI Chat",
+    "empty-hint": "Start a conversation with your AI assistant.",
+    "start-hint": "Send a message to begin.",
+    "new-conversation": "New conversation",
+    "input-placeholder": "Ask anything, or ask the assistant to search, create, or organize your memos…",
+    "tool-result": "tool result",
+    "confirm-tools": "The assistant wants to run these tools. Approve to continue.",
+    "confirm": "Approve & continue",
+    "no-conversations": "No conversations yet",
+    "delete-confirm": "Delete this conversation? This cannot be undone and the chat history will be permanently removed.",
+    "delete-success": "Conversation deleted"
   }
 }

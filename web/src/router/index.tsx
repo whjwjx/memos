@@ -26,6 +26,7 @@ const NotFound = lazyWithReload(() => import("@/pages/NotFound"));
 const PermissionDenied = lazyWithReload(() => import("@/pages/PermissionDenied"));
 const Attachments = lazyWithReload(() => import("@/pages/Attachments"));
 const Setting = lazyWithReload(() => import("@/pages/Setting"));
+const AIChat = lazyWithReload(() => import("@/pages/AIChat"));
 const MemoViews = lazyWithReload(() => import("@/pages/MemoViews"));
 const SignIn = lazyWithReload(() => import("@/pages/SignIn"));
 const SignUp = lazyWithReload(() => import("@/pages/SignUp"));
@@ -110,6 +111,7 @@ export const routeConfig: RouteObject[] = [
                   { path: Routes.CALENDAR, element: <Calendar /> },
                   { path: Routes.INBOX, element: <Inboxes /> },
                   { path: Routes.SETTING, element: <Setting /> },
+                  { path: Routes.AI_CHAT, element: <AIChat /> },
                 ],
               },
             ],

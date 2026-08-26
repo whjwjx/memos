@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   ArrowRightIcon,
   BellIcon,
+  BotIcon,
   CalendarDaysIcon,
   ChevronDownIcon,
   EarthIcon,
@@ -25,7 +26,7 @@ import {
   Trash2Icon,
   UserRoundIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, matchPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -36,14 +37,16 @@ import StatisticsView from "@/components/StatisticsView";
 import UserMenu from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { memoViewServiceClient } from "@/connect";
+import { aiChatServiceClient, memoViewServiceClient } from "@/connect";
 import { type AttachmentSection, type InboxFilter, useAppSidebar } from "@/contexts/AppSidebarContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalMemoEditor } from "@/contexts/GlobalMemoEditorContext";
 import { useInstance } from "@/contexts/InstanceContext";
 import { stringifyFilters, useMemoFilterContext } from "@/contexts/MemoFilterContext";
+import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/useAIChat";
 import { useAttachmentLibraryStats } from "@/hooks/useAttachmentLibrary";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { type MemoStatsContext, useFilteredMemoStats } from "@/hooks/useFilteredMemoStats";
@@ -354,6 +357,166 @@ const InboxSidebarContent = () => {
   );
 };
 
+const AIChatSidebarContent = () => {
+  const t = useTranslate();
+  const navigate = useNavigate();
+  const { setMobileOpen } = useAppSidebar();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const { data: conversations = [] } = useConversations();
+  const createConversation = useCreateConversation();
+  const deleteConversation = useDeleteConversation();
+  const [deleteTarget, setDeleteTarget] = useState<string>();
+  const [renamingId, setRenamingId] = useState<string>();
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const activeConversationId = searchParams.get("conversation") ?? undefined;
+
+  const handleCreate = async () => {
+    try {
+      const res = await createConversation.mutateAsync({});
+      navigate(`${ROUTES.AI_CHAT}?conversation=${res.id}`);
+      setMobileOpen(false);
+    } catch (error: unknown) {
+      handleError(error, toast.error, { context: "Create conversation" });
+    }
+  };
+
+  const startRename = (conv: { id: string; title: string }) => {
+    setRenamingId(conv.id);
+    setRenameValue(conv.title);
+    // Focus after the input mounts.
+    requestAnimationFrame(() => renameInputRef.current?.focus());
+  };
+
+  const commitRename = async () => {
+    if (!renamingId) return;
+    const trimmed = renameValue.trim();
+    const original = conversations.find((c) => c.id === renamingId)?.title ?? "";
+    setRenamingId(undefined);
+    if (!trimmed || trimmed === original) return;
+    try {
+      await aiChatServiceClient.updateConversation({ conversation: { id: renamingId, title: trimmed } });
+      queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversations"] });
+    } catch (error: unknown) {
+      handleError(error, toast.error, { context: "Rename conversation" });
+    }
+  };
+
+  const cancelRename = () => setRenamingId(undefined);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    try {
+      await deleteConversation.mutateAsync(id);
+      toast.success(t("aiChat.delete-success"));
+      if (activeConversationId === id) {
+        setSearchParams({}, { replace: true });
+        navigate(ROUTES.AI_CHAT, { replace: true });
+      }
+    } catch (error: unknown) {
+      handleError(error, toast.error, { context: "Delete conversation" });
+    } finally {
+      setDeleteTarget(undefined);
+    }
+  };
+
+  return (
+    <SidebarSection
+      label={t("aiChat.title")}
+      action={
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={SIDEBAR_SECTION_ACTION_BUTTON_CLASSES}
+          onClick={handleCreate}
+          disabled={createConversation.isPending}
+          aria-label={t("aiChat.new-conversation")}
+        >
+          <SquarePenIcon className={SIDEBAR_SECTION_ACTION_ICON_CLASSES} strokeWidth={1.8} />
+        </Button>
+      }
+    >
+      {conversations.length === 0 ? (
+        <div className="px-2 py-1 text-sm text-muted-foreground">{t("aiChat.no-conversations")}</div>
+      ) : (
+        conversations.map((conv) => {
+          const active = activeConversationId === conv.id;
+          const isRenaming = renamingId === conv.id;
+          return (
+            <div key={conv.id} className={cn(SIDEBAR_ROW_CLASSES, "group/conv", sidebarRowStateClasses(active))}>
+              {isRenaming ? (
+                <Input
+                  ref={renameInputRef}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRename();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelRename();
+                    }
+                  }}
+                  className="h-7 min-w-0 flex-1 rounded-md px-2 text-sm"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate(`${ROUTES.AI_CHAT}?conversation=${conv.id}`);
+                    setMobileOpen(false);
+                  }}
+                  className="flex h-full min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  <BotIcon className={SIDEBAR_ROW_ICON_CLASSES} strokeWidth={1.8} />
+                  <span className="min-w-0 flex-1 truncate">{conv.title || conv.id}</span>
+                </button>
+              )}
+              {!isRenaming && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    nativeButton={false}
+                    render={
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label={t("common.more")}
+                        className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-opacity hover:bg-background/70 md:opacity-0 md:group-hover/conv:opacity-100 md:focus-visible:opacity-100 data-popup-open:opacity-100"
+                      />
+                    }
+                  >
+                    <MoreHorizontalIcon className="size-3.5" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={2} size="sm">
+                    <DropdownMenuItem onClick={() => startRename(conv)}>{t("common.rename")}</DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(conv.id)}>
+                      {t("common.delete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          );
+        })
+      )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(undefined)}
+        title={t("aiChat.delete-confirm")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={handleDelete}
+        confirmVariant="destructive"
+      />
+    </SidebarSection>
+  );
+};
+
 const SettingsSidebarContent = () => {
   const t = useTranslate();
   const location = useLocation();
@@ -407,6 +570,7 @@ const RouteSidebarContent = () => {
   if (kind === "views") return <ViewsSection manageActive />;
   if (kind === "attachments") return <AttachmentsSidebarContent />;
   if (kind === "inbox") return <InboxSidebarContent />;
+  if (kind === "ai-chat") return <AIChatSidebarContent />;
   if (kind === "settings") return <SettingsSidebarContent />;
   if (kind === "memo" && memoDetail) return <MemoDetailSidebarContent />;
   // Routes without a specific tenant (about, error pages, unknown paths, memo detail
@@ -519,6 +683,13 @@ const GlobalNavigation = () => {
           icon: BellIcon,
           active: location.pathname === ROUTES.INBOX,
           count: unreadCount,
+        },
+        {
+          id: "ai-chat",
+          label: t("aiChat.title"),
+          path: ROUTES.AI_CHAT,
+          icon: BotIcon,
+          active: location.pathname === ROUTES.AI_CHAT,
         },
       ]
     : [

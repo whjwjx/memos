@@ -615,14 +615,9 @@
       "tool-get-comments": "读取某条 memo 下的评论。",
       "tool-manage-settings": "修改用户或实例设置（需确认）。",
       "tool-create-memo": "创建新 memo（需确认）。",
-      "tool-summarize-requirements": "将近期 memos 聚类整理成汇总 memo（需确认）。",
       "tool-agent-reply": "触发某条 memo 的 AI 评论（需确认）。",
       "tool-auto-tag": "为 memo 自动打标签（需确认）。",
-      "tool-query-queue": "查看 agent 评论 / 打标队列状态（管理员）。",
-      "tool-query-my-data": "对当前用户自己的数据做只读查询（强制行级过滤）。",
-      "tool-query-db": "对业务表做完整读写查询（管理员，需确认）。",
-      "tool-get-logs": "读取实例日志（管理员）。",
-      "tool-project-status": "展示实例的 memo/用户/队列统计（管理员）。"
+      "tool-delete-memo": "永久删除一条 memo（需确认）。"
     },
     "preference": {
       "appearance-description": "选择当前账号使用的界面语言和外观主题。",
@@ -1084,5 +1079,18 @@
       "description": "这些文件从未附加到任何备忘。可在此查看或删除。",
       "title": "未关联的上传"
     }
+  },
+  "aiChat": {
+    "title": "AI 对话",
+    "empty-hint": "与你的 AI 助手开始一段对话。",
+    "start-hint": "发送消息开始对话。",
+    "new-conversation": "新建对话",
+    "input-placeholder": "询问任何问题，或让助手搜索、创建、整理你的备忘录…",
+    "tool-result": "工具结果",
+    "confirm-tools": "助手想要运行以下工具，确认后继续。",
+    "confirm": "确认并继续",
+    "no-conversations": "暂无对话",
+    "delete-confirm": "确定删除这段对话吗？此操作不可撤销，对话历史将被永久清除。",
+    "delete-success": "对话已删除"
   }
 }
