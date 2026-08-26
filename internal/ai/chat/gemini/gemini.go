@@ -4,6 +4,7 @@ package gemini
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strings"
 
@@ -64,18 +65,35 @@ func (m *Model) Generate(ctx context.Context, req chat.Request) (*chat.Response,
 		return nil, errors.New("at least one message or a system prompt is required")
 	}
 
-	var parts []*genai.Part
+	var contents []*genai.Content
 	if req.System != "" {
-		parts = append(parts, genai.NewPartFromText(req.System))
+		contents = append(contents, genai.NewContentFromText(req.System, genai.RoleUser))
 	}
 	for _, msg := range req.Messages {
 		switch strings.ToLower(strings.TrimSpace(msg.Role)) {
 		case chat.RoleAssistant:
-			parts = append(parts, genai.NewPartFromText("ASSISTANT: "+msg.Content))
-		case chat.RoleSystem:
-			parts = append(parts, genai.NewPartFromText(msg.Content))
+			// An assistant turn may carry tool calls requested in a prior step.
+			if len(msg.ToolCalls) > 0 {
+				parts := make([]*genai.Part, 0, len(msg.ToolCalls))
+				for _, tc := range msg.ToolCalls {
+					var args map[string]any
+					_ = json.Unmarshal([]byte(tc.ArgumentsJSON), &args)
+					parts = append(parts, genai.NewPartFromFunctionCall(tc.Name, args))
+				}
+				if strings.TrimSpace(msg.Content) != "" {
+					parts = append(parts, genai.NewPartFromText(msg.Content))
+				}
+				contents = append(contents, genai.NewContentFromParts(parts, genai.RoleModel))
+				continue
+			}
+			contents = append(contents, genai.NewContentFromText("ASSISTANT: "+msg.Content, genai.RoleModel))
+		case chat.RoleTool:
+			// A tool result answers a prior function call.
+			var resp map[string]any
+			_ = json.Unmarshal([]byte(msg.Content), &resp)
+			contents = append(contents, genai.NewContentFromFunctionResponse(msg.Name, resp, genai.RoleUser))
 		default:
-			parts = append(parts, genai.NewPartFromText("USER: "+msg.Content))
+			contents = append(contents, genai.NewContentFromText("USER: "+msg.Content, genai.RoleUser))
 		}
 	}
 
@@ -87,18 +105,140 @@ func (m *Model) Generate(ctx context.Context, req chat.Request) (*chat.Response,
 	if req.MaxTokens > 0 {
 		cfg.MaxOutputTokens = int32(req.MaxTokens)
 	}
+	if len(req.Tools) > 0 {
+		tool := &genai.Tool{}
+		for _, t := range req.Tools {
+			tool.FunctionDeclarations = append(tool.FunctionDeclarations, &genai.FunctionDeclaration{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  geminiSchemaFromJSON(t.ParametersJSON),
+			})
+		}
+		cfg.Tools = []*genai.Tool{tool}
+		switch strings.ToLower(strings.TrimSpace(req.ToolChoice)) {
+		case chat.ToolChoiceNone:
+			cfg.ToolConfig = &genai.ToolConfig{
+				FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeNone},
+			}
+		case chat.ToolChoiceRequired:
+			cfg.ToolConfig = &genai.ToolConfig{
+				FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeAny},
+			}
+		case chat.ToolChoiceAuto:
+			cfg.ToolConfig = &genai.ToolConfig{
+				FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeAuto},
+			}
+		default:
+			if req.ToolChoice != "" {
+				cfg.ToolConfig = &genai.ToolConfig{
+					FunctionCallingConfig: &genai.FunctionCallingConfig{
+						Mode:                 genai.FunctionCallingConfigModeAny,
+						AllowedFunctionNames: []string{req.ToolChoice},
+					},
+				}
+			}
+		}
+	}
 
-	resp, err := m.client.Models.GenerateContent(ctx, normalizeModelName(req.Model), []*genai.Content{
-		genai.NewContentFromParts(parts, genai.RoleUser),
-	}, cfg)
+	resp, err := m.client.Models.GenerateContent(ctx, normalizeModelName(req.Model), contents, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send Gemini request")
 	}
 
-	return &chat.Response{
+	out := &chat.Response{
 		Text:         strings.TrimSpace(resp.Text()),
 		FinishReason: mapFinishReason(resp),
-	}, nil
+	}
+	// Extract function calls from the first candidate's parts.
+	if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+		for _, part := range resp.Candidates[0].Content.Parts {
+			if part.FunctionCall == nil {
+				continue
+			}
+			argsJSON, err := json.Marshal(part.FunctionCall.Args)
+			if err != nil {
+				argsJSON = []byte("{}")
+			}
+			out.ToolCalls = append(out.ToolCalls, chat.ToolCall{
+				ID:            part.FunctionCall.ID,
+				Name:          part.FunctionCall.Name,
+				ArgumentsJSON: string(argsJSON),
+			})
+		}
+	}
+	return out, nil
+}
+
+// geminiSchemaFromJSON converts a JSON Schema string into a Gemini Schema.
+// Gemini uses upper-cased type names (e.g. "STRING") that differ from the
+// lowercase JSON Schema convention, so we map them while walking the tree.
+func geminiSchemaFromJSON(raw string) *genai.Schema {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil
+	}
+	return buildGeminiSchema(m)
+}
+
+func buildGeminiSchema(m map[string]any) *genai.Schema {
+	if m == nil {
+		return nil
+	}
+	schema := &genai.Schema{}
+	if desc, ok := m["description"].(string); ok {
+		schema.Description = desc
+	}
+	if t, ok := m["type"].(string); ok {
+		schema.Type = mapJSONTypeToGemini(t)
+	}
+	if enum, ok := m["enum"].([]any); ok {
+		for _, e := range enum {
+			if s, ok := e.(string); ok {
+				schema.Enum = append(schema.Enum, s)
+			}
+		}
+	}
+	if props, ok := m["properties"].(map[string]any); ok {
+		schema.Properties = make(map[string]*genai.Schema, len(props))
+		for name, p := range props {
+			if pm, ok := p.(map[string]any); ok {
+				schema.Properties[name] = buildGeminiSchema(pm)
+			}
+		}
+	}
+	if req, ok := m["required"].([]any); ok {
+		for _, r := range req {
+			if s, ok := r.(string); ok {
+				schema.Required = append(schema.Required, s)
+			}
+		}
+	}
+	if items, ok := m["items"].(map[string]any); ok {
+		schema.Items = buildGeminiSchema(items)
+	}
+	return schema
+}
+
+func mapJSONTypeToGemini(t string) genai.Type {
+	switch strings.ToLower(t) {
+	case "string":
+		return genai.TypeString
+	case "number":
+		return genai.TypeNumber
+	case "integer":
+		return genai.TypeInteger
+	case "boolean":
+		return genai.TypeBoolean
+	case "array":
+		return genai.TypeArray
+	case "object":
+		return genai.TypeObject
+	default:
+		return genai.TypeUnspecified
+	}
 }
 
 func mapFinishReason(resp *genai.GenerateContentResponse) chat.FinishReason {

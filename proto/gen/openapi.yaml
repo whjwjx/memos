@@ -6,6 +6,181 @@ info:
     title: ""
     version: 0.0.1
 paths:
+    /api/v1/ai/chats:
+        get:
+            tags:
+                - AIChatService
+            description: ListConversations lists the current user's chat sessions, newest first.
+            operationId: AIChatService_ListConversations
+            parameters:
+                - name: pageSize
+                  in: query
+                  description: Maximum number of conversations to return. Defaults to 50.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: A page token from a previous response.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListConversationsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - AIChatService
+            description: CreateConversation starts a new chat session for the current user.
+            operationId: AIChatService_CreateConversation
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CreateConversationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Conversation'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/chats/{conversation.id}:
+        patch:
+            tags:
+                - AIChatService
+            description: |-
+                UpdateConversation patches mutable fields (currently the title) of a chat
+                 session. Used to set a human-readable title from the first user message.
+            operationId: AIChatService_UpdateConversation
+            parameters:
+                - name: conversation.id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateConversationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Conversation'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/chats/{conversationId}:sendMessage:
+        post:
+            tags:
+                - AIChatService
+            description: |-
+                SendMessage appends a user turn and runs the assistant. The assistant may
+                 return tool calls (and mark sensitive ones for confirmation) or a final
+                 reply. To continue after a confirmation, resend with approved_tool_call_ids
+                 populated so the assistant executes the pending tool calls.
+            operationId: AIChatService_SendMessage
+            parameters:
+                - name: conversationId
+                  in: path
+                  description: Required. Conversation resource id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SendMessageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SendMessageResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/chats/{id}:
+        get:
+            tags:
+                - AIChatService
+            description: GetConversation returns a conversation and its message history (oldest first).
+            operationId: AIChatService_GetConversation
+            parameters:
+                - name: id
+                  in: path
+                  description: Required. Conversation resource id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetConversationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - AIChatService
+            description: DeleteConversation removes a chat session and its messages.
+            operationId: AIChatService_DeleteConversation
+            parameters:
+                - name: id
+                  in: path
+                  description: Required. Conversation resource id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteConversationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/ai/providers:test:
         post:
             tags:
@@ -2578,6 +2753,70 @@ components:
                      };
 
                      // ...
+        Conversation:
+            type: object
+            properties:
+                id:
+                    readOnly: true
+                    type: string
+                    description: Output only. Server-assigned id.
+                name:
+                    readOnly: true
+                    type: string
+                    description: Output only. Stable resource name, e.g. "conversations/abc123".
+                title:
+                    type: string
+                    description: The human-readable title shown in the chat list.
+                agentId:
+                    type: string
+                    description: Optional. The chat agent preset id this conversation is bound to.
+                createTime:
+                    readOnly: true
+                    type: string
+                    description: Output only. Unix timestamp of creation.
+                updateTime:
+                    readOnly: true
+                    type: string
+                    description: Output only. Unix timestamp of the last update.
+            description: Conversation is a single AI chat session owned by a user.
+        ConversationMessage:
+            type: object
+            properties:
+                id:
+                    readOnly: true
+                    type: string
+                    description: Output only.
+                role:
+                    type: string
+                    description: 'Role of the author: "user", "assistant", "tool", or "system".'
+                content:
+                    type: string
+                    description: Text content of the message. Empty when the turn is a tool call request.
+                toolCalls:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ToolCall'
+                    description: Tool calls requested by the assistant this turn (assistant turns only).
+                toolCallId:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        For a tool-result turn, the id of the assistant tool call this message
+                         answers. Lets the client correlate results back to the originating call.
+                name:
+                    readOnly: true
+                    type: string
+                    description: For a tool-result turn, the name of the tool that produced this message.
+            description: ConversationMessage is a single turn within a conversation.
+        CreateConversationRequest:
+            type: object
+            properties:
+                agentId:
+                    type: string
+                    description: Optional. Agent preset id to bind. Empty uses the default agent.
+                title:
+                    type: string
+                    description: Optional. Initial title.
         CreateLinkedIdentityRequest:
             required:
                 - parent
@@ -2626,6 +2865,9 @@ components:
                 token:
                     type: string
                     description: "The actual token value - only returned on creation.\r\n This is the only time the token value will be visible."
+        DeleteConversationResponse:
+            type: object
+            properties: {}
         FieldMapping:
             type: object
             properties:
@@ -2647,6 +2889,15 @@ components:
                 logoUrl:
                     type: string
             description: Custom profile configuration for instance branding.
+        GetConversationResponse:
+            type: object
+            properties:
+                conversation:
+                    $ref: '#/components/schemas/Conversation'
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ConversationMessage'
         GetCurrentUserResponse:
             type: object
             properties:
@@ -3109,6 +3360,16 @@ components:
                 nextPageToken:
                     type: string
                     description: "A token that can be sent as `page_token` to retrieve the next page.\r\n If this field is omitted, there are no subsequent pages."
+        ListConversationsResponse:
+            type: object
+            properties:
+                conversations:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Conversation'
+                nextPageToken:
+                    type: string
+                    description: Token for the next page, if any.
         ListIdentityProvidersResponse:
             type: object
             properties:
@@ -3622,6 +3883,46 @@ components:
                     type: string
                     description: When the access token expires.
                     format: date-time
+        SendMessageRequest:
+            required:
+                - conversationId
+                - content
+            type: object
+            properties:
+                conversationId:
+                    type: string
+                    description: Required. Conversation resource id.
+                content:
+                    type: string
+                    description: Required for a new user turn. Text the user typed.
+                approvedToolCallIds:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Populate when continuing after a confirmation. Ids of tool calls the user
+                         approved; the assistant executes them and continues the loop.
+        SendMessageResponse:
+            type: object
+            properties:
+                content:
+                    type: string
+                    description: The assistant's reply text, if the turn finished without pending tools.
+                toolCalls:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ToolCall'
+                    description: |-
+                        Tool calls the assistant requested this turn. Sensitive ones carry
+                         requires_confirmation=true and must be approved before re-sending.
+                requiresConfirmation:
+                    type: boolean
+                    description: True when the assistant is waiting for confirmation on one or more tools.
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ConversationMessage'
+                    description: Assistant turns appended during this request (including tool results).
         SetMemoAttachmentsRequest:
             required:
                 - name
@@ -3798,6 +4099,25 @@ components:
                     type: string
                     description: Optional. Recipient email address. If omitted, the current user's email address is used.
             description: Request message for TestInstanceEmailSetting method.
+        ToolCall:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Unique id correlating the call with its result message.
+                name:
+                    type: string
+                    description: The tool (function) name.
+                arguments:
+                    type: string
+                    description: JSON-encoded arguments for the call.
+                result:
+                    type: string
+                    description: Present on the tool result message answering this call.
+                requiresConfirmation:
+                    type: boolean
+                    description: True when the tool requires user confirmation before executing.
+            description: ToolCall is a single function call the assistant requested.
         TranscribeRequest:
             required:
                 - audio
@@ -3830,6 +4150,19 @@ components:
                 contentType:
                     type: string
                     description: Optional. The MIME type of the input audio.
+        UpdateConversationRequest:
+            required:
+                - conversation
+            type: object
+            properties:
+                conversation:
+                    allOf:
+                        - $ref: '#/components/schemas/Conversation'
+                    description: Required. The conversation to update, identified by id (or name).
+                updateMask:
+                    type: string
+                    description: Fields to update (currently only title is honored).
+                    format: field-mask
         UpsertMemoReactionRequest:
             required:
                 - name
@@ -4138,6 +4471,11 @@ components:
                     type: number
                     format: double
 tags:
+    - name: AIChatService
+      description: |-
+        AIChatService exposes the conversational AI assistant with tool-calling
+         support. It is decoupled from AIService, which holds AI infrastructure
+         operations such as transcription and provider probing.
     - name: AIService
     - name: AttachmentService
     - name: AuthService

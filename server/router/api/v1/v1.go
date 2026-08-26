@@ -35,6 +35,7 @@ type APIV1Service struct {
 	v1pb.UnimplementedAIServiceServer
 	v1pb.UnimplementedMemoViewServiceServer
 	v1pb.UnimplementedIdentityProviderServiceServer
+	v1pb.UnimplementedAIChatServiceServer
 
 	Secret                  string
 	Profile                 *profile.Profile

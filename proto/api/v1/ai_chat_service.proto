@@ -1,0 +1,205 @@
+syntax = "proto3";
+
+package memos.api.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+
+option go_package = "gen/api/v1";
+
+// AIChatService exposes the conversational AI assistant with tool-calling
+// support. It is decoupled from AIService, which holds AI infrastructure
+// operations such as transcription and provider probing.
+service AIChatService {
+  // CreateConversation starts a new chat session for the current user.
+  rpc CreateConversation(CreateConversationRequest) returns (Conversation) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/chats"
+      body: "*"
+    };
+    option (google.api.method_signature) = "agent_id";
+  }
+
+  // ListConversations lists the current user's chat sessions, newest first.
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/ai/chats"
+    };
+  }
+
+  // GetConversation returns a conversation and its message history (oldest first).
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/ai/chats/{id}"
+    };
+    option (google.api.method_signature) = "id";
+  }
+
+  // DeleteConversation removes a chat session and its messages.
+  rpc DeleteConversation(DeleteConversationRequest) returns (DeleteConversationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/ai/chats/{id}"
+    };
+    option (google.api.method_signature) = "id";
+  }
+
+  // UpdateConversation patches mutable fields (currently the title) of a chat
+  // session. Used to set a human-readable title from the first user message.
+  rpc UpdateConversation(UpdateConversationRequest) returns (Conversation) {
+    option (google.api.http) = {
+      patch: "/api/v1/ai/chats/{conversation.id}"
+      body: "*"
+    };
+    option (google.api.method_signature) = "conversation";
+  }
+
+  // SendMessage appends a user turn and runs the assistant. The assistant may
+  // return tool calls (and mark sensitive ones for confirmation) or a final
+  // reply. To continue after a confirmation, resend with approved_tool_call_ids
+  // populated so the assistant executes the pending tool calls.
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/chats/{conversation_id}:sendMessage"
+      body: "*"
+    };
+    option (google.api.method_signature) = "conversation_id,content";
+  }
+}
+
+// Conversation is a single AI chat session owned by a user.
+message Conversation {
+  // Output only. Server-assigned id.
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Stable resource name, e.g. "conversations/abc123".
+  string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The human-readable title shown in the chat list.
+  string title = 3;
+
+  // Optional. The chat agent preset id this conversation is bound to.
+  string agent_id = 4;
+
+  // Output only. Unix timestamp of creation.
+  int64 create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Unix timestamp of the last update.
+  int64 update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ConversationMessage is a single turn within a conversation.
+message ConversationMessage {
+  // Output only.
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Role of the author: "user", "assistant", "tool", or "system".
+  string role = 2;
+
+  // Text content of the message. Empty when the turn is a tool call request.
+  string content = 3;
+
+  // Tool calls requested by the assistant this turn (assistant turns only).
+  repeated ToolCall tool_calls = 4;
+
+  // For a tool-result turn, the id of the assistant tool call this message
+  // answers. Lets the client correlate results back to the originating call.
+  string tool_call_id = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // For a tool-result turn, the name of the tool that produced this message.
+  string name = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ToolCall is a single function call the assistant requested.
+message ToolCall {
+  // Unique id correlating the call with its result message.
+  string id = 1;
+
+  // The tool (function) name.
+  string name = 2;
+
+  // JSON-encoded arguments for the call.
+  string arguments = 3;
+
+  // Present on the tool result message answering this call.
+  string result = 4;
+
+  // True when the tool requires user confirmation before executing.
+  bool requires_confirmation = 5;
+}
+
+message CreateConversationRequest {
+  // Optional. Agent preset id to bind. Empty uses the default agent.
+  string agent_id = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Initial title.
+  string title = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message ListConversationsRequest {
+  // Maximum number of conversations to return. Defaults to 50.
+  int32 page_size = 1;
+
+  // A page token from a previous response.
+  string page_token = 2;
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+
+  // Token for the next page, if any.
+  string next_page_token = 2;
+}
+
+message GetConversationRequest {
+  // Required. Conversation resource id.
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetConversationResponse {
+  Conversation conversation = 1;
+  repeated ConversationMessage messages = 2;
+}
+
+message DeleteConversationRequest {
+  // Required. Conversation resource id.
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message DeleteConversationResponse {}
+
+message UpdateConversationRequest {
+  // Required. The conversation to update, identified by id (or name).
+  Conversation conversation = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Fields to update (currently only title is honored).
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message SendMessageRequest {
+  // Required. Conversation resource id.
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required for a new user turn. Text the user typed.
+  string content = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // Populate when continuing after a confirmation. Ids of tool calls the user
+  // approved; the assistant executes them and continues the loop.
+  repeated string approved_tool_call_ids = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message SendMessageResponse {
+  // The assistant's reply text, if the turn finished without pending tools.
+  string content = 1;
+
+  // Tool calls the assistant requested this turn. Sensitive ones carry
+  // requires_confirmation=true and must be approved before re-sending.
+  repeated ToolCall tool_calls = 2;
+
+  // True when the assistant is waiting for confirmation on one or more tools.
+  bool requires_confirmation = 3;
+
+  // Assistant turns appended during this request (including tool results).
+  repeated ConversationMessage messages = 4;
+}
