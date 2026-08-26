@@ -302,6 +302,50 @@ message InstanceSetting {
     // capability instance of the Agent system, applied instance-wide by an
     // admin. When empty, the auto-tagging feature is disabled.
     repeated TaggerConfig taggers = 4;
+
+    // chat_agents is the list of conversational assistant presets surfaced in the
+    // /ai-chat page. Stage 1 uses only the first enabled preset as the default
+    // assistant; a second enabled preset triggers the agent selector in the UI.
+    repeated ChatAgentConfig chat_agents = 5;
+
+    // tools is the per-tool toggle and safety configuration for the conversational
+    // assistant, keyed by tool name (e.g. "query_db"). Admin controls enable and
+    // whether a tool requires a confirmation card before executing.
+    map<string, ToolConfig> tools = 6;
+  }
+
+  // ChatAgentConfig describes a conversational assistant preset for the /ai-chat
+  // page. It is a prompt + provider binding with an authorized tool set. Multiple
+  // presets are admin extensions that differ only in system prompt and capability
+  // scope; they are NOT separate agent runtimes.
+  message ChatAgentConfig {
+    // id is the stable identifier of the preset.
+    string id = 1;
+    // name is the human-readable preset name shown in the selector (stage 2+).
+    string name = 2;
+    // builtin marks a preset shipped with memos. Built-in presets cannot be
+    // deleted, but their name/system_prompt may be edited.
+    bool builtin = 3;
+    // provider_id references an entry in AISetting.providers[].id.
+    // Empty string means the preset is disabled.
+    string provider_id = 4;
+    // model is the provider-specific text-generation model identifier.
+    // Empty string falls back to the engine default.
+    string model = 5;
+    // system_prompt steers the assistant's behavior, tone, and constraints.
+    string system_prompt = 6;
+    // enabled toggles whether the preset is selectable in /ai-chat.
+    bool enabled = 7;
+  }
+
+  // ToolConfig is the per-tool toggle and safety configuration stored in
+  // AISetting.tools, keyed by tool name.
+  message ToolConfig {
+    // enabled controls whether the tool is exposed to any user.
+    bool enabled = 1;
+    // requires_confirmation marks a sensitive tool that must show a confirmation
+    // card before executing (e.g. write operations).
+    bool requires_confirmation = 2;
   }
 
   // AgentConfig describes an AI persona that posts comment-style replies to

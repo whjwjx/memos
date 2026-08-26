@@ -93,6 +93,12 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 	if err := preparePersistedTaggerConfigs(setting, existingProviders); err != nil {
 		return err
 	}
+	if err := preparePersistedChatAgentConfigs(setting, existingProviders); err != nil {
+		return err
+	}
+	if err := preparePersistedToolConfigs(setting); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -126,6 +132,49 @@ func preparePersistedTaggerConfigs(setting *storepb.InstanceAISetting, existingP
 
 		if tagger.MaxTags < 0 {
 			return errors.Errorf("tagger %q max_tags must be >= 0", tagger.Id)
+		}
+	}
+	return nil
+}
+
+func preparePersistedChatAgentConfigs(setting *storepb.InstanceAISetting, existingProviders map[string]*storepb.AIProviderConfig) error {
+	chatAgentIDs := map[string]bool{}
+	for _, chatAgent := range setting.GetChatAgents() {
+		if chatAgent == nil {
+			return errors.New("chat agent cannot be nil")
+		}
+
+		chatAgent.Id = strings.TrimSpace(chatAgent.Id)
+		if chatAgent.Id == "" {
+			chatAgent.Id = shortuuid.New()
+		}
+		if chatAgentIDs[chatAgent.Id] {
+			return errors.Errorf("duplicate chat agent ID %q", chatAgent.Id)
+		}
+		chatAgentIDs[chatAgent.Id] = true
+
+		chatAgent.Name = strings.TrimSpace(chatAgent.Name)
+		if chatAgent.Name == "" {
+			return errors.New("chat agent name is required")
+		}
+
+		chatAgent.ProviderId = strings.TrimSpace(chatAgent.ProviderId)
+		if chatAgent.ProviderId != "" {
+			if _, ok := existingProviders[chatAgent.ProviderId]; !ok {
+				return errors.Errorf("chat agent %q references unknown provider_id %q", chatAgent.Id, chatAgent.ProviderId)
+			}
+		}
+
+		chatAgent.Model = strings.TrimSpace(chatAgent.Model)
+		chatAgent.SystemPrompt = strings.TrimSpace(chatAgent.SystemPrompt)
+	}
+	return nil
+}
+
+func preparePersistedToolConfigs(setting *storepb.InstanceAISetting) error {
+	for name, tool := range setting.GetTools() {
+		if tool == nil {
+			return errors.Errorf("tool %q cannot be nil", name)
 		}
 	}
 	return nil

@@ -2793,6 +2793,16 @@ components:
                     items:
                         $ref: '#/components/schemas/InstanceSetting_TaggerConfig'
                     description: "taggers is the list of AI auto-tagging rules. A tagger is the tagging\r\n capability instance of the Agent system, applied instance-wide by an\r\n admin. When empty, the auto-tagging feature is disabled."
+                chatAgents:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/InstanceSetting_ChatAgentConfig'
+                    description: "chat_agents is the list of conversational assistant presets surfaced in the\r\n /ai-chat page. Stage 1 uses only the first enabled preset as the default\r\n assistant; a second enabled preset triggers the agent selector in the UI."
+                tools:
+                    type: object
+                    additionalProperties:
+                        $ref: '#/components/schemas/InstanceSetting_ToolConfig'
+                    description: "tools is the per-tool toggle and safety configuration for the conversational\r\n assistant, keyed by tool name (e.g. \"query_db\"). Admin controls enable and\r\n whether a tool requires a confirmation card before executing."
             description: AI provider configuration settings.
         InstanceSetting_AgentConfig:
             type: object
@@ -2827,6 +2837,31 @@ components:
                     description: max_length caps the generated reply length (in characters).
                     format: int32
             description: "AgentConfig describes an AI persona that posts comment-style replies to\r\n memos. Configured instance-wide by an admin; regular users only consume them."
+        InstanceSetting_ChatAgentConfig:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: id is the stable identifier of the preset.
+                name:
+                    type: string
+                    description: name is the human-readable preset name shown in the selector (stage 2+).
+                builtin:
+                    type: boolean
+                    description: "builtin marks a preset shipped with memos. Built-in presets cannot be\r\n deleted, but their name/system_prompt may be edited."
+                providerId:
+                    type: string
+                    description: "provider_id references an entry in AISetting.providers[].id.\r\n Empty string means the preset is disabled."
+                model:
+                    type: string
+                    description: "model is the provider-specific text-generation model identifier.\r\n Empty string falls back to the engine default."
+                systemPrompt:
+                    type: string
+                    description: system_prompt steers the assistant's behavior, tone, and constraints.
+                enabled:
+                    type: boolean
+                    description: enabled toggles whether the preset is selectable in /ai-chat.
+            description: "ChatAgentConfig describes a conversational assistant preset for the /ai-chat\r\n page. It is a prompt + provider binding with an authorized tool set. Multiple\r\n presets are admin extensions that differ only in system prompt and capability\r\n scope; they are NOT separate agent runtimes."
         InstanceSetting_GeneralSetting:
             type: object
             properties:
@@ -2976,6 +3011,16 @@ components:
                         $ref: '#/components/schemas/InstanceSetting_TagMetadata'
                     description: "Map of tag name pattern to tag metadata.\r\n Each key is treated as an anchored regular expression (^pattern$),\r\n so a single entry like \"project/.*\" matches all tags under that prefix.\r\n Exact tag names are also valid (they are trivially valid regex patterns)."
             description: "Tag metadata configuration.\r\n Active tag metadata is stored in per-user tag settings.\r\n This message remains for backward compatibility with existing clients and migrations."
+        InstanceSetting_ToolConfig:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                    description: enabled controls whether the tool is exposed to any user.
+                requiresConfirmation:
+                    type: boolean
+                    description: "requires_confirmation marks a sensitive tool that must show a confirmation\r\n card before executing (e.g. write operations)."
+            description: "ToolConfig is the per-tool toggle and safety configuration stored in\r\n AISetting.tools, keyed by tool name."
         InstanceSetting_TranscriptionConfig:
             type: object
             properties:
@@ -3965,6 +4010,12 @@ components:
                     type: integer
                     description: "The end of the calendar day in minutes from midnight.\r\n Hours after this are hidden in the calendar week view. Defaults to 1440."
                     format: int32
+                showCommentPreview:
+                    type: boolean
+                    description: "Whether to show the first few comments under each memo in the feed.\r\n When false, memo cards in the list no longer render the comment preview.\r\n Defaults to true."
+                commentIndicatorOnHover:
+                    type: boolean
+                    description: "Whether the memo card comment count indicator is only shown on hover.\r\n When true, the indicator is hidden until the card is hovered. Defaults to false (always shown)."
             description: General user settings configuration.
         UserSetting_TagMetadata:
             type: object

@@ -22,9 +22,13 @@ import {
   InstanceSetting_AIProviderConfigSchema,
   InstanceSetting_AIProviderType,
   InstanceSetting_AISettingSchema,
+  InstanceSetting_ChatAgentConfig,
+  InstanceSetting_ChatAgentConfigSchema,
   InstanceSetting_Key,
   InstanceSetting_TaggerConfig,
   InstanceSetting_TaggerConfigSchema,
+  InstanceSetting_ToolConfig,
+  InstanceSetting_ToolConfigSchema,
   InstanceSetting_TranscriptionConfig,
   InstanceSetting_TranscriptionConfigSchema,
   InstanceSettingSchema,
@@ -180,6 +184,84 @@ const toTaggerConfig = (tagger: LocalTagger) =>
     maxTags: tagger.maxTags,
   });
 
+// Static registry of the conversational assistant's built-in tools. The tool set
+// is fixed server-side; admin may only toggle enable and mark confirmation. Keys
+// must match internal/ai/tools registry names. `description` is an i18n key
+// resolved with t() at render time.
+const toolRegistry: { name: string; descriptionKey: string; adminOnly: boolean; defaultRequiresConfirmation: boolean }[] = [
+  { name: "search_memos", descriptionKey: "setting.ai.tool-search-memos", adminOnly: false, defaultRequiresConfirmation: false },
+  { name: "get_comments", descriptionKey: "setting.ai.tool-get-comments", adminOnly: false, defaultRequiresConfirmation: false },
+  { name: "manage_settings", descriptionKey: "setting.ai.tool-manage-settings", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "create_memo", descriptionKey: "setting.ai.tool-create-memo", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "summarize_requirements", descriptionKey: "setting.ai.tool-summarize-requirements", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "agent_reply", descriptionKey: "setting.ai.tool-agent-reply", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "auto_tag", descriptionKey: "setting.ai.tool-auto-tag", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "query_queue", descriptionKey: "setting.ai.tool-query-queue", adminOnly: true, defaultRequiresConfirmation: false },
+  { name: "query_my_data", descriptionKey: "setting.ai.tool-query-my-data", adminOnly: false, defaultRequiresConfirmation: false },
+  { name: "query_db", descriptionKey: "setting.ai.tool-query-db", adminOnly: true, defaultRequiresConfirmation: false },
+  { name: "get_logs", descriptionKey: "setting.ai.tool-get-logs", adminOnly: true, defaultRequiresConfirmation: false },
+  { name: "project_status", descriptionKey: "setting.ai.tool-project-status", adminOnly: true, defaultRequiresConfirmation: false },
+];
+
+type LocalChatAgent = {
+  id: string;
+  name: string;
+  builtin: boolean;
+  providerId: string;
+  model: string;
+  systemPrompt: string;
+  enabled: boolean;
+};
+
+const toLocalChatAgent = (agent: InstanceSetting_ChatAgentConfig): LocalChatAgent => ({
+  id: agent.id,
+  name: agent.name,
+  builtin: agent.builtin,
+  providerId: agent.providerId,
+  model: agent.model,
+  systemPrompt: agent.systemPrompt,
+  enabled: agent.enabled,
+});
+
+const newChatAgent = (): LocalChatAgent => ({
+  id: uuidv4(),
+  name: "",
+  builtin: false,
+  providerId: "",
+  model: "",
+  systemPrompt: "",
+  enabled: false,
+});
+
+const toChatAgentConfig = (agent: LocalChatAgent) =>
+  create(InstanceSetting_ChatAgentConfigSchema, {
+    id: agent.id,
+    name: agent.name.trim(),
+    builtin: agent.builtin,
+    providerId: agent.providerId,
+    model: agent.model.trim(),
+    systemPrompt: agent.systemPrompt,
+    enabled: agent.enabled,
+  });
+
+type LocalTool = {
+  name: string;
+  enabled: boolean;
+  requiresConfirmation: boolean;
+};
+
+const toLocalTool = (name: string, tool: InstanceSetting_ToolConfig | undefined): LocalTool => ({
+  name,
+  enabled: tool?.enabled ?? false,
+  requiresConfirmation: tool?.requiresConfirmation ?? false,
+});
+
+const toToolConfig = (tool: LocalTool) =>
+  create(InstanceSetting_ToolConfigSchema, {
+    enabled: tool.enabled,
+    requiresConfirmation: tool.requiresConfirmation,
+  });
+
 const toProviderConfig = (provider: LocalAIProvider) =>
   create(InstanceSetting_AIProviderConfigSchema, {
     id: provider.id,
@@ -201,10 +283,29 @@ const AISection = () => {
   const t = useTranslate();
   const saveInstanceSetting = useInstanceSettingUpdater();
   const { aiSetting: originalSetting } = useInstance();
+
+  // Built-in conversational assistant templates. Admin clicks "add from template"
+  // to seed a ChatAgentConfig draft; the resulting entry is indistinguishable from
+  // a user-created one (builtin is informational for the multi-preset selector in a
+  // later stage).
+  const chatAgentTemplates: { name: string; systemPrompt: string }[] = [
+    {
+      name: t("setting.ai.agent-template-general"),
+      systemPrompt: t("setting.ai.agent-template-general-prompt"),
+    },
+    {
+      name: t("setting.ai.agent-template-requirements"),
+      systemPrompt: t("setting.ai.agent-template-requirements-prompt"),
+    },
+  ];
   const [providers, setProviders] = useState<LocalAIProvider[]>(() => originalSetting.providers.map(toLocalProvider));
   const [transcription, setTranscription] = useState<LocalTranscription>(() => toLocalTranscription(originalSetting.transcription));
   const [agents, setAgents] = useState<LocalAgent[]>(() => originalSetting.agents.map(toLocalAgent));
   const [taggers, setTaggers] = useState<LocalTagger[]>(() => originalSetting.taggers.map(toLocalTagger));
+  const [chatAgents, setChatAgents] = useState<LocalChatAgent[]>(() => originalSetting.chatAgents.map(toLocalChatAgent));
+  const [tools, setTools] = useState<LocalTool[]>(() =>
+    toolRegistry.map((tool) => toLocalTool(tool.name, originalSetting.tools[tool.name])),
+  );
   const [editingProvider, setEditingProvider] = useState<LocalAIProvider | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<LocalAIProvider | undefined>();
   const [editingAgent, setEditingAgent] = useState<LocalAgent | undefined>();
@@ -223,6 +324,14 @@ const AISection = () => {
   useEffect(() => {
     setTaggers(originalSetting.taggers.map(toLocalTagger));
   }, [originalSetting.taggers]);
+
+  useEffect(() => {
+    setChatAgents(originalSetting.chatAgents.map(toLocalChatAgent));
+  }, [originalSetting.chatAgents]);
+
+  useEffect(() => {
+    setTools(toolRegistry.map((tool) => toLocalTool(tool.name, originalSetting.tools[tool.name])));
+  }, [originalSetting.tools]);
 
   // Only re-sync the transcription draft when the server-side content actually
   // changes — not on every originalSetting identity change. This prevents
@@ -246,16 +355,22 @@ const AISection = () => {
   );
 
   // Persists the AI setting using a specific providers list, transcription
-  // value, agents list, and taggers list. Provider/transcription/agent
-  // operations pass the current taggers so an in-progress tagger draft is never
-  // accidentally committed.
+  // value, agents list, taggers list, chat agents list, and tools map.
+  // Provider/transcription/agent operations pass the current chat agents and
+  // tools so an in-progress draft is never accidentally committed.
   const persistAISetting = async (
     nextProviders: LocalAIProvider[],
     nextTranscription: InstanceSetting_TranscriptionConfig | undefined,
     nextAgents: LocalAgent[],
     nextTaggers: LocalTagger[],
+    nextChatAgents: LocalChatAgent[],
+    nextTools: LocalTool[],
     errorContext: string,
   ) => {
+    const nextToolMap: Record<string, InstanceSetting_ToolConfig> = {};
+    for (const tool of nextTools) {
+      nextToolMap[tool.name] = toToolConfig(tool);
+    }
     return saveInstanceSetting({
       key: InstanceSetting_Key.AI,
       setting: create(InstanceSettingSchema, {
@@ -267,6 +382,8 @@ const AISection = () => {
             transcription: nextTranscription,
             agents: nextAgents.map(toAgentConfig),
             taggers: nextTaggers.map(toTaggerConfig),
+            chatAgents: nextChatAgents.map(toChatAgentConfig),
+            tools: nextToolMap,
           }),
         },
       }),
@@ -301,7 +418,7 @@ const AISection = () => {
       ? providers.map((item) => (item.id === normalizedProvider.id ? normalizedProvider : item))
       : [...providers, normalizedProvider];
 
-    const ok = await persistAISetting(nextProviders, originalSetting.transcription, agents, taggers, "Update AI provider");
+    const ok = await persistAISetting(nextProviders, originalSetting.transcription, agents, taggers, chatAgents, tools, "Update AI provider");
     if (!ok) return;
     setProviders(nextProviders);
     setEditingProvider(undefined);
@@ -321,7 +438,7 @@ const AISection = () => {
         ? create(InstanceSetting_TranscriptionConfigSchema, {})
         : persistedTranscription;
 
-    const ok = await persistAISetting(nextProviders, nextTranscription, agents, taggers, "Delete AI provider");
+    const ok = await persistAISetting(nextProviders, nextTranscription, agents, taggers, chatAgents, tools, "Delete AI provider");
     if (!ok) return;
     setProviders(nextProviders);
     if (transcription.providerId === target.id) {
@@ -335,7 +452,7 @@ const AISection = () => {
       toast.error(t("setting.ai.transcription-empty-providers"));
       return;
     }
-    await persistAISetting(providers, toTranscriptionConfig(transcription), agents, taggers, "Update transcription");
+    await persistAISetting(providers, toTranscriptionConfig(transcription), agents, taggers, chatAgents, tools, "Update transcription");
   };
 
   const handleCreateAgent = () => {
@@ -365,7 +482,7 @@ const AISection = () => {
       ? agents.map((item) => (item.id === normalizedAgent.id ? normalizedAgent : item))
       : [...agents, normalizedAgent];
 
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, "Update AI agent");
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, chatAgents, tools, "Update AI agent");
     if (!ok) return;
     setAgents(nextAgents);
     setEditingAgent(undefined);
@@ -373,7 +490,7 @@ const AISection = () => {
 
   const handleToggleAgent = async (agent: LocalAgent) => {
     const nextAgents = agents.map((item) => (item.id === agent.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, "Toggle AI agent");
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, chatAgents, tools, "Toggle AI agent");
     if (!ok) return;
     setAgents(nextAgents);
   };
@@ -382,7 +499,7 @@ const AISection = () => {
     if (!deleteAgentTarget) return;
     const target = deleteAgentTarget;
     const nextAgents = agents.filter((agent) => agent.id !== target.id);
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, "Delete AI agent");
+    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, chatAgents, tools, "Delete AI agent");
     if (!ok) return;
     setAgents(nextAgents);
     setDeleteAgentTarget(undefined);
@@ -415,7 +532,7 @@ const AISection = () => {
       ? taggers.map((item) => (item.id === normalizedTagger.id ? normalizedTagger : item))
       : [...taggers, normalizedTagger];
 
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, "Update AI tagger");
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, chatAgents, tools, "Update AI tagger");
     if (!ok) return;
     setTaggers(nextTaggers);
     setEditingTagger(undefined);
@@ -423,7 +540,7 @@ const AISection = () => {
 
   const handleToggleTagger = async (tagger: LocalTagger) => {
     const nextTaggers = taggers.map((item) => (item.id === tagger.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, "Toggle AI tagger");
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, chatAgents, tools, "Toggle AI tagger");
     if (!ok) return;
     setTaggers(nextTaggers);
   };
@@ -432,10 +549,79 @@ const AISection = () => {
     if (!deleteTaggerTarget) return;
     const target = deleteTaggerTarget;
     const nextTaggers = taggers.filter((tagger) => tagger.id !== target.id);
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, "Delete AI tagger");
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, chatAgents, tools, "Delete AI tagger");
     if (!ok) return;
     setTaggers(nextTaggers);
     setDeleteTaggerTarget(undefined);
+  };
+
+  const [editingChatAgent, setEditingChatAgent] = useState<LocalChatAgent | undefined>();
+  const [deleteChatAgentTarget, setDeleteChatAgentTarget] = useState<LocalChatAgent | undefined>();
+
+  const handleCreateChatAgent = () => {
+    setEditingChatAgent(newChatAgent());
+  };
+
+  const handleCreateChatAgentFromTemplate = (template: { name: string; systemPrompt: string }) => {
+    setEditingChatAgent({ ...newChatAgent(), name: template.name, systemPrompt: template.systemPrompt });
+  };
+
+  const handleEditChatAgent = (agent: LocalChatAgent) => {
+    setEditingChatAgent({ ...agent });
+  };
+
+  const handleSaveChatAgent = async (agent: LocalChatAgent) => {
+    const name = agent.name.trim();
+    if (!name) {
+      toast.error(t("setting.ai.chat-agent-name-required"));
+      return;
+    }
+    if (agent.enabled && !agent.providerId) {
+      toast.error(t("setting.ai.chat-agent-provider-required"));
+      return;
+    }
+
+    const normalizedAgent = { ...agent, name };
+    const exists = chatAgents.some((item) => item.id === normalizedAgent.id);
+    const nextChatAgents = exists
+      ? chatAgents.map((item) => (item.id === normalizedAgent.id ? normalizedAgent : item))
+      : [...chatAgents, normalizedAgent];
+
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, nextChatAgents, tools, "Update chat agent");
+    if (!ok) return;
+    setChatAgents(nextChatAgents);
+    setEditingChatAgent(undefined);
+  };
+
+  const handleToggleChatAgent = async (agent: LocalChatAgent) => {
+    const nextChatAgents = chatAgents.map((item) => (item.id === agent.id ? { ...item, enabled: !item.enabled } : item));
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, nextChatAgents, tools, "Toggle chat agent");
+    if (!ok) return;
+    setChatAgents(nextChatAgents);
+  };
+
+  const handleDeleteChatAgent = async () => {
+    if (!deleteChatAgentTarget) return;
+    const target = deleteChatAgentTarget;
+    const nextChatAgents = chatAgents.filter((agent) => agent.id !== target.id);
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, nextChatAgents, tools, "Delete chat agent");
+    if (!ok) return;
+    setChatAgents(nextChatAgents);
+    setDeleteChatAgentTarget(undefined);
+  };
+
+  const handleToggleTool = async (tool: LocalTool) => {
+    const nextTools = tools.map((item) => (item.name === tool.name ? { ...item, enabled: !item.enabled } : item));
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, chatAgents, nextTools, "Toggle chat tool");
+    if (!ok) return;
+    setTools(nextTools);
+  };
+
+  const handleToggleToolConfirmation = async (tool: LocalTool) => {
+    const nextTools = tools.map((item) => (item.name === tool.name ? { ...item, requiresConfirmation: !item.requiresConfirmation } : item));
+    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, chatAgents, nextTools, "Toggle chat tool confirmation");
+    if (!ok) return;
+    setTools(nextTools);
   };
 
   return (
@@ -681,6 +867,147 @@ const AISection = () => {
         />
       </SettingGroup>
 
+      <SettingGroup
+        title={t("setting.ai.chat-agents-title")}
+        description={t("setting.ai.chat-agents-description")}
+        showSeparator
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {chatAgentTemplates.map((template) => (
+              <Button key={template.name} variant="outline" onClick={() => handleCreateChatAgentFromTemplate(template)}>
+                <PlusIcon className="w-4 h-4 mr-2" />
+                {template.name}
+              </Button>
+            ))}
+            <Button onClick={handleCreateChatAgent}>
+              <PlusIcon className="w-4 h-4 mr-2" />
+              {t("setting.ai.add-chat-agent")}
+            </Button>
+          </div>
+        }
+      >
+        <SettingTable
+          columns={[
+            {
+              key: "name",
+              header: t("common.name"),
+              render: (_, agent: LocalChatAgent) => (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-foreground">{agent.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{agent.id}</span>
+                </div>
+              ),
+            },
+            {
+              key: "providerId",
+              header: t("setting.ai.chat-agent-provider"),
+              render: (_, agent: LocalChatAgent) => {
+                const provider = providers.find((item) => item.id === agent.providerId);
+                return <span>{provider ? provider.title || provider.id : "-"}</span>;
+              },
+            },
+            {
+              key: "enabled",
+              header: t("setting.ai.chat-agent-enabled"),
+              render: (_, agent: LocalChatAgent) => (
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={agent.enabled}
+                  onChange={() => handleToggleChatAgent(agent)}
+                  aria-label={t("setting.ai.chat-agent-toggle-aria", { name: agent.name })}
+                />
+              ),
+            },
+            {
+              key: "actions",
+              header: "",
+              className: "text-right",
+              render: (_, agent: LocalChatAgent) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                    <MoreVerticalIcon className="w-4 h-auto" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={2}>
+                    <DropdownMenuItem onClick={() => handleEditChatAgent(agent)}>{t("common.edit")}</DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setDeleteChatAgentTarget(agent)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      {t("common.delete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ),
+            },
+          ]}
+          data={chatAgents}
+          emptyMessage={t("setting.ai.no-chat-agents")}
+          getRowKey={(agent) => agent.id}
+        />
+      </SettingGroup>
+
+      <SettingGroup
+        title={t("setting.ai.chat-tools-title")}
+        description={t("setting.ai.chat-tools-description")}
+        showSeparator
+      >
+        <SettingTable
+          columns={[
+            {
+              key: "name",
+              header: t("common.name"),
+              render: (_, tool: LocalTool) => {
+                const meta = toolRegistry.find((item) => item.name === tool.name);
+                return (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-foreground">{tool.name}</span>
+                    {meta && <span className="text-xs text-muted-foreground">{t(meta.descriptionKey as Parameters<typeof t>[0])}</span>}
+                  </div>
+                );
+              },
+            },
+            {
+              key: "scope",
+              header: t("setting.ai.chat-tool-scope"),
+              render: (_, tool: LocalTool) => {
+                const meta = toolRegistry.find((item) => item.name === tool.name);
+                return <span>{meta?.adminOnly ? t("setting.ai.chat-tool-admin") : t("setting.ai.chat-tool-user")}</span>;
+              },
+            },
+            {
+              key: "enabled",
+              header: t("setting.ai.chat-tool-enabled"),
+              render: (_, tool: LocalTool) => (
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={tool.enabled}
+                  onChange={() => handleToggleTool(tool)}
+                  aria-label={t("setting.ai.chat-tool-toggle-aria", { name: tool.name })}
+                />
+              ),
+            },
+            {
+              key: "requiresConfirmation",
+              header: t("setting.ai.chat-tool-confirm"),
+              render: (_, tool: LocalTool) => (
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={tool.requiresConfirmation}
+                  onChange={() => handleToggleToolConfirmation(tool)}
+                  aria-label={t("setting.ai.chat-tool-confirm-toggle-aria", { name: tool.name })}
+                />
+              ),
+            },
+          ]}
+          data={tools}
+          emptyMessage={t("setting.ai.no-chat-tools")}
+          getRowKey={(tool) => tool.name}
+        />
+      </SettingGroup>
+
       <AIProviderDialog
         provider={editingProvider}
         onOpenChange={(open) => !open && setEditingProvider(undefined)}
@@ -728,6 +1055,23 @@ const AISection = () => {
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}
         onConfirm={handleDeleteTagger}
+        confirmVariant="destructive"
+      />
+
+      <ChatAgentDialog
+        agent={editingChatAgent}
+        providers={providers}
+        onOpenChange={(open) => !open && setEditingChatAgent(undefined)}
+        onSave={handleSaveChatAgent}
+      />
+
+      <ConfirmDialog
+        open={!!deleteChatAgentTarget}
+        onOpenChange={(open) => !open && setDeleteChatAgentTarget(undefined)}
+        title={deleteChatAgentTarget ? t("setting.ai.delete-chat-agent", { name: deleteChatAgentTarget.name }) : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={handleDeleteChatAgent}
         confirmVariant="destructive"
       />
     </SettingSection>
@@ -1241,6 +1585,133 @@ const AITaggerDialog = ({ tagger, providers, onOpenChange, onSave }: AITaggerDia
               maxLength={4096}
             />
             <p className="text-xs text-muted-foreground">{t("setting.ai.tagger-prompt-help")}</p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={handleSave}>{t("common.save")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+interface ChatAgentDialogProps {
+  agent?: LocalChatAgent;
+  providers: LocalAIProvider[];
+  onOpenChange: (open: boolean) => void;
+  onSave: (agent: LocalChatAgent) => void;
+}
+
+const ChatAgentDialog = ({ agent, providers, onOpenChange, onSave }: ChatAgentDialogProps) => {
+  const t = useTranslate();
+  const [draft, setDraft] = useState<LocalChatAgent>(() => agent ?? newChatAgent());
+
+  useEffect(() => {
+    setDraft(agent ?? newChatAgent());
+  }, [agent]);
+
+  const updateDraft = (partial: Partial<LocalChatAgent>) => {
+    setDraft((prev) => ({ ...prev, ...partial }));
+  };
+
+  const providerOptions = useMemo(
+    () => [
+      { value: "__none__", label: t("setting.ai.chat-agent-no-provider") },
+      ...providers.map((provider) => ({ value: provider.id, label: provider.title || provider.id })),
+    ],
+    [providers, t],
+  );
+
+  const referencedProvider = providers.find((item) => item.id === draft.providerId);
+  const placeholderForProvider = (provider: LocalAIProvider | undefined) => {
+    if (!provider) return "";
+    return provider.type === InstanceSetting_AIProviderType.GEMINI
+      ? t("setting.ai.transcription-model-placeholder-gemini")
+      : t("setting.ai.transcription-model-placeholder-openai");
+  };
+
+  const handleSave = () => {
+    onSave(draft);
+  };
+
+  return (
+    <Dialog open={!!agent} onOpenChange={onOpenChange}>
+      <DialogContent size="2xl">
+        <DialogHeader>
+          <DialogTitle>{t("setting.ai.edit-chat-agent")}</DialogTitle>
+          <DialogDescription>{t("setting.ai.chat-agent-dialog-description")}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.chat-agent-name")}</Label>
+            <Input
+              value={draft.name}
+              onChange={(e) => updateDraft({ name: e.target.value })}
+              placeholder={t("setting.ai.chat-agent-name-placeholder")}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.chat-agent-provider")}</Label>
+            <Select
+              value={draft.providerId || "__none__"}
+              items={providerOptions}
+              onValueChange={(value) => updateDraft({ providerId: value === "__none__" ? "" : value })}
+              disabled={providers.length === 0}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {providerOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {providers.length === 0 && <p className="text-xs text-muted-foreground">{t("setting.ai.chat-agent-empty-providers")}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.chat-agent-model")}</Label>
+            <Input
+              value={draft.model}
+              onChange={(e) => updateDraft({ model: e.target.value })}
+              placeholder={placeholderForProvider(referencedProvider)}
+              disabled={!draft.providerId}
+              maxLength={256}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>{t("setting.ai.chat-agent-enabled")}</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={draft.enabled}
+                onChange={(e) => updateDraft({ enabled: e.target.checked })}
+              />
+              <span className="text-xs text-muted-foreground">{t("setting.ai.chat-agent-enabled-help")}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label>{t("setting.ai.chat-agent-system")}</Label>
+            <Textarea
+              value={draft.systemPrompt}
+              onChange={(e) => updateDraft({ systemPrompt: e.target.value })}
+              placeholder={t("setting.ai.chat-agent-system-placeholder")}
+              rows={5}
+              maxLength={4096}
+            />
+            <p className="text-xs text-muted-foreground">{t("setting.ai.chat-agent-system-help")}</p>
           </div>
         </div>
 
