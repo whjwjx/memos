@@ -95,4 +95,14 @@ type Driver interface {
 	UpsertMemoTagTask(ctx context.Context, create *CreateMemoTagTask) (*MemoTagTask, error)
 	ListMemoTagTasks(ctx context.Context, find *FindMemoTagTask) ([]*MemoTagTask, error)
 	UpdateMemoTagTask(ctx context.Context, update *UpdateMemoTagTask) error
+
+	// Conversation model related methods.
+	CreateConversation(ctx context.Context, create *CreateConversation) (*Conversation, error)
+	ListConversations(ctx context.Context, find *FindConversation) ([]*Conversation, error)
+	UpdateConversation(ctx context.Context, update *UpdateConversation) (*Conversation, error)
+	DeleteConversation(ctx context.Context, id int32) error
+	CreateConversationMessage(ctx context.Context, create *CreateConversationMessage) (*ConversationMessage, error)
+	ListConversationMessages(ctx context.Context, find *FindConversationMessage) ([]*ConversationMessage, error)
+	UpdateConversationMessage(ctx context.Context, update *UpdateConversationMessage) error
+	DeleteConversationMessages(ctx context.Context, conversationID int32) error
 }

@@ -29,5 +29,9 @@ web/coverage/
 # Local compiled binary (built for deployment, not source).
 memos-linux
 
+# Local AI dev/test data and archives (feature development artifacts).
+dev-data-ai/
+memos-test
+
 # Personal docs (deployment-specific, not part of upstream source).
 docs-wang/

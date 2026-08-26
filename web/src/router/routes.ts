@@ -7,6 +7,7 @@ export const ROUTES = {
   ARCHIVED: "/archived",
   VIEWS: "/views",
   SETTING: "/setting",
+  AI_CHAT: "/ai-chat",
   EXPLORE: "/explore",
   AUTH: "/auth",
   AUTH_SIGNUP: "/auth/signup",

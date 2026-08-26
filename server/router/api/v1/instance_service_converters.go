@@ -342,6 +342,8 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 		Transcription: convertTranscriptionConfigFromStore(setting.GetTranscription()),
 		Agents:        make([]*v1pb.InstanceSetting_AgentConfig, 0, len(setting.GetAgents())),
 		Taggers:       make([]*v1pb.InstanceSetting_TaggerConfig, 0, len(setting.GetTaggers())),
+		ChatAgents:    make([]*v1pb.InstanceSetting_ChatAgentConfig, 0, len(setting.GetChatAgents())),
+		Tools:         make(map[string]*v1pb.InstanceSetting_ToolConfig, len(setting.GetTools())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -387,6 +389,29 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 			MaxTags:    tagger.GetMaxTags(),
 		})
 	}
+	for _, chatAgent := range setting.GetChatAgents() {
+		if chatAgent == nil {
+			continue
+		}
+		aiSetting.ChatAgents = append(aiSetting.ChatAgents, &v1pb.InstanceSetting_ChatAgentConfig{
+			Id:           chatAgent.GetId(),
+			Name:         chatAgent.GetName(),
+			Builtin:      chatAgent.GetBuiltin(),
+			ProviderId:   chatAgent.GetProviderId(),
+			Model:        chatAgent.GetModel(),
+			SystemPrompt: chatAgent.GetSystemPrompt(),
+			Enabled:      chatAgent.GetEnabled(),
+		})
+	}
+	for name, tool := range setting.GetTools() {
+		if tool == nil {
+			continue
+		}
+		aiSetting.Tools[name] = &v1pb.InstanceSetting_ToolConfig{
+			Enabled:              tool.GetEnabled(),
+			RequiresConfirmation: tool.GetRequiresConfirmation(),
+		}
+	}
 	return aiSetting
 }
 
@@ -400,6 +425,8 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 		Transcription: convertTranscriptionConfigToStore(setting.GetTranscription()),
 		Agents:        make([]*storepb.AIAgentConfig, 0, len(setting.GetAgents())),
 		Taggers:       make([]*storepb.TaggerConfig, 0, len(setting.GetTaggers())),
+		ChatAgents:    make([]*storepb.ChatAgentConfig, 0, len(setting.GetChatAgents())),
+		Tools:         make(map[string]*storepb.ToolConfig, len(setting.GetTools())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -442,6 +469,29 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 			Enabled:    tagger.GetEnabled(),
 			MaxTags:    tagger.GetMaxTags(),
 		})
+	}
+	for _, chatAgent := range setting.GetChatAgents() {
+		if chatAgent == nil {
+			continue
+		}
+		aiSetting.ChatAgents = append(aiSetting.ChatAgents, &storepb.ChatAgentConfig{
+			Id:           chatAgent.GetId(),
+			Name:         chatAgent.GetName(),
+			Builtin:      chatAgent.GetBuiltin(),
+			ProviderId:   chatAgent.GetProviderId(),
+			Model:        chatAgent.GetModel(),
+			SystemPrompt: chatAgent.GetSystemPrompt(),
+			Enabled:      chatAgent.GetEnabled(),
+		})
+	}
+	for name, tool := range setting.GetTools() {
+		if tool == nil {
+			continue
+		}
+		aiSetting.Tools[name] = &storepb.ToolConfig{
+			Enabled:              tool.GetEnabled(),
+			RequiresConfirmation: tool.GetRequiresConfirmation(),
+		}
 	}
 	return aiSetting
 }
