@@ -109,4 +109,11 @@ type Driver interface {
 	ListConversationMessages(ctx context.Context, find *FindConversationMessage) ([]*ConversationMessage, error)
 	UpdateConversationMessage(ctx context.Context, update *UpdateConversationMessage) error
 	DeleteConversationMessages(ctx context.Context, conversationID int32) error
+
+	// TranslationHistory model related methods.
+	CreateTranslationHistory(ctx context.Context, create *TranslationHistory) (*TranslationHistory, error)
+	ListTranslationHistories(ctx context.Context, find *FindTranslationHistory) ([]*TranslationHistory, error)
+	GetTranslationHistory(ctx context.Context, find *FindTranslationHistory) (*TranslationHistory, error)
+	DeleteTranslationHistory(ctx context.Context, delete *DeleteTranslationHistory) error
+	DeleteTranslationHistories(ctx context.Context, delete *DeleteTranslationHistories) error
 }

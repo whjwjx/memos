@@ -373,6 +373,7 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 		ChatAgents:    make([]*v1pb.InstanceSetting_ChatAgentConfig, 0, len(setting.GetChatAgents())),
 		Tools:         make(map[string]*v1pb.InstanceSetting_ToolConfig, len(setting.GetTools())),
 		Memory:        convertMemoryConfigFromStore(setting.GetMemory()),
+		Translation:   convertTranslationConfigFromStore(setting.GetTranslation()),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -457,6 +458,7 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 		ChatAgents:    make([]*storepb.ChatAgentConfig, 0, len(setting.GetChatAgents())),
 		Tools:         make(map[string]*storepb.ToolConfig, len(setting.GetTools())),
 		Memory:        convertMemoryConfigToStore(setting.GetMemory()),
+		Translation:   convertTranslationConfigToStore(setting.GetTranslation()),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -593,5 +595,29 @@ func convertTranscriptionConfigToStore(setting *v1pb.InstanceSetting_Transcripti
 		Model:      setting.GetModel(),
 		Language:   setting.GetLanguage(),
 		Prompt:     setting.GetPrompt(),
+	}
+}
+
+func convertTranslationConfigFromStore(setting *storepb.TranslationConfig) *v1pb.InstanceSetting_TranslationConfig {
+	if setting == nil {
+		return nil
+	}
+	return &v1pb.InstanceSetting_TranslationConfig{
+		Enabled:       setting.GetEnabled(),
+		ProviderId:    setting.GetProviderId(),
+		Model:         setting.GetModel(),
+		MaxTextLength: setting.GetMaxTextLength(),
+	}
+}
+
+func convertTranslationConfigToStore(setting *v1pb.InstanceSetting_TranslationConfig) *storepb.TranslationConfig {
+	if setting == nil {
+		return nil
+	}
+	return &storepb.TranslationConfig{
+		Enabled:       setting.GetEnabled(),
+		ProviderId:    setting.GetProviderId(),
+		Model:         setting.GetModel(),
+		MaxTextLength: setting.GetMaxTextLength(),
 	}
 }

@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,8 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AIService_Transcribe_FullMethodName     = "/memos.api.v1.AIService/Transcribe"
-	AIService_TestAIProvider_FullMethodName = "/memos.api.v1.AIService/TestAIProvider"
+	AIService_Transcribe_FullMethodName                = "/memos.api.v1.AIService/Transcribe"
+	AIService_TestAIProvider_FullMethodName            = "/memos.api.v1.AIService/TestAIProvider"
+	AIService_Translate_FullMethodName                 = "/memos.api.v1.AIService/Translate"
+	AIService_ListTranslationHistories_FullMethodName  = "/memos.api.v1.AIService/ListTranslationHistories"
+	AIService_DeleteTranslationHistory_FullMethodName  = "/memos.api.v1.AIService/DeleteTranslationHistory"
+	AIService_ClearTranslationHistories_FullMethodName = "/memos.api.v1.AIService/ClearTranslationHistories"
 )
 
 // AIServiceClient is the client API for AIService service.
@@ -33,6 +38,17 @@ type AIServiceClient interface {
 	// model endpoint and authenticate. Returns the provider's reply so the
 	// caller can confirm end-to-end connectivity.
 	TestAIProvider(ctx context.Context, in *TestAIProviderRequest, opts ...grpc.CallOption) (*TestAIProviderResponse, error)
+	// Translate translates text between English and Chinese using the configured
+	// instance AI translation provider.
+	Translate(ctx context.Context, in *TranslateRequest, opts ...grpc.CallOption) (*TranslateResponse, error)
+	// ListTranslationHistories lists the current user's translation history.
+	ListTranslationHistories(ctx context.Context, in *ListTranslationHistoriesRequest, opts ...grpc.CallOption) (*ListTranslationHistoriesResponse, error)
+	// DeleteTranslationHistory deletes one translation history item owned by the
+	// current user.
+	DeleteTranslationHistory(ctx context.Context, in *DeleteTranslationHistoryRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ClearTranslationHistories deletes all translation history items owned by
+	// the current user.
+	ClearTranslationHistories(ctx context.Context, in *ClearTranslationHistoriesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type aIServiceClient struct {
@@ -63,6 +79,46 @@ func (c *aIServiceClient) TestAIProvider(ctx context.Context, in *TestAIProvider
 	return out, nil
 }
 
+func (c *aIServiceClient) Translate(ctx context.Context, in *TranslateRequest, opts ...grpc.CallOption) (*TranslateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TranslateResponse)
+	err := c.cc.Invoke(ctx, AIService_Translate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) ListTranslationHistories(ctx context.Context, in *ListTranslationHistoriesRequest, opts ...grpc.CallOption) (*ListTranslationHistoriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTranslationHistoriesResponse)
+	err := c.cc.Invoke(ctx, AIService_ListTranslationHistories_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) DeleteTranslationHistory(ctx context.Context, in *DeleteTranslationHistoryRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AIService_DeleteTranslationHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) ClearTranslationHistories(ctx context.Context, in *ClearTranslationHistoriesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AIService_ClearTranslationHistories_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AIServiceServer is the server API for AIService service.
 // All implementations must embed UnimplementedAIServiceServer
 // for forward compatibility.
@@ -73,6 +129,17 @@ type AIServiceServer interface {
 	// model endpoint and authenticate. Returns the provider's reply so the
 	// caller can confirm end-to-end connectivity.
 	TestAIProvider(context.Context, *TestAIProviderRequest) (*TestAIProviderResponse, error)
+	// Translate translates text between English and Chinese using the configured
+	// instance AI translation provider.
+	Translate(context.Context, *TranslateRequest) (*TranslateResponse, error)
+	// ListTranslationHistories lists the current user's translation history.
+	ListTranslationHistories(context.Context, *ListTranslationHistoriesRequest) (*ListTranslationHistoriesResponse, error)
+	// DeleteTranslationHistory deletes one translation history item owned by the
+	// current user.
+	DeleteTranslationHistory(context.Context, *DeleteTranslationHistoryRequest) (*emptypb.Empty, error)
+	// ClearTranslationHistories deletes all translation history items owned by
+	// the current user.
+	ClearTranslationHistories(context.Context, *ClearTranslationHistoriesRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAIServiceServer()
 }
 
@@ -88,6 +155,18 @@ func (UnimplementedAIServiceServer) Transcribe(context.Context, *TranscribeReque
 }
 func (UnimplementedAIServiceServer) TestAIProvider(context.Context, *TestAIProviderRequest) (*TestAIProviderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TestAIProvider not implemented")
+}
+func (UnimplementedAIServiceServer) Translate(context.Context, *TranslateRequest) (*TranslateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Translate not implemented")
+}
+func (UnimplementedAIServiceServer) ListTranslationHistories(context.Context, *ListTranslationHistoriesRequest) (*ListTranslationHistoriesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTranslationHistories not implemented")
+}
+func (UnimplementedAIServiceServer) DeleteTranslationHistory(context.Context, *DeleteTranslationHistoryRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteTranslationHistory not implemented")
+}
+func (UnimplementedAIServiceServer) ClearTranslationHistories(context.Context, *ClearTranslationHistoriesRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ClearTranslationHistories not implemented")
 }
 func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
 func (UnimplementedAIServiceServer) testEmbeddedByValue()                   {}
@@ -146,6 +225,78 @@ func _AIService_TestAIProvider_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AIService_Translate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TranslateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).Translate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_Translate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).Translate(ctx, req.(*TranslateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_ListTranslationHistories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTranslationHistoriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).ListTranslationHistories(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_ListTranslationHistories_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).ListTranslationHistories(ctx, req.(*ListTranslationHistoriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_DeleteTranslationHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTranslationHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).DeleteTranslationHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_DeleteTranslationHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).DeleteTranslationHistory(ctx, req.(*DeleteTranslationHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_ClearTranslationHistories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClearTranslationHistoriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).ClearTranslationHistories(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_ClearTranslationHistories_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).ClearTranslationHistories(ctx, req.(*ClearTranslationHistoriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AIService_ServiceDesc is the grpc.ServiceDesc for AIService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +311,22 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TestAIProvider",
 			Handler:    _AIService_TestAIProvider_Handler,
+		},
+		{
+			MethodName: "Translate",
+			Handler:    _AIService_Translate_Handler,
+		},
+		{
+			MethodName: "ListTranslationHistories",
+			Handler:    _AIService_ListTranslationHistories_Handler,
+		},
+		{
+			MethodName: "DeleteTranslationHistory",
+			Handler:    _AIService_DeleteTranslationHistory_Handler,
+		},
+		{
+			MethodName: "ClearTranslationHistories",
+			Handler:    _AIService_ClearTranslationHistories_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

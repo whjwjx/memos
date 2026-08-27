@@ -20,6 +20,8 @@ const (
 	maxTranscriptionConfigModelLength    = 256
 	maxTranscriptionConfigLanguageLength = 32
 	maxTranscriptionConfigPromptLength   = 4096
+	maxTranslationConfigModelLength      = 256
+	maxTranslationConfigMaxTextLength    = 100000
 	maxBatchGetInstanceSettings          = 100
 )
 
@@ -179,6 +181,10 @@ func (s *APIV1Service) getInstanceSettingByName(ctx context.Context, name string
 			ai.Transcription.Model = ""
 			ai.Transcription.Language = ""
 			ai.Transcription.Prompt = ""
+		}
+		if ai := result.GetAiSetting(); ai != nil && ai.Translation != nil {
+			ai.Translation.ProviderId = ""
+			ai.Translation.Model = ""
 		}
 	}
 	return result, nil

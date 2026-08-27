@@ -992,4 +992,98 @@ func TestUpdateInstanceSetting(t *testing.T) {
 		require.Equal(t, "en", stored.GetTranscription().GetLanguage())
 		require.Equal(t, "names: Alice", stored.GetTranscription().GetPrompt())
 	})
+
+	t.Run("UpdateInstanceSetting - translation provider_id must reference an existing provider", func(t *testing.T) {
+		ts := NewTestService(t)
+		defer ts.Cleanup()
+
+		hostUser, err := ts.CreateHostUser(ctx, "admin-translation-provider")
+		require.NoError(t, err)
+		adminCtx := ts.CreateUserContext(ctx, hostUser.ID)
+
+		_, err = ts.Service.UpdateInstanceSetting(adminCtx, &v1pb.UpdateInstanceSettingRequest{
+			Setting: &v1pb.InstanceSetting{
+				Name: "instance/settings/AI",
+				Value: &v1pb.InstanceSetting_AiSetting{
+					AiSetting: &v1pb.InstanceSetting_AISetting{
+						Providers: []*v1pb.InstanceSetting_AIProviderConfig{
+							{
+								Id:     "openai-main",
+								Title:  "OpenAI",
+								Type:   v1pb.InstanceSetting_OPENAI,
+								ApiKey: "sk-test",
+							},
+						},
+						Translation: &v1pb.InstanceSetting_TranslationConfig{
+							Enabled:    true,
+							ProviderId: "does-not-exist",
+						},
+					},
+				},
+			},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "translation provider_id")
+	})
+
+	t.Run("UpdateInstanceSetting - translation is preserved when omitted on update", func(t *testing.T) {
+		ts := NewTestService(t)
+		defer ts.Cleanup()
+
+		hostUser, err := ts.CreateHostUser(ctx, "admin-translation-preserve")
+		require.NoError(t, err)
+		adminCtx := ts.CreateUserContext(ctx, hostUser.ID)
+
+		_, err = ts.Service.UpdateInstanceSetting(adminCtx, &v1pb.UpdateInstanceSettingRequest{
+			Setting: &v1pb.InstanceSetting{
+				Name: "instance/settings/AI",
+				Value: &v1pb.InstanceSetting_AiSetting{
+					AiSetting: &v1pb.InstanceSetting_AISetting{
+						Providers: []*v1pb.InstanceSetting_AIProviderConfig{
+							{
+								Id:     "openai-main",
+								Title:  "OpenAI",
+								Type:   v1pb.InstanceSetting_OPENAI,
+								ApiKey: "sk-test",
+							},
+						},
+						Translation: &v1pb.InstanceSetting_TranslationConfig{
+							Enabled:       true,
+							ProviderId:    "openai-main",
+							Model:         "gpt-4o-mini",
+							MaxTextLength: 5000,
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		_, err = ts.Service.UpdateInstanceSetting(adminCtx, &v1pb.UpdateInstanceSettingRequest{
+			Setting: &v1pb.InstanceSetting{
+				Name: "instance/settings/AI",
+				Value: &v1pb.InstanceSetting_AiSetting{
+					AiSetting: &v1pb.InstanceSetting_AISetting{
+						Providers: []*v1pb.InstanceSetting_AIProviderConfig{
+							{
+								Id:     "openai-main",
+								Title:  "OpenAI",
+								Type:   v1pb.InstanceSetting_OPENAI,
+								ApiKey: "",
+							},
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		stored, err := ts.Store.GetInstanceAISetting(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, stored.GetTranslation())
+		require.True(t, stored.GetTranslation().GetEnabled())
+		require.Equal(t, "openai-main", stored.GetTranslation().GetProviderId())
+		require.Equal(t, "gpt-4o-mini", stored.GetTranslation().GetModel())
+		require.Equal(t, int32(5000), stored.GetTranslation().GetMaxTextLength())
+	})
 }

@@ -547,6 +547,38 @@ func (s *ConnectServiceHandler) TestAIProvider(ctx context.Context, req *connect
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) Translate(ctx context.Context, req *connect.Request[v1pb.TranslateRequest]) (*connect.Response[v1pb.TranslateResponse], error) {
+	resp, err := s.APIV1Service.Translate(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ListTranslationHistories(ctx context.Context, req *connect.Request[v1pb.ListTranslationHistoriesRequest]) (*connect.Response[v1pb.ListTranslationHistoriesResponse], error) {
+	resp, err := s.APIV1Service.ListTranslationHistories(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) DeleteTranslationHistory(ctx context.Context, req *connect.Request[v1pb.DeleteTranslationHistoryRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.DeleteTranslationHistory(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ClearTranslationHistories(ctx context.Context, req *connect.Request[v1pb.ClearTranslationHistoriesRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.ClearTranslationHistories(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // MemoViewService
 
 // ListMemoViews lists the saved memo views owned by a user.
