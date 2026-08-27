@@ -77,6 +77,8 @@ interface ResolvedToolCall {
   requiresConfirmation: boolean;
   // "pending" 等待用户决定；"approved"/"rejected" 已处理（卡片保留作为记录，不消失）。
   status: "pending" | "approved" | "rejected";
+  // 用户在二次确认卡片上输入的确认词（如 query_db 写操作的 "yes"）。
+  confirmKeyword?: string;
 }
 
 interface SendMessageState {
@@ -96,7 +98,11 @@ export const useSendMessage = (conversationId: string | undefined) => {
   const updateTitle = useUpdateConversationTitle(conversationId);
 
   const mutation = useMutation({
-    mutationFn: async (input: { content: string; approvedToolCallIds?: string[] }) => {
+    mutationFn: async (input: {
+      content: string;
+      approvedToolCallIds?: string[];
+      toolApprovals?: { toolCallId: string; confirmKeyword: string }[];
+    }) => {
       if (!conversationId) {
         throw new Error("conversation not created yet");
       }
@@ -104,6 +110,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
         conversationId,
         content: input.content,
         approvedToolCallIds: input.approvedToolCallIds ?? [],
+        toolApprovals: input.toolApprovals ?? [],
       });
       return response;
     },
@@ -113,7 +120,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
     // the canonical copy (real id). Approval continuations ("继续") do not insert
     // a new user bubble.
     onMutate: async (input) => {
-      if (input.approvedToolCallIds && input.approvedToolCallIds.length > 0) {
+      if ((input.approvedToolCallIds && input.approvedToolCallIds.length > 0) || (input.toolApprovals && input.toolApprovals.length > 0)) {
         return;
       }
       await queryClient.cancelQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
@@ -184,10 +191,11 @@ export const useSendMessage = (conversationId: string | undefined) => {
 
   // Mark a single tool call as approved/rejected. The card stays visible (it
   // becomes a record of what the user decided) instead of disappearing.
-  const resolveToolCall = useCallback((id: string, status: "approved" | "rejected") => {
+  // confirmKeyword is the keyword typed on a second-factor confirmation card.
+  const resolveToolCall = useCallback((id: string, status: "approved" | "rejected", confirmKeyword?: string) => {
     setState((prev) => ({
       ...prev,
-      toolCalls: prev.toolCalls.map((tc) => (tc.id === id ? { ...tc, status } : tc)),
+      toolCalls: prev.toolCalls.map((tc) => (tc.id === id ? { ...tc, status, confirmKeyword } : tc)),
     }));
   }, []);
 

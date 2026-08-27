@@ -127,3 +127,65 @@ func TestRunLoopRespectsMaxRounds(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 }
+
+func TestInjectConfirmKeyword(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		argsJSON string
+		keyword  string
+		want     string
+	}{
+		{`{"a":1}`, "yes", `{"a":1,"confirm_keyword":"yes"}`},
+		// Empty keyword leaves the arguments untouched.
+		{`{"a":1}`, "", `{"a":1}`},
+		// Existing confirm_keyword is overwritten by the system value.
+		{`{"a":1,"confirm_keyword":"old"}`, "yes", `{"a":1,"confirm_keyword":"yes"}`},
+	}
+	for _, c := range cases {
+		got := injectConfirmKeyword(c.argsJSON, c.keyword)
+		require.JSONEq(t, c.want, got)
+	}
+	// Non-JSON arguments are returned unchanged.
+	require.Equal(t, "not-json", injectConfirmKeyword("not-json", "yes"))
+}
+
+// recordingTool captures the last args it was invoked with.
+type recordingTool struct {
+	name     string
+	confirm  bool
+	lastArgs string
+}
+
+func (f *recordingTool) Spec() chat.ToolSpec {
+	return chat.ToolSpec{Name: f.name, Description: "fake", ParametersJSON: `{"type":"object","properties":{}}`}
+}
+
+func (f *recordingTool) RequiresConfirmation(_ string) bool {
+	return f.confirm
+}
+
+func (f *recordingTool) Run(_ context.Context, _ tools.ToolContext, argsJSON string) (string, error) {
+	f.lastArgs = argsJSON
+	return "ok", nil
+}
+
+func TestApplyApprovedResultsInjectsConfirmKeyword(t *testing.T) {
+	t.Parallel()
+	// With an approval keyword, the tool is re-invoked with confirm_keyword
+	// injected into its arguments.
+	tool := &recordingTool{name: "query_db", confirm: true}
+	reg := newRegistryWith(tool)
+	messages := []chat.Message{
+		{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c1", Name: "query_db", ArgumentsJSON: `{"operation":"delete","table":"memo"}`}}},
+		{Role: chat.RoleTool, ToolCallID: "c1", Name: "query_db", Content: "awaiting user confirmation"},
+	}
+	updated := applyApprovedResults(context.Background(), &AssistantRequest{}, reg, map[string]bool{"c1": true}, map[string]string{"c1": "yes"}, messages)
+	require.Len(t, updated, 1)
+	require.JSONEq(t, `{"operation":"delete","table":"memo","confirm_keyword":"yes"}`, tool.lastArgs)
+
+	// Without a keyword the arguments are passed through unchanged.
+	tool2 := &recordingTool{name: "query_db", confirm: true}
+	reg2 := newRegistryWith(tool2)
+	applyApprovedResults(context.Background(), &AssistantRequest{}, reg2, map[string]bool{"c1": true}, nil, messages)
+	require.JSONEq(t, `{"operation":"delete","table":"memo"}`, tool2.lastArgs)
+}

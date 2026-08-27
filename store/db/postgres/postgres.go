@@ -43,6 +43,11 @@ func (d *DB) GetDB() *sql.DB {
 	return d.db
 }
 
+// Dialect reports the SQL dialect name.
+func (d *DB) Dialect() string {
+	return "postgres"
+}
+
 func (d *DB) Close() error {
 	return d.db.Close()
 }

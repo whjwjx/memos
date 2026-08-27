@@ -8,7 +8,6 @@ import (
 
 	"connectrpc.com/connect"
 	shortuuid "github.com/lithammer/shortuuid/v4"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -192,8 +191,19 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 	systemPrompt = strings.TrimSpace(systemPrompt + "\n\n" + chatOperationalGuidance)
 
 	registry := tools.NewRegistry()
-	// Honor the per-tool enable toggles from instance config.
-	s.applyToolConfig(ctx, registry)
+	// Honor the per-tool enable toggles from instance config and scope
+	// admin-only tools to admin accounts.
+	s.applyToolConfig(ctx, registry, conv.UserID)
+
+	// Build the keyword-carrying approvals for write-gated tools (e.g. query_db
+	// update/delete). The keyword is what the user typed on the confirmation
+	// card; the assistant injects it into the tool arguments before execution.
+	approvals := make(map[string]string)
+	for _, approval := range req.ToolApprovals {
+		if approval.ToolCallId != "" && approval.ConfirmKeyword != "" {
+			approvals[approval.ToolCallId] = approval.ConfirmKeyword
+		}
+	}
 
 	resp, err := assistant.ToolLoop(ctx, providerCfg.model, &assistant.AssistantRequest{
 		System:              systemPrompt,
@@ -204,6 +214,7 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 		Registry:            registry,
 		ToolContext:         tools.ToolContext{UserID: conv.UserID, Store: s.Store},
 		ApprovedToolCallIDs: req.ApprovedToolCallIds,
+		Approvals:           approvals,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "chat loop failed: %v", err)
@@ -389,24 +400,45 @@ func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string) 
 var readOnlyTools = map[string]bool{
 	"search_memos": true,
 	"get_comments": true,
+	"get_logs":     true,
+}
+
+// adminOnlyTools are exposed only to admin accounts: their data (database rows,
+// server logs) belongs to all users. Non-admin users never see these tools in
+// the model's tool list. Keep in sync with the adminOnly entries in the
+// settings UI.
+var adminOnlyTools = map[string]bool{
+	"get_logs": true,
+	"query_db": true,
 }
 
 // applyToolConfig applies the admin's per-tool toggles from instance settings
-// onto the registry: it disables tools toggled off, and honors the confirmation
-// flag for tools the admin explicitly configured. Tools not present in the
-// settings keep their built-in behavior.
-func (s *APIV1Service) applyToolConfig(ctx context.Context, registry *tools.Registry) {
+// onto the registry for the given user: tools toggled off are removed entirely
+// so the model never sees them, admin-only tools are removed for non-admin
+// users, and the confirmation flag is honored for tools the admin explicitly
+// configured. Tools not present in the settings keep their built-in behavior.
+func (s *APIV1Service) applyToolConfig(ctx context.Context, registry *tools.Registry, userID int32) {
 	setting, err := s.Store.GetInstanceAISetting(ctx)
 	if err != nil || setting == nil {
 		return
 	}
+
+	// Scope isolation: admin-only tools are only exposed to admins.
+	user, err := s.Store.GetUser(ctx, &store.FindUser{ID: &userID})
+	if err != nil || user == nil || user.Role != store.RoleAdmin {
+		for name := range adminOnlyTools {
+			registry.Remove(name)
+		}
+	}
+
 	for name, cfg := range setting.GetTools() {
 		tool := registry.Get(name)
 		if tool == nil {
 			continue
 		}
 		if !cfg.GetEnabled() {
-			registry.Register(disabledTool{name: name})
+			// Disabled tools are removed entirely so the model never sees them.
+			registry.Remove(name)
 			continue
 		}
 		// Read-only tools are never confirmed; ignore any admin flag for them.
@@ -490,24 +522,6 @@ func findProviderByID(providers []*storepb.AIProviderConfig, id string) *storepb
 		}
 	}
 	return nil
-}
-
-// disabledTool is a placeholder that reports itself unavailable so disabled tools
-// are never offered to the model.
-type disabledTool struct {
-	name string
-}
-
-func (t disabledTool) Spec() chat.ToolSpec {
-	return chat.ToolSpec{Name: t.name, Description: "disabled", ParametersJSON: `{"type":"object","properties":{}}`}
-}
-
-func (disabledTool) RequiresConfirmation(_ string) bool {
-	return false
-}
-
-func (t disabledTool) Run(_ context.Context, _ tools.ToolContext, _ string) (string, error) {
-	return "", errors.Errorf("tool %q is disabled", t.name)
 }
 
 // configuredTool wraps a tool with the admin's per-tool confirmation flag so the

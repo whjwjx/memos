@@ -45,6 +45,11 @@ type AssistantRequest struct {
 	// turn. Tool calls requiring confirmation are only executed when their id
 	// is present here.
 	ApprovedToolCallIDs []string
+	// Approvals maps approved tool call ids to the keyword the user typed to
+	// confirm a sensitive write (e.g. "yes"). The keyword is injected into the
+	// tool arguments before execution so second-factor-gated tools can verify
+	// it; the model never sets it by itself.
+	Approvals map[string]string
 }
 
 // AssistantResponse is what a single turn yields.
@@ -91,7 +96,7 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 	// placeholder tool messages in place (preserving a valid message order), and
 	// we force ToolChoiceNone so the model only produces a final answer.
 	if len(approved) > 0 {
-		updated := applyApprovedResults(ctx, req, registry, approved, messages)
+		updated := applyApprovedResults(ctx, req, registry, approved, req.Approvals, messages)
 		if len(updated) > 0 {
 			resp, err := model.Generate(ctx, chat.Request{
 				Model:      req.Model,
@@ -208,7 +213,7 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 // message stays in its original position (immediately after the assistant
 // tool_calls turn), the resulting history remains valid for the provider. It
 // returns the messages that were updated so the caller can surface them.
-func applyApprovedResults(ctx context.Context, req *AssistantRequest, registry *tools.Registry, approved map[string]bool, messages []chat.Message) []chat.Message {
+func applyApprovedResults(ctx context.Context, req *AssistantRequest, registry *tools.Registry, approved map[string]bool, approvals map[string]string, messages []chat.Message) []chat.Message {
 	// Index tool-call arguments by id so we can find the args for each
 	// approved tool message regardless of where it sits in the history.
 	argsByID := make(map[string]string)
@@ -229,7 +234,11 @@ func applyApprovedResults(ctx context.Context, req *AssistantRequest, registry *
 			updated = append(updated, messages[i])
 			continue
 		}
-		result, execErr := tool.Run(ctx, req.ToolContext, argsByID[messages[i].ToolCallID])
+		// Inject the user's typed confirmation keyword (if any) so write-gated
+		// tools can verify it before mutating anything.
+		argsJSON := argsByID[messages[i].ToolCallID]
+		argsJSON = injectConfirmKeyword(argsJSON, approvals[messages[i].ToolCallID])
+		result, execErr := tool.Run(ctx, req.ToolContext, argsJSON)
 		if execErr != nil {
 			result = fmt.Sprintf("error: %v", execErr)
 		}
@@ -237,6 +246,25 @@ func applyApprovedResults(ctx context.Context, req *AssistantRequest, registry *
 		updated = append(updated, messages[i])
 	}
 	return updated
+}
+
+// injectConfirmKeyword adds the user's typed confirmation keyword to a tool
+// call's arguments so a second-factor-gated tool can verify it. Non-JSON
+// arguments or an empty keyword are returned unchanged.
+func injectConfirmKeyword(argsJSON, keyword string) string {
+	if keyword == "" {
+		return argsJSON
+	}
+	var args map[string]any
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return argsJSON
+	}
+	args["confirm_keyword"] = keyword
+	raw, err := json.Marshal(args)
+	if err != nil {
+		return argsJSON
+	}
+	return string(raw)
 }
 
 // respToolCallsFromMessages extracts the last assistant tool-call turn so the

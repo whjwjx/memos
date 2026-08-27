@@ -51,6 +51,8 @@ func NewRegistry() *Registry {
 		&ManageSettingsTool{},
 		&AgentReplyTool{},
 		&AutoTagTool{},
+		&QueryDBTool{},
+		&GetLogsTool{},
 	} {
 		r.tools[t.Spec().Name] = t
 	}
@@ -75,6 +77,11 @@ func (r *Registry) All() []Tool {
 // tests to inject fakes without depending on store backends.
 func (r *Registry) Register(t Tool) {
 	r.tools[t.Spec().Name] = t
+}
+
+// Remove deletes a tool from the registry so the model never sees it.
+func (r *Registry) Remove(name string) {
+	delete(r.tools, name)
 }
 
 // Specs returns the ToolSpec for every registered tool, suitable for sending to
