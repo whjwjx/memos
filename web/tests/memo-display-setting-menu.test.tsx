@@ -50,8 +50,11 @@ describe("MemoDisplaySettingMenu", () => {
     fireEvent.click(trigger);
 
     const compactMode = screen.getByRole("switch", { name: "Compact mode" });
-    expect(compactMode).not.toBeChecked();
+    expect(compactMode).toBeChecked();
     expect(compactMode).toBeEnabled();
+
+    fireEvent.click(compactMode);
+    expect(compactMode).not.toBeChecked();
 
     fireEvent.click(screen.getByRole("radio", { name: "2 columns" }));
 

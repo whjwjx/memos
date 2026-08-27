@@ -24,7 +24,7 @@ function nextHour(date: Date): Date {
 }
 
 const ScheduleSelector = (props: ScheduleSelectorProps) => {
-  const { value, duration, onChange, onOpenChange } = props;
+  const { value, duration, onChange, onOpenChange, mobileIconOnly } = props;
   const t = useTranslate();
   const [open, setOpen] = useState(false);
 
@@ -57,15 +57,21 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
         render={
           <button
             type="button"
-            className="inline-flex items-center rounded-md hover:bg-accent transition-colors h-8 px-2 text-sm text-muted-foreground"
+            aria-label={label}
+            className={cn(
+              "inline-flex h-8 min-w-0 items-center rounded-md text-sm text-muted-foreground transition-colors hover:bg-accent",
+              mobileIconOnly
+                ? "w-8 justify-center px-0 sm:w-auto sm:max-w-none sm:justify-start sm:px-2"
+                : "max-w-[9.5rem] px-2 sm:max-w-none",
+            )}
           />
         }
       >
-        <CalendarClockIcon className={cn("opacity-60 mr-1.5", "w-4 h-4")} />
-        <span className="truncate">{label}</span>
-        <ChevronDownIcon className="ml-0.5 opacity-60 w-4 h-4" />
+        <CalendarClockIcon className={cn("h-4 w-4 shrink-0 opacity-60", mobileIconOnly ? "mr-0 sm:mr-1.5" : "mr-1.5")} />
+        <span className={cn("min-w-0 truncate", mobileIconOnly && "hidden sm:inline")}>{label}</span>
+        <ChevronDownIcon className={cn("ml-0.5 h-4 w-4 shrink-0 opacity-60", mobileIconOnly && "hidden sm:block")} />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-3">
+      <PopoverContent align="start" className="w-[min(18rem,calc(100vw-1rem))] p-3">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.time")}</span>

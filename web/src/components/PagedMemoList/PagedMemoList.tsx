@@ -111,6 +111,41 @@ function useAutoFetchWhenNotScrollable({
   }, []);
 }
 
+const arraysEqual = (left: string[], right: string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+const sameKeySet = (left: string[], right: string[]): boolean => {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const rightSet = new Set(right);
+  return left.every((key) => rightSet.has(key));
+};
+
+const timestampOrderSignature = (timestamp: Memo["createTime"]): string =>
+  timestamp ? `${timestamp.seconds.toString()}:${timestamp.nanos}` : "";
+
+const memoOrderSignature = (memo: Memo): string =>
+  [memo.state, timestampOrderSignature(memo.createTime), timestampOrderSignature(memo.updateTime)].join("\n");
+
+const memoOrderSignatures = (memos: Memo[]): Map<string, string> =>
+  new Map(memos.map((memo) => [getMemoKey(memo), memoOrderSignature(memo)]));
+
+const unchangedSortInputs = (previous: Map<string, string>, current: Map<string, string>): boolean => {
+  if (previous.size !== current.size) {
+    return false;
+  }
+
+  for (const [key, signature] of previous) {
+    if (current.get(key) !== signature) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const PagedMemoList = (props: Props) => {
   const t = useTranslate();
   const { isUserSettingsInitialized, userGeneralSetting } = useAuth();
@@ -163,10 +198,39 @@ const PagedMemoList = (props: Props) => {
   // Apply custom sorting if provided, otherwise use memos directly, then hoist
   // a freshly created memo to the very top so it stays visible above pins.
   const { newMemoName } = useNewMemo();
+  const orderResetKey = `${props.state || State.NORMAL}\n${props.orderBy || "create_time desc"}\n${props.filter || ""}\n${props.pageSize || DEFAULT_LIST_MEMOS_PAGE_SIZE}`;
+  const stableOrderRef = useRef<{ resetKey: string; keys: string[]; signatures: Map<string, string> }>({
+    resetKey: "",
+    keys: [],
+    signatures: new Map(),
+  });
   const sortedMemoList = useMemo(() => {
     const sorted = props.listSort ? props.listSort(memos) : memos;
-    return hoistMemoToFront(sorted, newMemoName);
-  }, [memos, props.listSort, newMemoName]);
+    const hoisted = hoistMemoToFront(sorted, newMemoName);
+    const sortedKeys = hoisted.map(getMemoKey);
+    const signatures = memoOrderSignatures(hoisted);
+
+    if (stableOrderRef.current.resetKey !== orderResetKey) {
+      stableOrderRef.current = { resetKey: orderResetKey, keys: sortedKeys, signatures };
+      return hoisted;
+    }
+
+    const shouldPreserveCurrentOrder =
+      !arraysEqual(stableOrderRef.current.keys, sortedKeys) &&
+      sameKeySet(stableOrderRef.current.keys, sortedKeys) &&
+      unchangedSortInputs(stableOrderRef.current.signatures, signatures);
+    const nextKeys = shouldPreserveCurrentOrder ? stableOrderRef.current.keys : sortedKeys;
+    stableOrderRef.current = { resetKey: orderResetKey, keys: nextKeys, signatures };
+    if (!shouldPreserveCurrentOrder) {
+      return hoisted;
+    }
+
+    const memosByKey = new Map(hoisted.map((memo) => [getMemoKey(memo), memo]));
+    return nextKeys.flatMap((key) => {
+      const memo = memosByKey.get(key);
+      return memo ? [memo] : [];
+    });
+  }, [memos, props.listSort, newMemoName, orderResetKey]);
 
   // Auto-fetch hook: fetches more content when page isn't scrollable
   useAutoFetchWhenNotScrollable({

@@ -56,8 +56,8 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-row justify-between items-center mb-2">
-      <div className="flex flex-row justify-start items-center gap-1">
+    <div className="mb-2 flex w-full flex-row items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-row items-center justify-start gap-1">
         <InsertMenu
           isUploading={isUploading}
           isSaving={isSaving}
@@ -70,11 +70,11 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
           onToggleFormattingToolbar={onToggleFormattingToolbar}
           onInsertImages={onInsertImages}
         />
-        <VisibilitySelector value={visibility} onChange={handleVisibilityChange} />
-        <ScheduleSelector value={scheduledTime} duration={scheduledDuration} onChange={handleScheduleChange} />
+        <VisibilitySelector value={visibility} onChange={handleVisibilityChange} mobileIconOnly />
+        <ScheduleSelector value={scheduledTime} duration={scheduledDuration} onChange={handleScheduleChange} mobileIconOnly />
       </div>
 
-      <div className="flex flex-row justify-end items-center gap-2">
+      <div className="flex shrink-0 flex-row items-center justify-end gap-2">
         {onCancel && (
           <Button variant="ghost" onClick={onCancel} disabled={isSaving}>
             {t("common.cancel")}

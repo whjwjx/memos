@@ -1,3 +1,4 @@
+import { useDirection } from "@base-ui/react/direction-provider";
 import type { CSSProperties } from "react";
 import { useEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation, useSearchParams } from "react-router-dom";
@@ -9,7 +10,7 @@ import AppSidebar, {
   SidebarResizeHandle,
   useSidebarWidth,
 } from "@/components/AppSidebar";
-import { AppSidebarProvider } from "@/contexts/AppSidebarContext";
+import { AppSidebarProvider, useAppSidebar } from "@/contexts/AppSidebarContext";
 import { GlobalMemoEditorProvider } from "@/contexts/GlobalMemoEditorContext";
 import { useInstance } from "@/contexts/InstanceContext";
 import { MemoFilterProvider, useMemoFilterContext } from "@/contexts/MemoFilterContext";
@@ -19,6 +20,10 @@ import { buildAuthRoute, shouldGatePrivateInstance } from "@/utils/auth-redirect
 import { useTranslate } from "@/utils/i18n";
 
 const MEMOS_DEPLOY_URL = "https://usememos.com/docs/deploy";
+const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 64;
+const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_PX = 56;
+const MOBILE_SIDEBAR_SWIPE_AXIS_RATIO = 1.4;
+const MOBILE_SIDEBAR_SWIPE_IGNORE_SELECTOR = "input, textarea, select, button, [contenteditable='true']";
 
 const DemoBanner = () => {
   const t = useTranslate();
@@ -36,17 +41,98 @@ const DemoBanner = () => {
   );
 };
 
+function useMobileSidebarSwipe(enabled: boolean, open: boolean, setOpen: (open: boolean) => void, direction: "ltr" | "rtl") {
+  const setOpenRef = useRef(setOpen);
+
+  useEffect(() => {
+    setOpenRef.current = setOpen;
+  }, [setOpen]);
+
+  useEffect(() => {
+    if (!enabled || open) {
+      return;
+    }
+
+    const start = { x: 0, y: 0, tracking: false };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1) {
+        start.tracking = false;
+        return;
+      }
+
+      if (event.target instanceof Element && event.target.closest(MOBILE_SIDEBAR_SWIPE_IGNORE_SELECTOR)) {
+        start.tracking = false;
+        return;
+      }
+
+      const touch = event.touches[0];
+      if (!touch) {
+        start.tracking = false;
+        return;
+      }
+
+      start.tracking = true;
+      start.x = touch.clientX;
+      start.y = touch.clientY;
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!start.tracking || event.touches.length !== 1) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      const horizontalDelta = direction === "rtl" ? start.x - touch.clientX : touch.clientX - start.x;
+      const verticalDelta = Math.abs(touch.clientY - start.y);
+      const isSidebarSwipe =
+        horizontalDelta >= MOBILE_SIDEBAR_SWIPE_DISTANCE_PX &&
+        verticalDelta <= MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_PX &&
+        horizontalDelta / Math.max(verticalDelta, 1) >= MOBILE_SIDEBAR_SWIPE_AXIS_RATIO;
+
+      if (isSidebarSwipe) {
+        start.tracking = false;
+        setOpenRef.current(true);
+      }
+    };
+
+    const stopTracking = () => {
+      start.tracking = false;
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", stopTracking, { passive: true });
+    window.addEventListener("touchcancel", stopTracking, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", stopTracking);
+      window.removeEventListener("touchcancel", stopTracking);
+    };
+  }, [direction, enabled, open]);
+}
+
 const RootLayoutContent = () => {
   const location = useLocation();
+  const direction = useDirection();
   const [searchParams] = useSearchParams();
   const currentUser = useCurrentUser();
   const md = useMediaQuery("md");
   const { profile } = useInstance();
   const { removeFilter } = useMemoFilterContext();
+  const { mobileOpen, setMobileOpen } = useAppSidebar();
   const { pathname } = location;
   const prevPathnameRef = useRef<string | undefined>(undefined);
   const shellRef = useRef<HTMLDivElement>(null);
   const { width: sidebarWidth, minWidth, maxWidth, setWidth: setSidebarWidth } = useSidebarWidth();
+
+  useMobileSidebarSwipe(!md, mobileOpen, setMobileOpen, direction);
 
   useEffect(() => {
     const prevPathname = prevPathnameRef.current;
