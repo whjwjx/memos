@@ -53,6 +53,7 @@ func NewRegistry() *Registry {
 		&AutoTagTool{},
 		&QueryDBTool{},
 		&GetLogsTool{},
+		&ManageMemoryTool{},
 	} {
 		r.tools[t.Spec().Name] = t
 	}

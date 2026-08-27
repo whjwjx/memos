@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { aiChatServiceClient } from "@/connect";
 import { type Conversation, type ConversationMessage } from "@/types/proto/api/v1/ai_chat_service_pb";
@@ -101,6 +101,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
     mutationFn: async (input: {
       content: string;
       approvedToolCallIds?: string[];
+      rejectedToolCallIds?: string[];
       toolApprovals?: { toolCallId: string; confirmKeyword: string }[];
     }) => {
       if (!conversationId) {
@@ -110,6 +111,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
         conversationId,
         content: input.content,
         approvedToolCallIds: input.approvedToolCallIds ?? [],
+        rejectedToolCallIds: input.rejectedToolCallIds ?? [],
         toolApprovals: input.toolApprovals ?? [],
       });
       return response;
@@ -120,7 +122,11 @@ export const useSendMessage = (conversationId: string | undefined) => {
     // the canonical copy (real id). Approval continuations ("继续") do not insert
     // a new user bubble.
     onMutate: async (input) => {
-      if ((input.approvedToolCallIds && input.approvedToolCallIds.length > 0) || (input.toolApprovals && input.toolApprovals.length > 0)) {
+      const hasDecisions =
+        (input.approvedToolCallIds && input.approvedToolCallIds.length > 0) ||
+        (input.rejectedToolCallIds && input.rejectedToolCallIds.length > 0) ||
+        (input.toolApprovals && input.toolApprovals.length > 0);
+      if (hasDecisions) {
         return;
       }
       await queryClient.cancelQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
@@ -149,6 +155,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
         queryClient.setQueryData(["ai-chat", "conversation", conversationId], ctx.prev);
       }
       setState(emptyState);
+      submittedIdsRef.current = new Set();
     },
     onSuccess: (response, variables) => {
       setState((prev) => ({
@@ -187,17 +194,56 @@ export const useSendMessage = (conversationId: string | undefined) => {
   // so a stale "pending tool" card from another chat never leaks across sessions.
   useEffect(() => {
     setState(emptyState);
+    submittedIdsRef.current = new Set();
   }, [conversationId]);
 
-  // Mark a single tool call as approved/rejected. The card stays visible (it
-  // becomes a record of what the user decided) instead of disappearing.
-  // confirmKeyword is the keyword typed on a second-factor confirmation card.
-  const resolveToolCall = useCallback((id: string, status: "approved" | "rejected", confirmKeyword?: string) => {
-    setState((prev) => ({
-      ...prev,
-      toolCalls: prev.toolCalls.map((tc) => (tc.id === id ? { ...tc, status, confirmKeyword } : tc)),
-    }));
-  }, []);
+  // Keep a mirror of the latest state so resolveToolCall can decide — outside a
+  // state updater — whether every card has been decided and a single batch
+  // submission should fire. React's updater runs at render time, not
+  // synchronously, so reading state here directly would see stale data.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // Ids already batched into a submitted decision, so cards carried over from
+  // earlier rounds (kept in the list as a record) are never re-submitted.
+  const submittedIdsRef = useRef<Set<string>>(new Set());
+
+  // Mark a single tool call as approved/rejected. Decisions are accumulated: the
+  // card updates immediately but is NOT submitted yet. Only when every pending
+  // card in the current round has been decided do we submit all decisions at
+  // once (approved ids + rejected ids + keywords), so nothing is executed until
+  // the user has confirmed/rejected everything. Cards stay visible as a record
+  // of what the user decided.
+  const resolveToolCall = useCallback(
+    (id: string, status: "approved" | "rejected", confirmKeyword?: string) => {
+      const toolCalls = stateRef.current.toolCalls.map((tc) => (tc.id === id ? { ...tc, status, confirmKeyword } : tc));
+      const pendingCount = toolCalls.filter((tc) => tc.status === "pending").length;
+      setState((prev) => ({ ...prev, toolCalls }));
+
+      // Nothing left pending → submit this round's new decisions exactly once.
+      const fresh = toolCalls.filter((tc) => tc.status !== "pending" && !submittedIdsRef.current.has(tc.id));
+      if (pendingCount === 0 && fresh.length > 0) {
+        const approvedIds = fresh.filter((tc) => tc.status === "approved").map((tc) => tc.id);
+        const rejectedIds = fresh.filter((tc) => tc.status === "rejected").map((tc) => tc.id);
+        const toolApprovals = fresh
+          .filter((tc) => tc.status === "approved" && tc.confirmKeyword)
+          .map((tc) => ({ toolCallId: tc.id, confirmKeyword: tc.confirmKeyword as string }));
+        fresh.forEach((tc) => submittedIdsRef.current.add(tc.id));
+        // Send a fixed approval instruction (NOT a free-text user message) so the
+        // model treats it as "the pending tools were decided" rather than a new
+        // task, keeping behavior consistent across turns.
+        mutation.mutate({
+          content: "[用户已批准上述待确认工具，请直接执行并继续]",
+          approvedToolCallIds: approvedIds,
+          rejectedToolCallIds: rejectedIds,
+          toolApprovals,
+        });
+      }
+    },
+    [mutation],
+  );
 
   return {
     ...state,

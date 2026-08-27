@@ -188,6 +188,10 @@ message SendMessageRequest {
   // approved; the assistant executes them and continues the loop.
   repeated string approved_tool_call_ids = 3 [(google.api.field_behavior) = OPTIONAL];
 
+  // Populate when continuing after a confirmation. Ids of tool calls the user
+  // explicitly rejected; the assistant records them as skipped and continues.
+  repeated string rejected_tool_call_ids = 5 [(google.api.field_behavior) = OPTIONAL];
+
   // Populate when continuing after a confirmation. Per-tool-call confirmations
   // that carry the keyword the user typed to approve a sensitive write (e.g.
   // "yes" for query_db update/delete). The assistant injects the keyword into

@@ -10,13 +10,16 @@ import (
 	"github.com/usememos/memos/internal/ai/tools"
 )
 
-// fakeModel returns queued responses in order, then a final text response.
+// fakeModel returns queued responses in order, then a final text response. The
+// last request is recorded so tests can assert what was sent to the provider.
 type fakeModel struct {
 	responses []*chat.Response
 	idx       int
+	lastReq   chat.Request
 }
 
-func (m *fakeModel) Generate(_ context.Context, _ chat.Request) (*chat.Response, error) {
+func (m *fakeModel) Generate(_ context.Context, req chat.Request) (*chat.Response, error) {
+	m.lastReq = req
 	if m.idx >= len(m.responses) {
 		return &chat.Response{Text: "done"}, nil
 	}
@@ -96,20 +99,99 @@ func TestRunLoopContinuesAfterApproval(t *testing.T) {
 	executed := false
 	model := &fakeModel{
 		responses: []*chat.Response{
-			{ToolCalls: []chat.ToolCall{{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`}}},
 			{Text: "settings updated"},
 		},
 	}
 	reg := newRegistryWith(&fakeTool{name: "manage_settings", confirm: true, executed: &executed})
 	resp, err := runLoop(context.Background(), model, &AssistantRequest{
-		Registry:            reg,
-		UserContent:         "update my settings",
+		Registry: reg,
+		// Prior turn: the model requested a sensitive tool that is still
+		// awaiting user confirmation.
+		History: []chat.Message{
+			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`}}},
+			{Role: chat.RoleTool, ToolCallID: "c2", Name: "manage_settings", Content: "awaiting user confirmation"},
+		},
+		UserContent:         "[user approved the pending tool, please execute and continue]",
 		ApprovedToolCallIDs: []string{"c2"},
 	})
 	require.NoError(t, err)
 	require.True(t, executed)
 	require.False(t, resp.RequiresConfirmation)
 	require.Equal(t, "settings updated", resp.Content)
+	// The approval continuation strips every function-calling trace: no tool
+	// definitions are sent (so no tool_choice is issued at all) and the history
+	// is flattened so the model cannot mimic pseudo-XML tool calls.
+	require.Equal(t, chat.ToolChoiceNone, model.lastReq.ToolChoice)
+	require.Empty(t, model.lastReq.Tools)
+	for _, m := range model.lastReq.Messages {
+		require.NotEqual(t, chat.RoleTool, m.Role)
+	}
+}
+
+func TestRunLoopApprovalExecutesApprovedAndSkipsRejected(t *testing.T) {
+	t.Parallel()
+	executed := false
+	model := &fakeModel{
+		responses: []*chat.Response{
+			{Text: "第一个已执行，第二个已跳过。"},
+		},
+	}
+	reg := newRegistryWith(&fakeTool{name: "manage_settings", confirm: true, executed: &executed})
+	resp, err := runLoop(context.Background(), model, &AssistantRequest{
+		Registry: reg,
+		History: []chat.Message{
+			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{
+				{ID: "c1", Name: "manage_settings", ArgumentsJSON: `{}`},
+				{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`},
+			}},
+			{Role: chat.RoleTool, ToolCallID: "c1", Name: "manage_settings", Content: "awaiting user confirmation"},
+			{Role: chat.RoleTool, ToolCallID: "c2", Name: "manage_settings", Content: "awaiting user confirmation"},
+		},
+		UserContent:         "[user decided the pending tools, continue]",
+		ApprovedToolCallIDs: []string{"c1"},
+		RejectedToolCallIDs: []string{"c2"},
+	})
+	require.NoError(t, err)
+	require.False(t, resp.RequiresConfirmation)
+	// Only the approved call ran; the rejected one was marked as skipped.
+	require.True(t, executed)
+	require.Equal(t, "第一个已执行，第二个已跳过。", resp.Content)
+	require.Len(t, resp.ToolMessages, 2)
+	for _, m := range resp.ToolMessages {
+		require.NotEqual(t, "awaiting user confirmation", m.Content)
+	}
+}
+
+func TestRunLoopApprovalStripsPseudoXML(t *testing.T) {
+	t.Parallel()
+	// The model echoes a pseudo-XML tool call instead of a summary. The loop
+	// must strip it and fall back to a neutral completion line.
+	model := &fakeModel{
+		responses: []*chat.Response{
+			{Text: "<tool_calls>\n<invoke name=\"manage_settings\">\n</invoke>\n</tool_calls>"},
+		},
+	}
+	reg := newRegistryWith(&fakeTool{name: "manage_settings", confirm: true})
+	resp, err := runLoop(context.Background(), model, &AssistantRequest{
+		Registry: reg,
+		History: []chat.Message{
+			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`}}},
+			{Role: chat.RoleTool, ToolCallID: "c2", Name: "manage_settings", Content: "awaiting user confirmation"},
+		},
+		UserContent:         "[user approved the pending tool, please execute and continue]",
+		ApprovedToolCallIDs: []string{"c2"},
+	})
+	require.NoError(t, err)
+	require.False(t, resp.RequiresConfirmation)
+	// The pseudo-XML is gone; the fallback summary mentions the tool result.
+	require.NotContains(t, resp.Content, "<tool_calls>")
+	require.NotContains(t, resp.Content, "<invoke")
+	require.NotEmpty(t, resp.Content)
+	// The request sent to the model carries no tools and no tool messages.
+	require.Empty(t, model.lastReq.Tools)
+	for _, m := range model.lastReq.Messages {
+		require.NotEqual(t, chat.RoleTool, m.Role)
+	}
 }
 
 func TestRunLoopRespectsMaxRounds(t *testing.T) {

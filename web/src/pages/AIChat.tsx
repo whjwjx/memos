@@ -15,6 +15,17 @@ import { useTranslate } from "@/utils/i18n";
 
 const AWAITING_PLACEHOLDER = "awaiting user confirmation";
 
+// stripFakeToolCalls hides pseudo tool-call XML that some models emit as plain
+// text (e.g. <tool_calls><invoke name="...">...</invoke></tool_calls>) instead
+// of a native function call. Real tool calls are surfaced via the confirmation
+// cards and never reach the markdown renderer.
+const stripFakeToolCalls = (content: string): string => {
+  let cleaned = content.replace(/<tool_calls\b[^>]*>[\s\S]*?<\/tool_calls>/gi, "");
+  cleaned = cleaned.replace(/<invoke\b[^>]*>[\s\S]*?<\/invoke>/gi, "");
+  cleaned = cleaned.trim();
+  return cleaned || "Done.";
+};
+
 const MessageBubble = ({ msg }: { msg: ConversationMessage }) => {
   if (msg.role === "tool") {
     // Pending placeholders are surfaced via the confirmation card instead.
@@ -42,7 +53,11 @@ const MessageBubble = ({ msg }: { msg: ConversationMessage }) => {
           isUser ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted rounded-bl-sm"
         }`}
       >
-        {isUser ? <span className="whitespace-pre-wrap break-words">{msg.content}</span> : <ChatMarkdown content={msg.content} />}
+        {isUser ? (
+          <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+        ) : (
+          <ChatMarkdown content={stripFakeToolCalls(msg.content)} />
+        )}
       </div>
     </div>
   );
@@ -275,28 +290,16 @@ const AIChat = () => {
     [send, conversationId],
   );
 
-  // Approve a single tool call: execute just that one (dangerous writes run
-  // one-at-a-time) and mark the card as approved. The card stays visible.
-  // confirmKeyword carries the keyword typed on a second-factor confirmation
-  // card (e.g. "yes" for query_db writes) and is sent to the backend.
+  // Decide a single tool call (approve/reject). Decisions accumulate in the
+  // hook: nothing is submitted until every pending card in the current round
+  // has been decided, then all decisions are sent in one batch. Cards stay
+  // visible as a record of what the user decided.
   const handleResolve = useCallback(
     (id: string, status: "approved" | "rejected", confirmKeyword?: string) => {
       if (!conversationId) return;
       resolveToolCall(id, status, confirmKeyword);
-      if (status === "approved") {
-        // Send a fixed approval instruction (NOT a free-text user message) so the
-        // model treats it as "the pending tool was approved" rather than a new
-        // task, keeping behavior consistent across turns.
-        send({
-          content: "[用户已批准上述待确认工具，请直接执行并继续]",
-          approvedToolCallIds: [id],
-          toolApprovals: confirmKeyword ? [{ toolCallId: id, confirmKeyword }] : [],
-        });
-      }
-      // Reject: just record the decision; the user can send a follow-up message
-      // (or the assistant continues) without executing the tool.
     },
-    [send, resolveToolCall, conversationId],
+    [resolveToolCall, conversationId],
   );
 
   const handleKeyDown = useCallback(
