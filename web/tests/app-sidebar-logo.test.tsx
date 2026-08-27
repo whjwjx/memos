@@ -148,7 +148,7 @@ describe("App sidebar logo", () => {
     expect(logo).toHaveAttribute("href", "/");
     fireEvent.click(screen.getByRole("button", { name: "editor.new-memo" }));
     expect(globalEditorState.openEditor).toHaveBeenCalledOnce();
-    expect(screen.getByRole("link", { name: "common.calendar" })).toHaveAttribute("href", "/calendar");
+    expect(screen.queryByRole("link", { name: "common.calendar" })).not.toBeInTheDocument();
   });
 
   it("hides Compose when the composer reports it is not available", () => {
@@ -234,10 +234,17 @@ describe("App sidebar logo", () => {
     );
 
     const calendar = screen.getByText("Calendar");
+    const calendarLink = screen.getByRole("link", { name: "common.calendar" });
+    const reviewLink = screen.getByRole("link", { name: "review.title" });
     const views = screen.getByText("common.views");
     expect(screen.getByRole("region", { name: "common.statistics" })).toBeInTheDocument();
+    expect(calendarLink).toHaveAttribute("href", "/calendar");
+    expect(reviewLink).toHaveAttribute("href", "/review");
     expect(screen.getByRole("heading", { name: "common.views", level: 2 })).toBeInTheDocument();
     expect(calendar.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(calendar.compareDocumentPosition(calendarLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(calendarLink.compareDocumentPosition(reviewLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(reviewLink.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const viewOptions = screen.getByRole("button", { name: "memo.view-options" });
     const createView = screen.getByRole("button", { name: "common.create" });
     expect(viewOptions.compareDocumentPosition(createView) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

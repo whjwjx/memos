@@ -23,7 +23,7 @@ const MEMOS_DEPLOY_URL = "https://usememos.com/docs/deploy";
 const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 64;
 const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_PX = 56;
 const MOBILE_SIDEBAR_SWIPE_AXIS_RATIO = 1.4;
-const MOBILE_SIDEBAR_SWIPE_IGNORE_SELECTOR = "input, textarea, select, button, [contenteditable='true']";
+const MOBILE_SIDEBAR_SWIPE_IGNORE_SELECTOR = "input, textarea, select, button, [contenteditable='true'], [data-review-swipe-area='true']";
 
 const DemoBanner = () => {
   const t = useTranslate();
