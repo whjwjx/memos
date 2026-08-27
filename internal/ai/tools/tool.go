@@ -45,8 +45,12 @@ func NewRegistry() *Registry {
 	r := &Registry{tools: make(map[string]Tool)}
 	for _, t := range []Tool{
 		&SearchMemosTool{},
+		&GetMemoTool{},
 		&GetCommentsTool{},
 		&CreateMemoTool{},
+		&UpdateMemoTool{},
+		&TagMemoTool{},
+		&BatchUpdateMemosTool{},
 		&DeleteMemoTool{},
 		&ManageSettingsTool{},
 		&AgentReplyTool{},

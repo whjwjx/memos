@@ -18,13 +18,18 @@ func TestRegistryContainsAllStage1Tools(t *testing.T) {
 	}
 	for _, name := range []string{
 		"search_memos",
+		"get_memo",
 		"get_comments",
 		"create_memo",
+		"update_memo",
+		"tag_memo",
+		"batch_update_memos",
 		"manage_settings",
 		"agent_reply",
 		"auto_tag",
 		"query_db",
 		"get_logs",
+		"manage_memory",
 	} {
 		require.Truef(t, got[name], "registry missing tool %q", name)
 	}
@@ -58,7 +63,11 @@ func TestToolsRejectMissingRequiredArgs(t *testing.T) {
 		args string
 	}{
 		{"get_comments", `{"limit":5}`},            // missing memoUid
+		{"get_memo", `{}`},                         // missing memoUid
 		{"create_memo", `{"visibility":"PUBLIC"}`}, // missing content
+		{"update_memo", `{}`},                      // missing memoUid
+		{"tag_memo", `{}`},                         // missing memoUid
+		{"batch_update_memos", `{}`},               // missing memoUids
 		{"delete_memo", `{}`},                      // missing memoUid
 		{"agent_reply", `{}`},                      // missing memoUid
 		{"auto_tag", `{}`},                         // missing memoUid
