@@ -9,6 +9,7 @@ import (
 	context "context"
 	errors "errors"
 	v1 "github.com/usememos/memos/proto/gen/api/v1"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"
 )
@@ -38,6 +39,17 @@ const (
 	// AIServiceTestAIProviderProcedure is the fully-qualified name of the AIService's TestAIProvider
 	// RPC.
 	AIServiceTestAIProviderProcedure = "/memos.api.v1.AIService/TestAIProvider"
+	// AIServiceTranslateProcedure is the fully-qualified name of the AIService's Translate RPC.
+	AIServiceTranslateProcedure = "/memos.api.v1.AIService/Translate"
+	// AIServiceListTranslationHistoriesProcedure is the fully-qualified name of the AIService's
+	// ListTranslationHistories RPC.
+	AIServiceListTranslationHistoriesProcedure = "/memos.api.v1.AIService/ListTranslationHistories"
+	// AIServiceDeleteTranslationHistoryProcedure is the fully-qualified name of the AIService's
+	// DeleteTranslationHistory RPC.
+	AIServiceDeleteTranslationHistoryProcedure = "/memos.api.v1.AIService/DeleteTranslationHistory"
+	// AIServiceClearTranslationHistoriesProcedure is the fully-qualified name of the AIService's
+	// ClearTranslationHistories RPC.
+	AIServiceClearTranslationHistoriesProcedure = "/memos.api.v1.AIService/ClearTranslationHistories"
 )
 
 // AIServiceClient is a client for the memos.api.v1.AIService service.
@@ -48,6 +60,17 @@ type AIServiceClient interface {
 	// model endpoint and authenticate. Returns the provider's reply so the
 	// caller can confirm end-to-end connectivity.
 	TestAIProvider(context.Context, *connect.Request[v1.TestAIProviderRequest]) (*connect.Response[v1.TestAIProviderResponse], error)
+	// Translate translates text between English and Chinese using the configured
+	// instance AI translation provider.
+	Translate(context.Context, *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error)
+	// ListTranslationHistories lists the current user's translation history.
+	ListTranslationHistories(context.Context, *connect.Request[v1.ListTranslationHistoriesRequest]) (*connect.Response[v1.ListTranslationHistoriesResponse], error)
+	// DeleteTranslationHistory deletes one translation history item owned by the
+	// current user.
+	DeleteTranslationHistory(context.Context, *connect.Request[v1.DeleteTranslationHistoryRequest]) (*connect.Response[emptypb.Empty], error)
+	// ClearTranslationHistories deletes all translation history items owned by
+	// the current user.
+	ClearTranslationHistories(context.Context, *connect.Request[v1.ClearTranslationHistoriesRequest]) (*connect.Response[emptypb.Empty], error)
 }
 
 // NewAIServiceClient constructs a client for the memos.api.v1.AIService service. By default, it
@@ -73,13 +96,41 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(aIServiceMethods.ByName("TestAIProvider")),
 			connect.WithClientOptions(opts...),
 		),
+		translate: connect.NewClient[v1.TranslateRequest, v1.TranslateResponse](
+			httpClient,
+			baseURL+AIServiceTranslateProcedure,
+			connect.WithSchema(aIServiceMethods.ByName("Translate")),
+			connect.WithClientOptions(opts...),
+		),
+		listTranslationHistories: connect.NewClient[v1.ListTranslationHistoriesRequest, v1.ListTranslationHistoriesResponse](
+			httpClient,
+			baseURL+AIServiceListTranslationHistoriesProcedure,
+			connect.WithSchema(aIServiceMethods.ByName("ListTranslationHistories")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteTranslationHistory: connect.NewClient[v1.DeleteTranslationHistoryRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AIServiceDeleteTranslationHistoryProcedure,
+			connect.WithSchema(aIServiceMethods.ByName("DeleteTranslationHistory")),
+			connect.WithClientOptions(opts...),
+		),
+		clearTranslationHistories: connect.NewClient[v1.ClearTranslationHistoriesRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AIServiceClearTranslationHistoriesProcedure,
+			connect.WithSchema(aIServiceMethods.ByName("ClearTranslationHistories")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // aIServiceClient implements AIServiceClient.
 type aIServiceClient struct {
-	transcribe     *connect.Client[v1.TranscribeRequest, v1.TranscribeResponse]
-	testAIProvider *connect.Client[v1.TestAIProviderRequest, v1.TestAIProviderResponse]
+	transcribe                *connect.Client[v1.TranscribeRequest, v1.TranscribeResponse]
+	testAIProvider            *connect.Client[v1.TestAIProviderRequest, v1.TestAIProviderResponse]
+	translate                 *connect.Client[v1.TranslateRequest, v1.TranslateResponse]
+	listTranslationHistories  *connect.Client[v1.ListTranslationHistoriesRequest, v1.ListTranslationHistoriesResponse]
+	deleteTranslationHistory  *connect.Client[v1.DeleteTranslationHistoryRequest, emptypb.Empty]
+	clearTranslationHistories *connect.Client[v1.ClearTranslationHistoriesRequest, emptypb.Empty]
 }
 
 // Transcribe calls memos.api.v1.AIService.Transcribe.
@@ -92,6 +143,26 @@ func (c *aIServiceClient) TestAIProvider(ctx context.Context, req *connect.Reque
 	return c.testAIProvider.CallUnary(ctx, req)
 }
 
+// Translate calls memos.api.v1.AIService.Translate.
+func (c *aIServiceClient) Translate(ctx context.Context, req *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error) {
+	return c.translate.CallUnary(ctx, req)
+}
+
+// ListTranslationHistories calls memos.api.v1.AIService.ListTranslationHistories.
+func (c *aIServiceClient) ListTranslationHistories(ctx context.Context, req *connect.Request[v1.ListTranslationHistoriesRequest]) (*connect.Response[v1.ListTranslationHistoriesResponse], error) {
+	return c.listTranslationHistories.CallUnary(ctx, req)
+}
+
+// DeleteTranslationHistory calls memos.api.v1.AIService.DeleteTranslationHistory.
+func (c *aIServiceClient) DeleteTranslationHistory(ctx context.Context, req *connect.Request[v1.DeleteTranslationHistoryRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.deleteTranslationHistory.CallUnary(ctx, req)
+}
+
+// ClearTranslationHistories calls memos.api.v1.AIService.ClearTranslationHistories.
+func (c *aIServiceClient) ClearTranslationHistories(ctx context.Context, req *connect.Request[v1.ClearTranslationHistoriesRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.clearTranslationHistories.CallUnary(ctx, req)
+}
+
 // AIServiceHandler is an implementation of the memos.api.v1.AIService service.
 type AIServiceHandler interface {
 	// Transcribe transcribes an audio file using an instance AI provider.
@@ -100,6 +171,17 @@ type AIServiceHandler interface {
 	// model endpoint and authenticate. Returns the provider's reply so the
 	// caller can confirm end-to-end connectivity.
 	TestAIProvider(context.Context, *connect.Request[v1.TestAIProviderRequest]) (*connect.Response[v1.TestAIProviderResponse], error)
+	// Translate translates text between English and Chinese using the configured
+	// instance AI translation provider.
+	Translate(context.Context, *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error)
+	// ListTranslationHistories lists the current user's translation history.
+	ListTranslationHistories(context.Context, *connect.Request[v1.ListTranslationHistoriesRequest]) (*connect.Response[v1.ListTranslationHistoriesResponse], error)
+	// DeleteTranslationHistory deletes one translation history item owned by the
+	// current user.
+	DeleteTranslationHistory(context.Context, *connect.Request[v1.DeleteTranslationHistoryRequest]) (*connect.Response[emptypb.Empty], error)
+	// ClearTranslationHistories deletes all translation history items owned by
+	// the current user.
+	ClearTranslationHistories(context.Context, *connect.Request[v1.ClearTranslationHistoriesRequest]) (*connect.Response[emptypb.Empty], error)
 }
 
 // NewAIServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -121,12 +203,44 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(aIServiceMethods.ByName("TestAIProvider")),
 		connect.WithHandlerOptions(opts...),
 	)
+	aIServiceTranslateHandler := connect.NewUnaryHandler(
+		AIServiceTranslateProcedure,
+		svc.Translate,
+		connect.WithSchema(aIServiceMethods.ByName("Translate")),
+		connect.WithHandlerOptions(opts...),
+	)
+	aIServiceListTranslationHistoriesHandler := connect.NewUnaryHandler(
+		AIServiceListTranslationHistoriesProcedure,
+		svc.ListTranslationHistories,
+		connect.WithSchema(aIServiceMethods.ByName("ListTranslationHistories")),
+		connect.WithHandlerOptions(opts...),
+	)
+	aIServiceDeleteTranslationHistoryHandler := connect.NewUnaryHandler(
+		AIServiceDeleteTranslationHistoryProcedure,
+		svc.DeleteTranslationHistory,
+		connect.WithSchema(aIServiceMethods.ByName("DeleteTranslationHistory")),
+		connect.WithHandlerOptions(opts...),
+	)
+	aIServiceClearTranslationHistoriesHandler := connect.NewUnaryHandler(
+		AIServiceClearTranslationHistoriesProcedure,
+		svc.ClearTranslationHistories,
+		connect.WithSchema(aIServiceMethods.ByName("ClearTranslationHistories")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/memos.api.v1.AIService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AIServiceTranscribeProcedure:
 			aIServiceTranscribeHandler.ServeHTTP(w, r)
 		case AIServiceTestAIProviderProcedure:
 			aIServiceTestAIProviderHandler.ServeHTTP(w, r)
+		case AIServiceTranslateProcedure:
+			aIServiceTranslateHandler.ServeHTTP(w, r)
+		case AIServiceListTranslationHistoriesProcedure:
+			aIServiceListTranslationHistoriesHandler.ServeHTTP(w, r)
+		case AIServiceDeleteTranslationHistoryProcedure:
+			aIServiceDeleteTranslationHistoryHandler.ServeHTTP(w, r)
+		case AIServiceClearTranslationHistoriesProcedure:
+			aIServiceClearTranslationHistoriesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -142,4 +256,20 @@ func (UnimplementedAIServiceHandler) Transcribe(context.Context, *connect.Reques
 
 func (UnimplementedAIServiceHandler) TestAIProvider(context.Context, *connect.Request[v1.TestAIProviderRequest]) (*connect.Response[v1.TestAIProviderResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.TestAIProvider is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) Translate(context.Context, *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.Translate is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) ListTranslationHistories(context.Context, *connect.Request[v1.ListTranslationHistoriesRequest]) (*connect.Response[v1.ListTranslationHistoriesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.ListTranslationHistories is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) DeleteTranslationHistory(context.Context, *connect.Request[v1.DeleteTranslationHistoryRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.DeleteTranslationHistory is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) ClearTranslationHistories(context.Context, *connect.Request[v1.ClearTranslationHistoriesRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.ClearTranslationHistories is not implemented"))
 }

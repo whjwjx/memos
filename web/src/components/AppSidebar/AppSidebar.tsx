@@ -14,6 +14,7 @@ import {
   HouseIcon,
   ImageIcon,
   InfoIcon,
+  LanguagesIcon,
   LayoutListIcon,
   ListIcon,
   type LucideIcon,
@@ -255,6 +256,11 @@ const TimeNavigationSection = () => {
       path: ROUTES.CALENDAR,
       label: t("common.calendar"),
       icon: CalendarDaysIcon,
+    },
+    {
+      path: ROUTES.TRANSLATE,
+      label: t("translation.title"),
+      icon: LanguagesIcon,
     },
     {
       path: ROUTES.REVIEW,

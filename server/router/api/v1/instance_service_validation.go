@@ -99,6 +99,50 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 	if err := preparePersistedToolConfigs(setting); err != nil {
 		return err
 	}
+	if err := preparePersistedTranslationConfig(setting, existing); err != nil {
+		return err
+	}
+	return nil
+}
+
+func preparePersistedTranslationConfig(setting *storepb.InstanceAISetting, existing *storepb.InstanceAISetting) error {
+	// Preserve existing translation config when older clients omit it during an
+	// AI setting update, matching transcription and credential preservation.
+	if setting.Translation == nil && existing != nil {
+		setting.Translation = existing.GetTranslation()
+	}
+	if setting.Translation == nil {
+		return nil
+	}
+
+	cfg := setting.Translation
+	cfg.ProviderId = strings.TrimSpace(cfg.ProviderId)
+	cfg.Model = strings.TrimSpace(cfg.Model)
+
+	if cfg.Enabled && cfg.ProviderId == "" {
+		return errors.New("translation provider_id is required when translation is enabled")
+	}
+	if cfg.ProviderId != "" {
+		referenced := false
+		for _, provider := range setting.Providers {
+			if provider != nil && provider.Id == cfg.ProviderId {
+				referenced = true
+				break
+			}
+		}
+		if !referenced {
+			return errors.Errorf("translation provider_id %q does not reference any configured provider", cfg.ProviderId)
+		}
+	}
+	if len(cfg.Model) > maxTranslationConfigModelLength {
+		return errors.Errorf("translation model is too long; maximum length is %d characters", maxTranslationConfigModelLength)
+	}
+	if cfg.MaxTextLength < 0 {
+		return errors.New("translation max_text_length must be >= 0")
+	}
+	if cfg.MaxTextLength > maxTranslationConfigMaxTextLength {
+		return errors.Errorf("translation max_text_length is too large; maximum is %d characters", maxTranslationConfigMaxTextLength)
+	}
 	return nil
 }
 

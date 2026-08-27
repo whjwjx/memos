@@ -2,18 +2,20 @@
 // @generated from file api/v1/ai_service.proto (package memos.api.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_annotations } from "../../google/api/annotations_pb";
 import { file_google_api_client } from "../../google/api/client_pb";
 import { file_google_api_field_behavior } from "../../google/api/field_behavior_pb";
+import type { EmptySchema } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_empty } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file api/v1/ai_service.proto.
  */
 export const file_api_v1_ai_service: GenFile = /*@__PURE__*/
-  fileDesc("ChdhcGkvdjEvYWlfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIkkKEVRyYW5zY3JpYmVSZXF1ZXN0EjQKBWF1ZGlvGAEgASgLMiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpcHRpb25BdWRpb0ID4EECIncKElRyYW5zY3JpcHRpb25BdWRpbxIWCgdjb250ZW50GAEgASgMQgPgQQRIABINCgN1cmkYAiABKAlIABIVCghmaWxlbmFtZRgDIAEoCUID4EEBEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUID4EEBQggKBnNvdXJjZSIiChJUcmFuc2NyaWJlUmVzcG9uc2USDAoEdGV4dBgBIAEoCSJFChVUZXN0QUlQcm92aWRlclJlcXVlc3QSGAoLcHJvdmlkZXJfaWQYASABKAlCA+BBAhISCgVtb2RlbBgCIAEoCUID4EEBIkIKFlRlc3RBSVByb3ZpZGVyUmVzcG9uc2USCgoCb2sYASABKAgSDQoFcmVwbHkYAiABKAkSDQoFZXJyb3IYAyABKAkyngIKCUFJU2VydmljZRJ5CgpUcmFuc2NyaWJlEh8ubWVtb3MuYXBpLnYxLlRyYW5zY3JpYmVSZXF1ZXN0GiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpYmVSZXNwb25zZSIo2kEFYXVkaW+C0+STAho6ASoiFS9hcGkvdjEvYWk6dHJhbnNjcmliZRKVAQoOVGVzdEFJUHJvdmlkZXISIy5tZW1vcy5hcGkudjEuVGVzdEFJUHJvdmlkZXJSZXF1ZXN0GiQubWVtb3MuYXBpLnYxLlRlc3RBSVByb3ZpZGVyUmVzcG9uc2UiONpBEXByb3ZpZGVyX2lkLG1vZGVsgtPkkwIeOgEqIhkvYXBpL3YxL2FpL3Byb3ZpZGVyczp0ZXN0QqYBChBjb20ubWVtb3MuYXBpLnYxQg5BaVNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior]);
+  fileDesc("ChdhcGkvdjEvYWlfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIkkKEVRyYW5zY3JpYmVSZXF1ZXN0EjQKBWF1ZGlvGAEgASgLMiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpcHRpb25BdWRpb0ID4EECIncKElRyYW5zY3JpcHRpb25BdWRpbxIWCgdjb250ZW50GAEgASgMQgPgQQRIABINCgN1cmkYAiABKAlIABIVCghmaWxlbmFtZRgDIAEoCUID4EEBEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUID4EEBQggKBnNvdXJjZSIiChJUcmFuc2NyaWJlUmVzcG9uc2USDAoEdGV4dBgBIAEoCSJFChVUZXN0QUlQcm92aWRlclJlcXVlc3QSGAoLcHJvdmlkZXJfaWQYASABKAlCA+BBAhISCgVtb2RlbBgCIAEoCUID4EEBIkIKFlRlc3RBSVByb3ZpZGVyUmVzcG9uc2USCgoCb2sYASABKAgSDQoFcmVwbHkYAiABKAkSDQoFZXJyb3IYAyABKAkiYQoQVHJhbnNsYXRlUmVxdWVzdBIRCgR0ZXh0GAEgASgJQgPgQQISOgoJZGlyZWN0aW9uGAIgASgOMiIubWVtb3MuYXBpLnYxLlRyYW5zbGF0aW9uRGlyZWN0aW9uQgPgQQEikQEKEVRyYW5zbGF0ZVJlc3BvbnNlEhcKD3RyYW5zbGF0ZWRfdGV4dBgBIAEoCRIXCg9zb3VyY2VfbGFuZ3VhZ2UYAiABKAkSFwoPdGFyZ2V0X2xhbmd1YWdlGAMgASgJEjEKB2hpc3RvcnkYBCABKAsyIC5tZW1vcy5hcGkudjEuVHJhbnNsYXRpb25IaXN0b3J5IrIBChJUcmFuc2xhdGlvbkhpc3RvcnkSDwoCaWQYASABKAlCA+BBAxIRCgRuYW1lGAIgASgJQgPgQQMSEwoLc291cmNlX3RleHQYAyABKAkSFwoPdHJhbnNsYXRlZF90ZXh0GAQgASgJEhcKD3NvdXJjZV9sYW5ndWFnZRgFIAEoCRIXCg90YXJnZXRfbGFuZ3VhZ2UYBiABKAkSGAoLY3JlYXRlX3RpbWUYByABKANCA+BBAyJICh9MaXN0VHJhbnNsYXRpb25IaXN0b3JpZXNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInAKIExpc3RUcmFuc2xhdGlvbkhpc3Rvcmllc1Jlc3BvbnNlEjMKCWhpc3RvcmllcxgBIAMoCzIgLm1lbW9zLmFwaS52MS5UcmFuc2xhdGlvbkhpc3RvcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjIKH0RlbGV0ZVRyYW5zbGF0aW9uSGlzdG9yeVJlcXVlc3QSDwoCaWQYASABKAlCA+BBAiIiCiBDbGVhclRyYW5zbGF0aW9uSGlzdG9yaWVzUmVxdWVzdCpjChRUcmFuc2xhdGlvbkRpcmVjdGlvbhIlCiFUUkFOU0xBVElPTl9ESVJFQ1RJT05fVU5TUEVDSUZJRUQQABIICgRBVVRPEAESDAoIRU5fVE9fWkgQAhIMCghaSF9UT19FThADMuwGCglBSVNlcnZpY2USeQoKVHJhbnNjcmliZRIfLm1lbW9zLmFwaS52MS5UcmFuc2NyaWJlUmVxdWVzdBogLm1lbW9zLmFwaS52MS5UcmFuc2NyaWJlUmVzcG9uc2UiKNpBBWF1ZGlvgtPkkwIaOgEqIhUvYXBpL3YxL2FpOnRyYW5zY3JpYmUSlQEKDlRlc3RBSVByb3ZpZGVyEiMubWVtb3MuYXBpLnYxLlRlc3RBSVByb3ZpZGVyUmVxdWVzdBokLm1lbW9zLmFwaS52MS5UZXN0QUlQcm92aWRlclJlc3BvbnNlIjjaQRFwcm92aWRlcl9pZCxtb2RlbILT5JMCHjoBKiIZL2FwaS92MS9haS9wcm92aWRlcnM6dGVzdBJ+CglUcmFuc2xhdGUSHi5tZW1vcy5hcGkudjEuVHJhbnNsYXRlUmVxdWVzdBofLm1lbW9zLmFwaS52MS5UcmFuc2xhdGVSZXNwb25zZSIw2kEOdGV4dCxkaXJlY3Rpb26C0+STAhk6ASoiFC9hcGkvdjEvYWk6dHJhbnNsYXRlEqMBChhMaXN0VHJhbnNsYXRpb25IaXN0b3JpZXMSLS5tZW1vcy5hcGkudjEuTGlzdFRyYW5zbGF0aW9uSGlzdG9yaWVzUmVxdWVzdBouLm1lbW9zLmFwaS52MS5MaXN0VHJhbnNsYXRpb25IaXN0b3JpZXNSZXNwb25zZSIogtPkkwIiEiAvYXBpL3YxL2FpL3RyYW5zbGF0aW9uLWhpc3RvcmllcxKVAQoYRGVsZXRlVHJhbnNsYXRpb25IaXN0b3J5Ei0ubWVtb3MuYXBpLnYxLkRlbGV0ZVRyYW5zbGF0aW9uSGlzdG9yeVJlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiMtpBAmlkgtPkkwInKiUvYXBpL3YxL2FpL3RyYW5zbGF0aW9uLWhpc3Rvcmllcy97aWR9Eo0BChlDbGVhclRyYW5zbGF0aW9uSGlzdG9yaWVzEi4ubWVtb3MuYXBpLnYxLkNsZWFyVHJhbnNsYXRpb25IaXN0b3JpZXNSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IiiC0+STAiIqIC9hcGkvdjEvYWkvdHJhbnNsYXRpb24taGlzdG9yaWVzQqYBChBjb20ubWVtb3MuYXBpLnYxQg5BaVNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_protobuf_empty]);
 
 /**
  * @generated from message memos.api.v1.TranscribeRequest
@@ -161,6 +163,222 @@ export const TestAIProviderResponseSchema: GenMessage<TestAIProviderResponse> = 
   messageDesc(file_api_v1_ai_service, 4);
 
 /**
+ * @generated from message memos.api.v1.TranslateRequest
+ */
+export type TranslateRequest = Message<"memos.api.v1.TranslateRequest"> & {
+  /**
+   * Required. Text to translate.
+   *
+   * @generated from field: string text = 1;
+   */
+  text: string;
+
+  /**
+   * Optional. Translation direction. Defaults to AUTO.
+   *
+   * @generated from field: memos.api.v1.TranslationDirection direction = 2;
+   */
+  direction: TranslationDirection;
+};
+
+/**
+ * Describes the message memos.api.v1.TranslateRequest.
+ * Use `create(TranslateRequestSchema)` to create a new message.
+ */
+export const TranslateRequestSchema: GenMessage<TranslateRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 5);
+
+/**
+ * @generated from message memos.api.v1.TranslateResponse
+ */
+export type TranslateResponse = Message<"memos.api.v1.TranslateResponse"> & {
+  /**
+   * @generated from field: string translated_text = 1;
+   */
+  translatedText: string;
+
+  /**
+   * @generated from field: string source_language = 2;
+   */
+  sourceLanguage: string;
+
+  /**
+   * @generated from field: string target_language = 3;
+   */
+  targetLanguage: string;
+
+  /**
+   * @generated from field: memos.api.v1.TranslationHistory history = 4;
+   */
+  history?: TranslationHistory | undefined;
+};
+
+/**
+ * Describes the message memos.api.v1.TranslateResponse.
+ * Use `create(TranslateResponseSchema)` to create a new message.
+ */
+export const TranslateResponseSchema: GenMessage<TranslateResponse> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 6);
+
+/**
+ * @generated from message memos.api.v1.TranslationHistory
+ */
+export type TranslationHistory = Message<"memos.api.v1.TranslationHistory"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string source_text = 3;
+   */
+  sourceText: string;
+
+  /**
+   * @generated from field: string translated_text = 4;
+   */
+  translatedText: string;
+
+  /**
+   * @generated from field: string source_language = 5;
+   */
+  sourceLanguage: string;
+
+  /**
+   * @generated from field: string target_language = 6;
+   */
+  targetLanguage: string;
+
+  /**
+   * @generated from field: int64 create_time = 7;
+   */
+  createTime: bigint;
+};
+
+/**
+ * Describes the message memos.api.v1.TranslationHistory.
+ * Use `create(TranslationHistorySchema)` to create a new message.
+ */
+export const TranslationHistorySchema: GenMessage<TranslationHistory> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 7);
+
+/**
+ * @generated from message memos.api.v1.ListTranslationHistoriesRequest
+ */
+export type ListTranslationHistoriesRequest = Message<"memos.api.v1.ListTranslationHistoriesRequest"> & {
+  /**
+   * Maximum number of records to return. Defaults to 50.
+   *
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * A page token from a previous response.
+   *
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message memos.api.v1.ListTranslationHistoriesRequest.
+ * Use `create(ListTranslationHistoriesRequestSchema)` to create a new message.
+ */
+export const ListTranslationHistoriesRequestSchema: GenMessage<ListTranslationHistoriesRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 8);
+
+/**
+ * @generated from message memos.api.v1.ListTranslationHistoriesResponse
+ */
+export type ListTranslationHistoriesResponse = Message<"memos.api.v1.ListTranslationHistoriesResponse"> & {
+  /**
+   * @generated from field: repeated memos.api.v1.TranslationHistory histories = 1;
+   */
+  histories: TranslationHistory[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message memos.api.v1.ListTranslationHistoriesResponse.
+ * Use `create(ListTranslationHistoriesResponseSchema)` to create a new message.
+ */
+export const ListTranslationHistoriesResponseSchema: GenMessage<ListTranslationHistoriesResponse> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 9);
+
+/**
+ * @generated from message memos.api.v1.DeleteTranslationHistoryRequest
+ */
+export type DeleteTranslationHistoryRequest = Message<"memos.api.v1.DeleteTranslationHistoryRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message memos.api.v1.DeleteTranslationHistoryRequest.
+ * Use `create(DeleteTranslationHistoryRequestSchema)` to create a new message.
+ */
+export const DeleteTranslationHistoryRequestSchema: GenMessage<DeleteTranslationHistoryRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 10);
+
+/**
+ * @generated from message memos.api.v1.ClearTranslationHistoriesRequest
+ */
+export type ClearTranslationHistoriesRequest = Message<"memos.api.v1.ClearTranslationHistoriesRequest"> & {
+};
+
+/**
+ * Describes the message memos.api.v1.ClearTranslationHistoriesRequest.
+ * Use `create(ClearTranslationHistoriesRequestSchema)` to create a new message.
+ */
+export const ClearTranslationHistoriesRequestSchema: GenMessage<ClearTranslationHistoriesRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 11);
+
+/**
+ * @generated from enum memos.api.v1.TranslationDirection
+ */
+export enum TranslationDirection {
+  /**
+   * @generated from enum value: TRANSLATION_DIRECTION_UNSPECIFIED = 0;
+   */
+  TRANSLATION_DIRECTION_UNSPECIFIED = 0,
+
+  /**
+   * AUTO asks the server to infer English-to-Chinese or Chinese-to-English.
+   *
+   * @generated from enum value: AUTO = 1;
+   */
+  AUTO = 1,
+
+  /**
+   * @generated from enum value: EN_TO_ZH = 2;
+   */
+  EN_TO_ZH = 2,
+
+  /**
+   * @generated from enum value: ZH_TO_EN = 3;
+   */
+  ZH_TO_EN = 3,
+}
+
+/**
+ * Describes the enum memos.api.v1.TranslationDirection.
+ */
+export const TranslationDirectionSchema: GenEnum<TranslationDirection> = /*@__PURE__*/
+  enumDesc(file_api_v1_ai_service, 0);
+
+/**
  * @generated from service memos.api.v1.AIService
  */
 export const AIService: GenService<{
@@ -185,6 +403,49 @@ export const AIService: GenService<{
     methodKind: "unary";
     input: typeof TestAIProviderRequestSchema;
     output: typeof TestAIProviderResponseSchema;
+  },
+  /**
+   * Translate translates text between English and Chinese using the configured
+   * instance AI translation provider.
+   *
+   * @generated from rpc memos.api.v1.AIService.Translate
+   */
+  translate: {
+    methodKind: "unary";
+    input: typeof TranslateRequestSchema;
+    output: typeof TranslateResponseSchema;
+  },
+  /**
+   * ListTranslationHistories lists the current user's translation history.
+   *
+   * @generated from rpc memos.api.v1.AIService.ListTranslationHistories
+   */
+  listTranslationHistories: {
+    methodKind: "unary";
+    input: typeof ListTranslationHistoriesRequestSchema;
+    output: typeof ListTranslationHistoriesResponseSchema;
+  },
+  /**
+   * DeleteTranslationHistory deletes one translation history item owned by the
+   * current user.
+   *
+   * @generated from rpc memos.api.v1.AIService.DeleteTranslationHistory
+   */
+  deleteTranslationHistory: {
+    methodKind: "unary";
+    input: typeof DeleteTranslationHistoryRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * ClearTranslationHistories deletes all translation history items owned by
+   * the current user.
+   *
+   * @generated from rpc memos.api.v1.AIService.ClearTranslationHistories
+   */
+  clearTranslationHistories: {
+    methodKind: "unary";
+    input: typeof ClearTranslationHistoriesRequestSchema;
+    output: typeof EmptySchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_api_v1_ai_service, 0);

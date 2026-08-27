@@ -5,6 +5,7 @@ package memos.api.v1;
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
+import "google/protobuf/empty.proto";
 
 option go_package = "gen/api/v1";
 
@@ -27,6 +28,40 @@ service AIService {
       body: "*"
     };
     option (google.api.method_signature) = "provider_id,model";
+  }
+
+  // Translate translates text between English and Chinese using the configured
+  // instance AI translation provider.
+  rpc Translate(TranslateRequest) returns (TranslateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/ai:translate"
+      body: "*"
+    };
+    option (google.api.method_signature) = "text,direction";
+  }
+
+  // ListTranslationHistories lists the current user's translation history.
+  rpc ListTranslationHistories(ListTranslationHistoriesRequest) returns (ListTranslationHistoriesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/ai/translation-histories"
+    };
+  }
+
+  // DeleteTranslationHistory deletes one translation history item owned by the
+  // current user.
+  rpc DeleteTranslationHistory(DeleteTranslationHistoryRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/api/v1/ai/translation-histories/{id}"
+    };
+    option (google.api.method_signature) = "id";
+  }
+
+  // ClearTranslationHistories deletes all translation history items owned by
+  // the current user.
+  rpc ClearTranslationHistories(ClearTranslationHistoriesRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/api/v1/ai/translation-histories"
+    };
   }
 }
 
@@ -75,3 +110,55 @@ message TestAIProviderResponse {
   // Error message when ok is false; empty otherwise.
   string error = 3;
 }
+
+enum TranslationDirection {
+  TRANSLATION_DIRECTION_UNSPECIFIED = 0;
+  // AUTO asks the server to infer English-to-Chinese or Chinese-to-English.
+  AUTO = 1;
+  EN_TO_ZH = 2;
+  ZH_TO_EN = 3;
+}
+
+message TranslateRequest {
+  // Required. Text to translate.
+  string text = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. Translation direction. Defaults to AUTO.
+  TranslationDirection direction = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message TranslateResponse {
+  string translated_text = 1;
+  string source_language = 2;
+  string target_language = 3;
+  TranslationHistory history = 4;
+}
+
+message TranslationHistory {
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string source_text = 3;
+  string translated_text = 4;
+  string source_language = 5;
+  string target_language = 6;
+  int64 create_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ListTranslationHistoriesRequest {
+  // Maximum number of records to return. Defaults to 50.
+  int32 page_size = 1;
+
+  // A page token from a previous response.
+  string page_token = 2;
+}
+
+message ListTranslationHistoriesResponse {
+  repeated TranslationHistory histories = 1;
+  string next_page_token = 2;
+}
+
+message DeleteTranslationHistoryRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ClearTranslationHistoriesRequest {}

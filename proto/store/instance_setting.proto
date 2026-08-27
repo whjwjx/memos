@@ -222,6 +222,24 @@ message InstanceAISetting {
   // conversation's system prompt. Managed by the admin through the settings UI
   // and by the admin-only manage_memory tool.
   MemoryConfig memory = 7;
+
+  // translation is the admin-configured AI translation capability surfaced in
+  // the /translate page. When unset or disabled, translation is unavailable.
+  TranslationConfig translation = 8;
+}
+
+// TranslationConfig configures the AI-backed translation page.
+message TranslationConfig {
+  // enabled toggles whether regular users can use AI translation.
+  bool enabled = 1;
+  // provider_id references an entry in InstanceAISetting.providers[].id.
+  string provider_id = 2;
+  // model is the provider-specific text-generation model identifier.
+  // Empty string falls back to the engine default.
+  string model = 3;
+  // max_text_length caps a single translation request in characters.
+  // 0 means the server default is used.
+  int32 max_text_length = 4;
 }
 
 // MemoryConfig holds the shared context bank used by the AI chat assistant.

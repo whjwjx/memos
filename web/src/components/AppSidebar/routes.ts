@@ -9,6 +9,7 @@ export type SidebarRouteKind =
   | "attachments"
   | "inbox"
   | "review"
+  | "translate"
   | "settings"
   | "ai-chat"
   | "memo"
@@ -21,6 +22,7 @@ export const getSidebarRouteKind = (path: string): SidebarRouteKind => {
   if (path === ROUTES.ATTACHMENTS) return "attachments";
   if (path === ROUTES.INBOX) return "inbox";
   if (path === ROUTES.REVIEW) return "review";
+  if (path === ROUTES.TRANSLATE) return "translate";
   if (path === ROUTES.SETTING) return "settings";
   if (path === ROUTES.AI_CHAT) return "ai-chat";
   if (matchPath("/memos/:uid", path) || matchPath(`${ROUTES.SHARED_MEMO}/token`, path)) return "memo";

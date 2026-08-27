@@ -206,6 +206,78 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/ai/translation-histories:
+        get:
+            tags:
+                - AIService
+            description: ListTranslationHistories lists the current user's translation history.
+            operationId: AIService_ListTranslationHistories
+            parameters:
+                - name: pageSize
+                  in: query
+                  description: Maximum number of records to return. Defaults to 50.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: A page token from a previous response.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListTranslationHistoriesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - AIService
+            description: |-
+                ClearTranslationHistories deletes all translation history items owned by
+                 the current user.
+            operationId: AIService_ClearTranslationHistories
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/translation-histories/{id}:
+        delete:
+            tags:
+                - AIService
+            description: |-
+                DeleteTranslationHistory deletes one translation history item owned by the
+                 current user.
+            operationId: AIService_DeleteTranslationHistory
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/ai:transcribe:
         post:
             tags:
@@ -225,6 +297,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/TranscribeResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai:translate:
+        post:
+            tags:
+                - AIService
+            description: |-
+                Translate translates text between English and Chinese using the configured
+                 instance AI translation provider.
+            operationId: AIService_Translate
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TranslateRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/TranslateResponse'
                 default:
                     description: Default error response
                     content:
@@ -3118,6 +3217,12 @@ components:
                          assistant. When enabled, its entries are injected into every chat
                          conversation's system prompt. Managed by the admin through the settings UI
                          and by the admin-only manage_memory tool.
+                translation:
+                    allOf:
+                        - $ref: '#/components/schemas/InstanceSetting_TranslationConfig'
+                    description: |-
+                        translation is the admin-configured AI translation capability surfaced in
+                         the /translate page. Non-admin callers can only see whether it is enabled.
             description: AI provider configuration settings.
         InstanceSetting_AgentConfig:
             type: object
@@ -3428,6 +3533,23 @@ components:
                     type: string
                     description: prompt is a default spelling/vocabulary hint passed to the provider.
             description: TranscriptionConfig configures the speech-to-text feature.
+        InstanceSetting_TranslationConfig:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                    description: enabled toggles whether regular users can use AI translation.
+                providerId:
+                    type: string
+                    description: provider_id references an entry in AISetting.providers[].id.
+                model:
+                    type: string
+                    description: model is the provider-specific text-generation model identifier.
+                maxTextLength:
+                    type: integer
+                    description: max_text_length caps a single translation request in characters.
+                    format: int32
+            description: TranslationConfig configures the AI-backed translation page.
         InstanceStats:
             type: object
             properties:
@@ -3608,6 +3730,15 @@ components:
                 nextPageToken:
                     type: string
                     description: A token for the next page of results.
+        ListTranslationHistoriesResponse:
+            type: object
+            properties:
+                histories:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/TranslationHistory'
+                nextPageToken:
+                    type: string
         ListUserNotificationsResponse:
             type: object
             properties:
@@ -4346,6 +4477,54 @@ components:
                 contentType:
                     type: string
                     description: Optional. The MIME type of the input audio.
+        TranslateRequest:
+            required:
+                - text
+            type: object
+            properties:
+                text:
+                    type: string
+                    description: Required. Text to translate.
+                direction:
+                    enum:
+                        - TRANSLATION_DIRECTION_UNSPECIFIED
+                        - AUTO
+                        - EN_TO_ZH
+                        - ZH_TO_EN
+                    type: string
+                    description: Optional. Translation direction. Defaults to AUTO.
+                    format: enum
+        TranslateResponse:
+            type: object
+            properties:
+                translatedText:
+                    type: string
+                sourceLanguage:
+                    type: string
+                targetLanguage:
+                    type: string
+                history:
+                    $ref: '#/components/schemas/TranslationHistory'
+        TranslationHistory:
+            type: object
+            properties:
+                id:
+                    readOnly: true
+                    type: string
+                name:
+                    readOnly: true
+                    type: string
+                sourceText:
+                    type: string
+                translatedText:
+                    type: string
+                sourceLanguage:
+                    type: string
+                targetLanguage:
+                    type: string
+                createTime:
+                    readOnly: true
+                    type: string
         UpdateConversationRequest:
             required:
                 - conversation

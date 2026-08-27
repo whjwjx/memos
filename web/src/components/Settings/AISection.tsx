@@ -35,6 +35,8 @@ import {
   InstanceSetting_ToolConfigSchema,
   InstanceSetting_TranscriptionConfig,
   InstanceSetting_TranscriptionConfigSchema,
+  InstanceSetting_TranslationConfig,
+  InstanceSetting_TranslationConfigSchema,
   InstanceSettingSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
 import { useTranslate } from "@/utils/i18n";
@@ -59,6 +61,13 @@ type LocalTranscription = {
   model: string;
   language: string;
   prompt: string;
+};
+
+type LocalTranslation = {
+  enabled: boolean;
+  providerId: string;
+  model: string;
+  maxTextLength: number;
 };
 
 const providerTypeOptions = [InstanceSetting_AIProviderType.OPENAI, InstanceSetting_AIProviderType.GEMINI];
@@ -86,6 +95,13 @@ const toLocalTranscription = (config: InstanceSetting_TranscriptionConfig | unde
   model: config?.model ?? "",
   language: config?.language ?? "",
   prompt: config?.prompt ?? "",
+});
+
+const toLocalTranslation = (config: InstanceSetting_TranslationConfig | undefined): LocalTranslation => ({
+  enabled: config?.enabled ?? false,
+  providerId: config?.providerId ?? "",
+  model: config?.model ?? "",
+  maxTextLength: config?.maxTextLength && config.maxTextLength > 0 ? config.maxTextLength : 5000,
 });
 
 const newProvider = (): LocalAIProvider => ({
@@ -379,6 +395,14 @@ const toTranscriptionConfig = (transcription: LocalTranscription) =>
     prompt: transcription.prompt,
   });
 
+const toTranslationConfig = (translation: LocalTranslation) =>
+  create(InstanceSetting_TranslationConfigSchema, {
+    enabled: translation.enabled,
+    providerId: translation.providerId,
+    model: translation.model.trim(),
+    maxTextLength: translation.maxTextLength,
+  });
+
 const AISection = () => {
   const t = useTranslate();
   const saveInstanceSetting = useInstanceSettingUpdater();
@@ -400,6 +424,7 @@ const AISection = () => {
   ];
   const [providers, setProviders] = useState<LocalAIProvider[]>(() => originalSetting.providers.map(toLocalProvider));
   const [transcription, setTranscription] = useState<LocalTranscription>(() => toLocalTranscription(originalSetting.transcription));
+  const [translation, setTranslation] = useState<LocalTranslation>(() => toLocalTranslation(originalSetting.translation));
   const [agents, setAgents] = useState<LocalAgent[]>(() => originalSetting.agents.map(toLocalAgent));
   const [taggers, setTaggers] = useState<LocalTagger[]>(() => originalSetting.taggers.map(toLocalTagger));
   const [chatAgents, setChatAgents] = useState<LocalChatAgent[]>(() => originalSetting.chatAgents.map(toLocalChatAgent));
@@ -469,6 +494,23 @@ const AISection = () => {
     [providers, transcription.providerId],
   );
 
+  const lastSyncedTranslation = useRef<LocalTranslation>(toLocalTranslation(originalSetting.translation));
+  useEffect(() => {
+    const next = toLocalTranslation(originalSetting.translation);
+    if (!isEqual(lastSyncedTranslation.current, next)) {
+      setTranslation(next);
+      lastSyncedTranslation.current = next;
+    }
+  }, [originalSetting.translation]);
+
+  const originalTranslation = useMemo(() => toLocalTranslation(originalSetting.translation), [originalSetting.translation]);
+  const translationHasChanges = !isEqual(translation, originalTranslation);
+
+  const translationProviderRef = useMemo(
+    () => providers.find((provider) => provider.id === translation.providerId),
+    [providers, translation.providerId],
+  );
+
   // Persists the AI setting using a specific providers list, transcription
   // value, agents list, taggers list, chat agents list, and tools map.
   // Provider/transcription/agent operations pass the current chat agents and
@@ -482,6 +524,7 @@ const AISection = () => {
     nextTools: LocalTool[],
     errorContext: string,
     nextMemory: LocalMemory = memory,
+    nextTranslation: InstanceSetting_TranslationConfig | undefined = originalSetting.translation,
   ) => {
     const nextToolMap: Record<string, InstanceSetting_ToolConfig> = {};
     for (const tool of nextTools) {
@@ -501,6 +544,7 @@ const AISection = () => {
             chatAgents: nextChatAgents.map(toChatAgentConfig),
             tools: nextToolMap,
             memory: toMemoryConfig(nextMemory),
+            translation: nextTranslation,
           }),
         },
       }),
@@ -562,12 +606,30 @@ const AISection = () => {
       persistedTranscription && persistedTranscription.providerId === target.id
         ? create(InstanceSetting_TranscriptionConfigSchema, {})
         : persistedTranscription;
+    const persistedTranslation = originalSetting.translation;
+    const nextTranslation =
+      persistedTranslation && persistedTranslation.providerId === target.id
+        ? create(InstanceSetting_TranslationConfigSchema, {})
+        : persistedTranslation;
 
-    const ok = await persistAISetting(nextProviders, nextTranscription, agents, taggers, chatAgents, tools, "Delete AI provider");
+    const ok = await persistAISetting(
+      nextProviders,
+      nextTranscription,
+      agents,
+      taggers,
+      chatAgents,
+      tools,
+      "Delete AI provider",
+      memory,
+      nextTranslation,
+    );
     if (!ok) return;
     setProviders(nextProviders);
     if (transcription.providerId === target.id) {
       setTranscription((prev) => ({ ...prev, providerId: "" }));
+    }
+    if (translation.providerId === target.id) {
+      setTranslation((prev) => ({ ...prev, enabled: false, providerId: "" }));
     }
     setDeleteTarget(undefined);
   };
@@ -578,6 +640,35 @@ const AISection = () => {
       return;
     }
     await persistAISetting(providers, toTranscriptionConfig(transcription), agents, taggers, chatAgents, tools, "Update transcription");
+  };
+
+  const handleSaveTranslation = async () => {
+    if (translation.enabled && !translation.providerId) {
+      toast.error(t("setting.ai.translation-provider-required"));
+      return;
+    }
+    if (translation.providerId && !translationProviderRef) {
+      toast.error(t("setting.ai.translation-empty-providers"));
+      return;
+    }
+    const normalized = {
+      ...translation,
+      maxTextLength: Math.min(100000, Math.max(1, Math.trunc(translation.maxTextLength || 5000))),
+    };
+    const ok = await persistAISetting(
+      providers,
+      originalSetting.transcription,
+      agents,
+      taggers,
+      chatAgents,
+      tools,
+      "Update translation",
+      memory,
+      toTranslationConfig(normalized),
+    );
+    if (!ok) return;
+    setTranslation(normalized);
+    lastSyncedTranslation.current = normalized;
   };
 
   const handleCreateAgent = () => {
@@ -917,6 +1008,24 @@ const AISection = () => {
           transcription={transcription}
           onChange={setTranscription}
           referencedProvider={transcriptionProviderRef}
+        />
+      </SettingGroup>
+
+      <SettingGroup
+        title={t("setting.ai.translation-title")}
+        description={t("setting.ai.translation-description")}
+        showSeparator
+        actions={
+          <Button disabled={!translationHasChanges} onClick={handleSaveTranslation}>
+            {t("common.save")}
+          </Button>
+        }
+      >
+        <TranslationForm
+          providers={providers}
+          translation={translation}
+          onChange={setTranslation}
+          referencedProvider={translationProviderRef}
         />
       </SettingGroup>
 
@@ -1425,6 +1534,101 @@ const TranscriptionForm = ({ providers, transcription, referencedProvider, onCha
           maxLength={4096}
         />
         <p className="text-xs text-muted-foreground">{t("setting.ai.transcription-prompt-help")}</p>
+      </div>
+    </div>
+  );
+};
+
+interface TranslationFormProps {
+  providers: LocalAIProvider[];
+  translation: LocalTranslation;
+  referencedProvider: LocalAIProvider | undefined;
+  onChange: (next: LocalTranslation) => void;
+}
+
+const TranslationForm = ({ providers, translation, referencedProvider, onChange }: TranslationFormProps) => {
+  const t = useTranslate();
+  const noProviders = providers.length === 0;
+
+  const providerOptions = useMemo(
+    () => [
+      { value: "__none__", label: t("setting.ai.translation-no-provider") },
+      ...providers.map((provider) => ({ value: provider.id, label: provider.title || provider.id })),
+    ],
+    [providers, t],
+  );
+
+  const update = (partial: Partial<LocalTranslation>) => {
+    onChange({ ...translation, ...partial });
+  };
+
+  const placeholderForProvider = (provider: LocalAIProvider | undefined) => {
+    if (!provider) return "";
+    return provider.type === InstanceSetting_AIProviderType.GEMINI
+      ? t("setting.ai.translation-model-placeholder-gemini")
+      : t("setting.ai.translation-model-placeholder-openai");
+  };
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
+      <label className="flex items-center gap-2 sm:col-span-2 text-sm">
+        <input
+          type="checkbox"
+          className="size-4 accent-primary"
+          checked={translation.enabled}
+          onChange={(e) => update({ enabled: e.target.checked })}
+        />
+        <span>{t("setting.ai.translation-enabled")}</span>
+      </label>
+
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <Label>{t("setting.ai.translation-provider")}</Label>
+        <Select
+          value={translation.providerId || "__none__"}
+          items={providerOptions}
+          onValueChange={(value) => update({ providerId: value === "__none__" ? "" : value })}
+          disabled={noProviders}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {providerOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {noProviders && <p className="text-xs text-muted-foreground">{t("setting.ai.translation-empty-providers")}</p>}
+        {referencedProvider && !referencedProvider.apiKeySet && (
+          <p className="text-xs text-destructive">{t("setting.ai.translation-warning-no-key")}</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>{t("setting.ai.translation-model")}</Label>
+        <Input
+          value={translation.model}
+          onChange={(e) => update({ model: e.target.value })}
+          placeholder={placeholderForProvider(referencedProvider)}
+          disabled={!translation.providerId}
+          maxLength={256}
+        />
+        <p className="text-xs text-muted-foreground">{t("setting.ai.translation-model-help")}</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>{t("setting.ai.translation-max-text-length")}</Label>
+        <Input
+          type="number"
+          value={translation.maxTextLength}
+          min={1}
+          max={100000}
+          onChange={(e) => update({ maxTextLength: Number(e.target.value) })}
+          disabled={!translation.providerId}
+        />
+        <p className="text-xs text-muted-foreground">{t("setting.ai.translation-max-text-length-help")}</p>
       </div>
     </div>
   );
