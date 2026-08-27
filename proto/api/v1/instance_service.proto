@@ -55,6 +55,12 @@ service InstanceService {
   rpc GetInstanceStats(GetInstanceStatsRequest) returns (InstanceStats) {
     option (google.api.http) = {get: "/api/v1/instance/stats"};
   }
+
+  // GetInstanceLogStats returns statistics about the server log files under
+  // {data}/logs. Admin only.
+  rpc GetInstanceLogStats(GetInstanceLogStatsRequest) returns (InstanceLogStats) {
+    option (google.api.http) = {get: "/api/v1/instance/log-stats"};
+  }
 }
 
 // Instance profile message containing basic instance information.
@@ -106,6 +112,7 @@ message InstanceSetting {
     TagsSetting tags_setting = 5;
     NotificationSetting notification_setting = 6;
     AISetting ai_setting = 7;
+    LogSetting log_setting = 8;
   }
 
   // Enumeration of instance setting keys.
@@ -123,6 +130,8 @@ message InstanceSetting {
     NOTIFICATION = 5;
     // AI is the key for AI provider settings.
     AI = 6;
+    // LOG is the key for server log retention settings.
+    LOG = 7;
   }
 
   // General instance settings configuration.
@@ -496,4 +505,27 @@ message InstanceStats {
     // size_bytes is the database size in bytes; -1 if unavailable.
     int64 size_bytes = 2;
   }
+}
+
+// LogSetting configures retention of the daily server log files under
+// {data}/logs. When enabled, log files older than retention_days are pruned
+// periodically while the server runs (not only at startup).
+message LogSetting {
+  // enabled toggles periodic log pruning. When disabled, log files are kept
+  // indefinitely and only the built-in startup pruning may still remove files.
+  bool enabled = 1;
+  // retention_days is how many days of daily log files are kept. Files with a
+  // modification time older than this are removed. Defaults to 3 when unset.
+  int32 retention_days = 2;
+}
+
+// Request for server log file statistics.
+message GetInstanceLogStatsRequest {}
+
+// Statistics about the server log files under {data}/logs.
+message InstanceLogStats {
+  // file_count is the number of memos-*.log files present.
+  int32 file_count = 1;
+  // total_bytes is the combined size of those files in bytes.
+  int64 total_bytes = 2;
 }

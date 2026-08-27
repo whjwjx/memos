@@ -40,6 +40,8 @@ const (
 	InstanceSettingKey_NOTIFICATION InstanceSettingKey = 6
 	// AI is the key for AI provider settings.
 	InstanceSettingKey_AI InstanceSettingKey = 7
+	// LOG is the key for server log retention settings.
+	InstanceSettingKey_LOG InstanceSettingKey = 8
 )
 
 // Enum value maps for InstanceSettingKey.
@@ -53,6 +55,7 @@ var (
 		5: "TAGS",
 		6: "NOTIFICATION",
 		7: "AI",
+		8: "LOG",
 	}
 	InstanceSettingKey_value = map[string]int32{
 		"INSTANCE_SETTING_KEY_UNSPECIFIED": 0,
@@ -63,6 +66,7 @@ var (
 		"TAGS":                             5,
 		"NOTIFICATION":                     6,
 		"AI":                               7,
+		"LOG":                              8,
 	}
 )
 
@@ -265,6 +269,7 @@ type InstanceSetting struct {
 	//	*InstanceSetting_TagsSetting
 	//	*InstanceSetting_NotificationSetting
 	//	*InstanceSetting_AiSetting
+	//	*InstanceSetting_LogSetting
 	Value         isInstanceSetting_Value `protobuf_oneof:"value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -377,6 +382,15 @@ func (x *InstanceSetting) GetAiSetting() *InstanceAISetting {
 	return nil
 }
 
+func (x *InstanceSetting) GetLogSetting() *InstanceLogSetting {
+	if x != nil {
+		if x, ok := x.Value.(*InstanceSetting_LogSetting); ok {
+			return x.LogSetting
+		}
+	}
+	return nil
+}
+
 type isInstanceSetting_Value interface {
 	isInstanceSetting_Value()
 }
@@ -409,6 +423,10 @@ type InstanceSetting_AiSetting struct {
 	AiSetting *InstanceAISetting `protobuf:"bytes,8,opt,name=ai_setting,json=aiSetting,proto3,oneof"`
 }
 
+type InstanceSetting_LogSetting struct {
+	LogSetting *InstanceLogSetting `protobuf:"bytes,9,opt,name=log_setting,json=logSetting,proto3,oneof"`
+}
+
 func (*InstanceSetting_BasicSetting) isInstanceSetting_Value() {}
 
 func (*InstanceSetting_GeneralSetting) isInstanceSetting_Value() {}
@@ -422,6 +440,8 @@ func (*InstanceSetting_TagsSetting) isInstanceSetting_Value() {}
 func (*InstanceSetting_NotificationSetting) isInstanceSetting_Value() {}
 
 func (*InstanceSetting_AiSetting) isInstanceSetting_Value() {}
+
+func (*InstanceSetting_LogSetting) isInstanceSetting_Value() {}
 
 type InstanceBasicSetting struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1729,6 +1749,7 @@ type TranscriptionConfig struct {
 	//   - whisper-1 (legacy, lower cost)
 	//   - gpt-4o-transcribe, gpt-4o-mini-transcribe (higher quality)
 	//   - gpt-4o-transcribe-diarize (includes speaker labels)
+	//
 	// GEMINI examples:
 	//   - gemini-2.5-flash (default, multimodal call)
 	//   - gemini-2.5-pro
@@ -1803,6 +1824,65 @@ func (x *TranscriptionConfig) GetPrompt() string {
 	return ""
 }
 
+// InstanceLogSetting configures retention of the daily server log files under
+// {data}/logs. When enabled, log files older than retention_days are pruned
+// periodically while the server runs (not only at startup).
+type InstanceLogSetting struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// enabled toggles periodic log pruning. When disabled, log files are kept
+	// indefinitely and only the built-in startup pruning may still remove files.
+	Enabled bool `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// retention_days is how many days of daily log files are kept. Files with a
+	// modification time older than this are removed. Defaults to 3 when unset.
+	RetentionDays int32 `protobuf:"varint,2,opt,name=retention_days,json=retentionDays,proto3" json:"retention_days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InstanceLogSetting) Reset() {
+	*x = InstanceLogSetting{}
+	mi := &file_store_instance_setting_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstanceLogSetting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstanceLogSetting) ProtoMessage() {}
+
+func (x *InstanceLogSetting) ProtoReflect() protoreflect.Message {
+	mi := &file_store_instance_setting_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstanceLogSetting.ProtoReflect.Descriptor instead.
+func (*InstanceLogSetting) Descriptor() ([]byte, []int) {
+	return file_store_instance_setting_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *InstanceLogSetting) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *InstanceLogSetting) GetRetentionDays() int32 {
+	if x != nil {
+		return x.RetentionDays
+	}
+	return 0
+}
+
 type InstanceNotificationSetting_EmailSetting struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -1821,7 +1901,7 @@ type InstanceNotificationSetting_EmailSetting struct {
 
 func (x *InstanceNotificationSetting_EmailSetting) Reset() {
 	*x = InstanceNotificationSetting_EmailSetting{}
-	mi := &file_store_instance_setting_proto_msgTypes[19]
+	mi := &file_store_instance_setting_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1833,7 +1913,7 @@ func (x *InstanceNotificationSetting_EmailSetting) String() string {
 func (*InstanceNotificationSetting_EmailSetting) ProtoMessage() {}
 
 func (x *InstanceNotificationSetting_EmailSetting) ProtoReflect() protoreflect.Message {
-	mi := &file_store_instance_setting_proto_msgTypes[19]
+	mi := &file_store_instance_setting_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1923,7 +2003,7 @@ var File_store_instance_setting_proto protoreflect.FileDescriptor
 
 const file_store_instance_setting_proto_rawDesc = "" +
 	"\n" +
-	"\x1cstore/instance_setting.proto\x12\vmemos.store\x1a\x17google/type/color.proto\"\xfb\x04\n" +
+	"\x1cstore/instance_setting.proto\x12\vmemos.store\x1a\x17google/type/color.proto\"\xbf\x05\n" +
 	"\x0fInstanceSetting\x121\n" +
 	"\x03key\x18\x01 \x01(\x0e2\x1f.memos.store.InstanceSettingKeyR\x03key\x12H\n" +
 	"\rbasic_setting\x18\x02 \x01(\v2!.memos.store.InstanceBasicSettingH\x00R\fbasicSetting\x12N\n" +
@@ -1933,7 +2013,9 @@ const file_store_instance_setting_proto_rawDesc = "" +
 	"\ftags_setting\x18\x06 \x01(\v2 .memos.store.InstanceTagsSettingH\x00R\vtagsSetting\x12]\n" +
 	"\x14notification_setting\x18\a \x01(\v2(.memos.store.InstanceNotificationSettingH\x00R\x13notificationSetting\x12?\n" +
 	"\n" +
-	"ai_setting\x18\b \x01(\v2\x1e.memos.store.InstanceAISettingH\x00R\taiSettingB\a\n" +
+	"ai_setting\x18\b \x01(\v2\x1e.memos.store.InstanceAISettingH\x00R\taiSetting\x12B\n" +
+	"\vlog_setting\x18\t \x01(\v2\x1f.memos.store.InstanceLogSettingH\x00R\n" +
+	"logSettingB\a\n" +
 	"\x05value\"\\\n" +
 	"\x14InstanceBasicSetting\x12\x1d\n" +
 	"\n" +
@@ -2063,7 +2145,10 @@ const file_store_instance_setting_proto_rawDesc = "" +
 	"providerId\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x1a\n" +
 	"\blanguage\x18\x03 \x01(\tR\blanguage\x12\x16\n" +
-	"\x06prompt\x18\x04 \x01(\tR\x06prompt*\x95\x01\n" +
+	"\x06prompt\x18\x04 \x01(\tR\x06prompt\"U\n" +
+	"\x12InstanceLogSetting\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12%\n" +
+	"\x0eretention_days\x18\x02 \x01(\x05R\rretentionDays*\x9e\x01\n" +
 	"\x12InstanceSettingKey\x12$\n" +
 	" INSTANCE_SETTING_KEY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05BASIC\x10\x01\x12\v\n" +
@@ -2072,7 +2157,8 @@ const file_store_instance_setting_proto_rawDesc = "" +
 	"\fMEMO_RELATED\x10\x04\x12\b\n" +
 	"\x04TAGS\x10\x05\x12\x10\n" +
 	"\fNOTIFICATION\x10\x06\x12\x06\n" +
-	"\x02AI\x10\a*s\n" +
+	"\x02AI\x10\a\x12\a\n" +
+	"\x03LOG\x10\b*s\n" +
 	"\vStorageType\x12\x1c\n" +
 	"\x18STORAGE_TYPE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15STORAGE_TYPE_DATABASE\x10\x01\x12\x16\n" +
@@ -2099,7 +2185,7 @@ func file_store_instance_setting_proto_rawDescGZIP() []byte {
 }
 
 var file_store_instance_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_store_instance_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_store_instance_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_store_instance_setting_proto_goTypes = []any{
 	(InstanceSettingKey)(0),                          // 0: memos.store.InstanceSettingKey
 	(StorageType)(0),                                 // 1: memos.store.StorageType
@@ -2123,10 +2209,11 @@ var file_store_instance_setting_proto_goTypes = []any{
 	(*TaggerConfig)(nil),                             // 19: memos.store.TaggerConfig
 	(*AIProviderConfig)(nil),                         // 20: memos.store.AIProviderConfig
 	(*TranscriptionConfig)(nil),                      // 21: memos.store.TranscriptionConfig
-	nil,                                              // 22: memos.store.InstanceTagsSetting.TagsEntry
-	(*InstanceNotificationSetting_EmailSetting)(nil), // 23: memos.store.InstanceNotificationSetting.EmailSetting
-	nil,                 // 24: memos.store.InstanceAISetting.ToolsEntry
-	(*color.Color)(nil), // 25: google.type.Color
+	(*InstanceLogSetting)(nil),                       // 22: memos.store.InstanceLogSetting
+	nil,                                              // 23: memos.store.InstanceTagsSetting.TagsEntry
+	(*InstanceNotificationSetting_EmailSetting)(nil), // 24: memos.store.InstanceNotificationSetting.EmailSetting
+	nil,                 // 25: memos.store.InstanceAISetting.ToolsEntry
+	(*color.Color)(nil), // 26: google.type.Color
 }
 var file_store_instance_setting_proto_depIdxs = []int32{
 	0,  // 0: memos.store.InstanceSetting.key:type_name -> memos.store.InstanceSettingKey
@@ -2137,29 +2224,30 @@ var file_store_instance_setting_proto_depIdxs = []int32{
 	13, // 5: memos.store.InstanceSetting.tags_setting:type_name -> memos.store.InstanceTagsSetting
 	14, // 6: memos.store.InstanceSetting.notification_setting:type_name -> memos.store.InstanceNotificationSetting
 	15, // 7: memos.store.InstanceSetting.ai_setting:type_name -> memos.store.InstanceAISetting
-	7,  // 8: memos.store.InstanceGeneralSetting.custom_profile:type_name -> memos.store.InstanceCustomProfile
-	1,  // 9: memos.store.Storage.type:type_name -> memos.store.StorageType
-	10, // 10: memos.store.Storage.s3_config:type_name -> memos.store.StorageS3Config
-	3,  // 11: memos.store.InstanceStorageSetting.storage_type:type_name -> memos.store.InstanceStorageSetting.StorageType
-	10, // 12: memos.store.InstanceStorageSetting.s3_config:type_name -> memos.store.StorageS3Config
-	8,  // 13: memos.store.InstanceStorageSetting.storages:type_name -> memos.store.Storage
-	25, // 14: memos.store.InstanceTagMetadata.background_color:type_name -> google.type.Color
-	22, // 15: memos.store.InstanceTagsSetting.tags:type_name -> memos.store.InstanceTagsSetting.TagsEntry
-	23, // 16: memos.store.InstanceNotificationSetting.email:type_name -> memos.store.InstanceNotificationSetting.EmailSetting
-	20, // 17: memos.store.InstanceAISetting.providers:type_name -> memos.store.AIProviderConfig
-	21, // 18: memos.store.InstanceAISetting.transcription:type_name -> memos.store.TranscriptionConfig
-	18, // 19: memos.store.InstanceAISetting.agents:type_name -> memos.store.AIAgentConfig
-	19, // 20: memos.store.InstanceAISetting.taggers:type_name -> memos.store.TaggerConfig
-	16, // 21: memos.store.InstanceAISetting.chat_agents:type_name -> memos.store.ChatAgentConfig
-	24, // 22: memos.store.InstanceAISetting.tools:type_name -> memos.store.InstanceAISetting.ToolsEntry
-	2,  // 23: memos.store.AIProviderConfig.type:type_name -> memos.store.AIProviderType
-	12, // 24: memos.store.InstanceTagsSetting.TagsEntry.value:type_name -> memos.store.InstanceTagMetadata
-	17, // 25: memos.store.InstanceAISetting.ToolsEntry.value:type_name -> memos.store.ToolConfig
-	26, // [26:26] is the sub-list for method output_type
-	26, // [26:26] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	22, // 8: memos.store.InstanceSetting.log_setting:type_name -> memos.store.InstanceLogSetting
+	7,  // 9: memos.store.InstanceGeneralSetting.custom_profile:type_name -> memos.store.InstanceCustomProfile
+	1,  // 10: memos.store.Storage.type:type_name -> memos.store.StorageType
+	10, // 11: memos.store.Storage.s3_config:type_name -> memos.store.StorageS3Config
+	3,  // 12: memos.store.InstanceStorageSetting.storage_type:type_name -> memos.store.InstanceStorageSetting.StorageType
+	10, // 13: memos.store.InstanceStorageSetting.s3_config:type_name -> memos.store.StorageS3Config
+	8,  // 14: memos.store.InstanceStorageSetting.storages:type_name -> memos.store.Storage
+	26, // 15: memos.store.InstanceTagMetadata.background_color:type_name -> google.type.Color
+	23, // 16: memos.store.InstanceTagsSetting.tags:type_name -> memos.store.InstanceTagsSetting.TagsEntry
+	24, // 17: memos.store.InstanceNotificationSetting.email:type_name -> memos.store.InstanceNotificationSetting.EmailSetting
+	20, // 18: memos.store.InstanceAISetting.providers:type_name -> memos.store.AIProviderConfig
+	21, // 19: memos.store.InstanceAISetting.transcription:type_name -> memos.store.TranscriptionConfig
+	18, // 20: memos.store.InstanceAISetting.agents:type_name -> memos.store.AIAgentConfig
+	19, // 21: memos.store.InstanceAISetting.taggers:type_name -> memos.store.TaggerConfig
+	16, // 22: memos.store.InstanceAISetting.chat_agents:type_name -> memos.store.ChatAgentConfig
+	25, // 23: memos.store.InstanceAISetting.tools:type_name -> memos.store.InstanceAISetting.ToolsEntry
+	2,  // 24: memos.store.AIProviderConfig.type:type_name -> memos.store.AIProviderType
+	12, // 25: memos.store.InstanceTagsSetting.TagsEntry.value:type_name -> memos.store.InstanceTagMetadata
+	17, // 26: memos.store.InstanceAISetting.ToolsEntry.value:type_name -> memos.store.ToolConfig
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_store_instance_setting_proto_init() }
@@ -2175,6 +2263,7 @@ func file_store_instance_setting_proto_init() {
 		(*InstanceSetting_TagsSetting)(nil),
 		(*InstanceSetting_NotificationSetting)(nil),
 		(*InstanceSetting_AiSetting)(nil),
+		(*InstanceSetting_LogSetting)(nil),
 	}
 	file_store_instance_setting_proto_msgTypes[4].OneofWrappers = []any{
 		(*Storage_S3Config)(nil),
@@ -2185,7 +2274,7 @@ func file_store_instance_setting_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_instance_setting_proto_rawDesc), len(file_store_instance_setting_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   21,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

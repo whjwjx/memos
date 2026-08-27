@@ -628,6 +628,27 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/instance/log-stats:
+        get:
+            tags:
+                - InstanceService
+            description: |-
+                GetInstanceLogStats returns statistics about the server log files under
+                 {data}/logs. Admin only.
+            operationId: InstanceService_GetInstanceLogStats
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InstanceLogStats'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/instance/profile:
         get:
             tags:
@@ -2555,7 +2576,9 @@ components:
                     type: array
                     items:
                         type: string
-                    description: "The resource names of the instance settings.\r\n Format: instance/settings/{setting}"
+                    description: |-
+                        The resource names of the instance settings.
+                         Format: instance/settings/{setting}
             description: Request message for BatchGetInstanceSettings method.
         BatchGetInstanceSettingsResponse:
             type: object
@@ -2951,6 +2974,17 @@ components:
             properties:
                 oauth2Config:
                     $ref: '#/components/schemas/OAuth2Config'
+        InstanceLogStats:
+            type: object
+            properties:
+                fileCount:
+                    type: integer
+                    description: file_count is the number of memos-*.log files present.
+                    format: int32
+                totalBytes:
+                    type: string
+                    description: total_bytes is the combined size of those files in bytes.
+            description: Statistics about the server log files under {data}/logs.
         InstanceProfile:
             type: object
             properties:
@@ -2966,20 +3000,29 @@ components:
                 admin:
                     allOf:
                         - $ref: '#/components/schemas/User'
-                    description: "The first administrator who set up this instance, for display purposes.\r\n May be null on an instance that has lost all admins; use needs_setup to\r\n determine whether initial setup is actually required."
+                    description: |-
+                        The first administrator who set up this instance, for display purposes.
+                         May be null on an instance that has lost all admins; use needs_setup to
+                         determine whether initial setup is actually required.
                 commit:
                     type: string
                     description: Commit is the current build commit of instance.
                 needsSetup:
                     type: boolean
-                    description: "NeedsSetup is true when the instance has no users yet and requires initial\r\n setup (creating the first admin account). Unlike a null admin, this stays\r\n false once any user exists, so an instance that has lost its admins is not\r\n mistaken for a fresh install."
+                    description: |-
+                        NeedsSetup is true when the instance has no users yet and requires initial
+                         setup (creating the first admin account). Unlike a null admin, this stays
+                         false once any user exists, so an instance that has lost its admins is not
+                         mistaken for a fresh install.
             description: Instance profile message containing basic instance information.
         InstanceSetting:
             type: object
             properties:
                 name:
                     type: string
-                    description: "The name of the instance setting.\r\n Format: instance/settings/{setting}"
+                    description: |-
+                        The name of the instance setting.
+                         Format: instance/settings/{setting}
                 generalSetting:
                     $ref: '#/components/schemas/InstanceSetting_GeneralSetting'
                 storageSetting:
@@ -2992,6 +3035,8 @@ components:
                     $ref: '#/components/schemas/InstanceSetting_NotificationSetting'
                 aiSetting:
                     $ref: '#/components/schemas/InstanceSetting_AISetting'
+                logSetting:
+                    $ref: '#/components/schemas/LogSetting'
             description: An instance setting resource.
         InstanceSetting_AIProviderConfig:
             type: object
@@ -3033,7 +3078,9 @@ components:
                 transcription:
                     allOf:
                         - $ref: '#/components/schemas/InstanceSetting_TranscriptionConfig'
-                    description: "transcription is the speech-to-text feature configuration.\r\n When unset or transcription.provider_id is empty, transcription is disabled."
+                    description: |-
+                        transcription is the speech-to-text feature configuration.
+                         When unset or transcription.provider_id is empty, transcription is disabled.
                 agents:
                     type: array
                     items:
@@ -3043,17 +3090,26 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/InstanceSetting_TaggerConfig'
-                    description: "taggers is the list of AI auto-tagging rules. A tagger is the tagging\r\n capability instance of the Agent system, applied instance-wide by an\r\n admin. When empty, the auto-tagging feature is disabled."
+                    description: |-
+                        taggers is the list of AI auto-tagging rules. A tagger is the tagging
+                         capability instance of the Agent system, applied instance-wide by an
+                         admin. When empty, the auto-tagging feature is disabled.
                 chatAgents:
                     type: array
                     items:
                         $ref: '#/components/schemas/InstanceSetting_ChatAgentConfig'
-                    description: "chat_agents is the list of conversational assistant presets surfaced in the\r\n /ai-chat page. Stage 1 uses only the first enabled preset as the default\r\n assistant; a second enabled preset triggers the agent selector in the UI."
+                    description: |-
+                        chat_agents is the list of conversational assistant presets surfaced in the
+                         /ai-chat page. Stage 1 uses only the first enabled preset as the default
+                         assistant; a second enabled preset triggers the agent selector in the UI.
                 tools:
                     type: object
                     additionalProperties:
                         $ref: '#/components/schemas/InstanceSetting_ToolConfig'
-                    description: "tools is the per-tool toggle and safety configuration for the conversational\r\n assistant, keyed by tool name (e.g. \"query_db\"). Admin controls enable and\r\n whether a tool requires a confirmation card before executing."
+                    description: |-
+                        tools is the per-tool toggle and safety configuration for the conversational
+                         assistant, keyed by tool name (e.g. "query_db"). Admin controls enable and
+                         whether a tool requires a confirmation card before executing.
             description: AI provider configuration settings.
         InstanceSetting_AgentConfig:
             type: object
@@ -3081,13 +3137,17 @@ components:
                     description: enabled toggles whether the agent replies to new memos.
                 delayMinutes:
                     type: integer
-                    description: "delay_minutes is how long to wait after a memo is created before the\r\n agent replies. 0 means reply immediately. Defaults to 5 when unset."
+                    description: |-
+                        delay_minutes is how long to wait after a memo is created before the
+                         agent replies. 0 means reply immediately. Defaults to 5 when unset.
                     format: int32
                 maxLength:
                     type: integer
                     description: max_length caps the generated reply length (in characters).
                     format: int32
-            description: "AgentConfig describes an AI persona that posts comment-style replies to\r\n memos. Configured instance-wide by an admin; regular users only consume them."
+            description: |-
+                AgentConfig describes an AI persona that posts comment-style replies to
+                 memos. Configured instance-wide by an admin; regular users only consume them.
         InstanceSetting_ChatAgentConfig:
             type: object
             properties:
@@ -3099,20 +3159,30 @@ components:
                     description: name is the human-readable preset name shown in the selector (stage 2+).
                 builtin:
                     type: boolean
-                    description: "builtin marks a preset shipped with memos. Built-in presets cannot be\r\n deleted, but their name/system_prompt may be edited."
+                    description: |-
+                        builtin marks a preset shipped with memos. Built-in presets cannot be
+                         deleted, but their name/system_prompt may be edited.
                 providerId:
                     type: string
-                    description: "provider_id references an entry in AISetting.providers[].id.\r\n Empty string means the preset is disabled."
+                    description: |-
+                        provider_id references an entry in AISetting.providers[].id.
+                         Empty string means the preset is disabled.
                 model:
                     type: string
-                    description: "model is the provider-specific text-generation model identifier.\r\n Empty string falls back to the engine default."
+                    description: |-
+                        model is the provider-specific text-generation model identifier.
+                         Empty string falls back to the engine default.
                 systemPrompt:
                     type: string
                     description: system_prompt steers the assistant's behavior, tone, and constraints.
                 enabled:
                     type: boolean
                     description: enabled toggles whether the preset is selectable in /ai-chat.
-            description: "ChatAgentConfig describes a conversational assistant preset for the /ai-chat\r\n page. It is a prompt + provider binding with an authorized tool set. Multiple\r\n presets are admin extensions that differ only in system prompt and capability\r\n scope; they are NOT separate agent runtimes."
+            description: |-
+                ChatAgentConfig describes a conversational assistant preset for the /ai-chat
+                 page. It is a prompt + provider binding with an authorized tool set. Multiple
+                 presets are admin extensions that differ only in system prompt and capability
+                 scope; they are NOT separate agent runtimes.
         InstanceSetting_GeneralSetting:
             type: object
             properties:
@@ -3134,7 +3204,10 @@ components:
                     description: custom_profile is the custom profile.
                 weekStartDayOffset:
                     type: integer
-                    description: "week_start_day_offset is the week start day offset from Sunday.\r\n 0: Sunday, 1: Monday, 2: Tuesday, 3: Wednesday, 4: Thursday, 5: Friday, 6: Saturday\r\n Default is Sunday."
+                    description: |-
+                        week_start_day_offset is the week start day offset from Sunday.
+                         0: Sunday, 1: Monday, 2: Tuesday, 3: Wednesday, 4: Thursday, 5: Friday, 6: Saturday
+                         Default is Sunday.
                     format: int32
                 disallowChangeUsername:
                     type: boolean
@@ -3199,7 +3272,9 @@ components:
                     format: enum
                 filepathTemplate:
                     type: string
-                    description: "The template of file path.\r\n e.g. assets/{timestamp}_{filename}"
+                    description: |-
+                        The template of file path.
+                         e.g. assets/{timestamp}_{filename}
                 uploadSizeLimitMb:
                     type: string
                     description: The max upload size in megabytes.
@@ -3222,7 +3297,9 @@ components:
                 backgroundColor:
                     allOf:
                         - $ref: '#/components/schemas/Color'
-                    description: "Optional background color for the tag label.\r\n When unset, the default tag color is used."
+                    description: |-
+                        Optional background color for the tag label.
+                         When unset, the default tag color is used.
                 blurContent:
                     type: boolean
                     description: Whether memos with this tag should have their content blurred.
@@ -3252,7 +3329,11 @@ components:
                     type: integer
                     description: max_tags caps how many tags are applied per memo (default 3, 0 = default).
                     format: int32
-            description: "TaggerConfig describes an AI auto-tagging rule. It is the tagging\r\n capability instance of the Agent system, configured instance-wide by an\r\n admin; regular users only consume them. Configured taggers apply #tags to\r\n memos additively without overwriting user-authored tags."
+            description: |-
+                TaggerConfig describes an AI auto-tagging rule. It is the tagging
+                 capability instance of the Agent system, configured instance-wide by an
+                 admin; regular users only consume them. Configured taggers apply #tags to
+                 memos additively without overwriting user-authored tags.
         InstanceSetting_TagsSetting:
             type: object
             properties:
@@ -3260,8 +3341,15 @@ components:
                     type: object
                     additionalProperties:
                         $ref: '#/components/schemas/InstanceSetting_TagMetadata'
-                    description: "Map of tag name pattern to tag metadata.\r\n Each key is treated as an anchored regular expression (^pattern$),\r\n so a single entry like \"project/.*\" matches all tags under that prefix.\r\n Exact tag names are also valid (they are trivially valid regex patterns)."
-            description: "Tag metadata configuration.\r\n Active tag metadata is stored in per-user tag settings.\r\n This message remains for backward compatibility with existing clients and migrations."
+                    description: |-
+                        Map of tag name pattern to tag metadata.
+                         Each key is treated as an anchored regular expression (^pattern$),
+                         so a single entry like "project/.*" matches all tags under that prefix.
+                         Exact tag names are also valid (they are trivially valid regex patterns).
+            description: |-
+                Tag metadata configuration.
+                 Active tag metadata is stored in per-user tag settings.
+                 This message remains for backward compatibility with existing clients and migrations.
         InstanceSetting_ToolConfig:
             type: object
             properties:
@@ -3270,20 +3358,31 @@ components:
                     description: enabled controls whether the tool is exposed to any user.
                 requiresConfirmation:
                     type: boolean
-                    description: "requires_confirmation marks a sensitive tool that must show a confirmation\r\n card before executing (e.g. write operations)."
-            description: "ToolConfig is the per-tool toggle and safety configuration stored in\r\n AISetting.tools, keyed by tool name."
+                    description: |-
+                        requires_confirmation marks a sensitive tool that must show a confirmation
+                         card before executing (e.g. write operations).
+            description: |-
+                ToolConfig is the per-tool toggle and safety configuration stored in
+                 AISetting.tools, keyed by tool name.
         InstanceSetting_TranscriptionConfig:
             type: object
             properties:
                 providerId:
                     type: string
-                    description: "provider_id references an entry in AISetting.providers[].id.\r\n Empty string means transcription is disabled."
+                    description: |-
+                        provider_id references an entry in AISetting.providers[].id.
+                         Empty string means transcription is disabled.
                 model:
                     type: string
-                    description: "model is the provider-specific model identifier.\r\n Empty string falls back to the engine default\r\n (whisper-1 for OPENAI providers, gemini-2.5-flash for GEMINI providers)."
+                    description: |-
+                        model is the provider-specific model identifier.
+                         Empty string falls back to the engine default
+                         (whisper-1 for OPENAI providers, gemini-2.5-flash for GEMINI providers).
                 language:
                     type: string
-                    description: "language is the default ISO 639-1 language hint sent to the provider.\r\n Empty string lets the provider auto-detect."
+                    description: |-
+                        language is the default ISO 639-1 language hint sent to the provider.
+                         Empty string lets the provider auto-detect.
                 prompt:
                     type: string
                     description: prompt is a default spelling/vocabulary hint passed to the provider.
@@ -3522,6 +3621,24 @@ components:
                     type: number
                     description: The longitude of the location.
                     format: double
+        LogSetting:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                    description: |-
+                        enabled toggles periodic log pruning. When disabled, log files are kept
+                         indefinitely and only the built-in startup pruning may still remove files.
+                retentionDays:
+                    type: integer
+                    description: |-
+                        retention_days is how many days of daily log files are kept. Files with a
+                         modification time older than this are removed. Defaults to 3 when unset.
+                    format: int32
+            description: |-
+                LogSetting configures retention of the daily server log files under
+                 {data}/logs. When enabled, log files older than retention_days are pruned
+                 periodically while the server runs (not only at startup).
         MediaCaptureTime:
             type: object
             properties:
@@ -3902,6 +4019,15 @@ components:
                     description: |-
                         Populate when continuing after a confirmation. Ids of tool calls the user
                          approved; the assistant executes them and continues the loop.
+                toolApprovals:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ToolApproval'
+                    description: |-
+                        Populate when continuing after a confirmation. Per-tool-call confirmations
+                         that carry the keyword the user typed to approve a sensitive write (e.g.
+                         "yes" for query_db update/delete). The assistant injects the keyword into
+                         the tool arguments before executing them.
         SendMessageResponse:
             type: object
             properties:
@@ -4043,8 +4169,13 @@ components:
                     type: boolean
                 insecureSkipTlsVerify:
                     type: boolean
-                    description: "insecure_skip_tls_verify disables TLS certificate verification when connecting\r\n to the S3 endpoint. Only enable this for trusted endpoints that use a self-signed\r\n certificate; it removes protection against man-in-the-middle attacks."
-            description: "Legacy S3 configuration retained for compatibility with existing clients.\r\n Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/"
+                    description: |-
+                        insecure_skip_tls_verify disables TLS certificate verification when connecting
+                         to the S3 endpoint. Only enable this for trusted endpoints that use a self-signed
+                         certificate; it removes protection against man-in-the-middle attacks.
+            description: |-
+                Legacy S3 configuration retained for compatibility with existing clients.
+                 Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/
         Storage_S3Config:
             type: object
             properties:
@@ -4063,8 +4194,13 @@ components:
                     type: boolean
                 insecureSkipTlsVerify:
                     type: boolean
-                    description: "insecure_skip_tls_verify disables TLS certificate verification when connecting\r\n to the S3 endpoint. Only enable this for trusted endpoints that use a self-signed\r\n certificate; it removes protection against man-in-the-middle attacks."
-            description: "S3 configuration for an S3-compatible object store.\r\n Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/"
+                    description: |-
+                        insecure_skip_tls_verify disables TLS certificate verification when connecting
+                         to the S3 endpoint. Only enable this for trusted endpoints that use a self-signed
+                         certificate; it removes protection against man-in-the-middle attacks.
+            description: |-
+                S3 configuration for an S3-compatible object store.
+                 Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/
         TestAIProviderRequest:
             required:
                 - providerId
@@ -4099,6 +4235,18 @@ components:
                     type: string
                     description: Optional. Recipient email address. If omitted, the current user's email address is used.
             description: Request message for TestInstanceEmailSetting method.
+        ToolApproval:
+            type: object
+            properties:
+                toolCallId:
+                    type: string
+                    description: Id of the assistant tool call being approved.
+                confirmKeyword:
+                    type: string
+                    description: Keyword the user typed to confirm, e.g. "yes".
+            description: |-
+                ToolApproval carries the user's explicit confirmation for a sensitive tool
+                 call that was gated behind a second confirmation step.
         ToolCall:
             type: object
             properties:

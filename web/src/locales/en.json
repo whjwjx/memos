@@ -720,7 +720,9 @@
       "tool-create-memo": "Create a new memo (needs confirmation).",
       "tool-agent-reply": "Trigger an AI comment on a memo (needs confirmation).",
       "tool-auto-tag": "Auto-tag a memo (needs confirmation).",
-      "tool-delete-memo": "Permanently delete a memo (needs confirmation)."
+      "tool-delete-memo": "Permanently delete a memo (needs confirmation).",
+      "tool-get-logs": "Read recent server log lines (admin only).",
+      "tool-query-db": "Query the database; write operations need the user's explicit confirmation (admin only)."
     },
     "instance": {
       "access-description": "Control sign-up, authentication, profile editing, and calendar defaults for this instance.",
@@ -1074,6 +1076,22 @@
       "last-updated": "Last updated {{ago}}",
       "refresh": "Refresh",
       "load-error": "Failed to load statistics"
+    },
+    "log": {
+      "label": "Logs",
+      "title": "Log Management",
+      "description": "Manage the retention of the daily server log files under the data directory.",
+      "retention-title": "Auto Cleanup",
+      "retention-description": "While the server runs, daily log files older than the retention window are pruned periodically.",
+      "enabled": "Enable auto cleanup",
+      "enabled-description": "Log files older than the retention window are removed every hour, without restarting the server.",
+      "retention-days": "Retention (days)",
+      "retention-days-description": "Daily log files with a modification time older than this many days are removed.",
+      "stats-title": "Log Files",
+      "file-count": "File count",
+      "total-size": "Total size",
+      "last-updated": "Last updated {{time}}",
+      "refresh": "Refresh"
     }
   },
   "tag": {

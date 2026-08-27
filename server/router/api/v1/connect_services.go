@@ -63,6 +63,14 @@ func (s *ConnectServiceHandler) GetInstanceStats(ctx context.Context, req *conne
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) GetInstanceLogStats(ctx context.Context, req *connect.Request[v1pb.GetInstanceLogStatsRequest]) (*connect.Response[v1pb.InstanceLogStats], error) {
+	resp, err := s.APIV1Service.GetInstanceLogStats(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // AuthService
 //
 // Auth service methods need special handling for response headers (cookies).

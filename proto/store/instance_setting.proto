@@ -22,6 +22,8 @@ enum InstanceSettingKey {
   NOTIFICATION = 6;
   // AI is the key for AI provider settings.
   AI = 7;
+  // LOG is the key for server log retention settings.
+  LOG = 8;
 }
 
 message InstanceSetting {
@@ -34,6 +36,7 @@ message InstanceSetting {
     InstanceTagsSetting tags_setting = 6;
     InstanceNotificationSetting notification_setting = 7;
     InstanceAISetting ai_setting = 8;
+    InstanceLogSetting log_setting = 9;
   }
 }
 
@@ -345,4 +348,16 @@ message TranscriptionConfig {
   // may ignore) and folded into the Gemini generation prompt as a "Context and
   // spelling hints" block (which the LLM will treat more literally).
   string prompt = 4;
+}
+
+// InstanceLogSetting configures retention of the daily server log files under
+// {data}/logs. When enabled, log files older than retention_days are pruned
+// periodically while the server runs (not only at startup).
+message InstanceLogSetting {
+  // enabled toggles periodic log pruning. When disabled, log files are kept
+  // indefinitely and only the built-in startup pruning may still remove files.
+  bool enabled = 1;
+  // retention_days is how many days of daily log files are kept. Files with a
+  // modification time older than this are removed. Defaults to 3 when unset.
+  int32 retention_days = 2;
 }
