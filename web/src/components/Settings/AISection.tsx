@@ -194,9 +194,10 @@ const toTaggerConfig = (tagger: LocalTagger) =>
 // resolved with t() at render time.
 // Mirrors the tools actually registered by the backend (internal/ai/tools
 // NewRegistry). Only tools present here can be toggled. All tools default to
-// enabled, and mutating ones (create_memo, delete_memo, auto_tag, agent_reply,
-// manage_settings, query_db) default to requiring confirmation, while
-// read-only/query tools (search_memos, get_comments, get_logs) never require
+// enabled, and mutating ones (create_memo, update_memo, tag_memo,
+// batch_update_memos, delete_memo, auto_tag, agent_reply, manage_settings,
+// query_db) default to requiring confirmation, while
+// read-only/query tools (search_memos, get_memo, get_comments, get_logs) never require
 // it.
 // confirmEditable=false marks tools whose confirmation is fixed: read-only
 // tools never require confirmation, so the toggle is disabled in the UI.
@@ -215,6 +216,13 @@ const toolRegistry: {
     confirmEditable: false,
   },
   {
+    name: "get_memo",
+    descriptionKey: "setting.ai.tool-get-memo",
+    adminOnly: false,
+    defaultRequiresConfirmation: false,
+    confirmEditable: false,
+  },
+  {
     name: "get_comments",
     descriptionKey: "setting.ai.tool-get-comments",
     adminOnly: false,
@@ -222,6 +230,9 @@ const toolRegistry: {
     confirmEditable: false,
   },
   { name: "create_memo", descriptionKey: "setting.ai.tool-create-memo", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "update_memo", descriptionKey: "setting.ai.tool-update-memo", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "tag_memo", descriptionKey: "setting.ai.tool-tag-memo", adminOnly: false, defaultRequiresConfirmation: true },
+  { name: "batch_update_memos", descriptionKey: "setting.ai.tool-batch-update-memos", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "manage_settings", descriptionKey: "setting.ai.tool-manage-settings", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "auto_tag", descriptionKey: "setting.ai.tool-auto-tag", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "agent_reply", descriptionKey: "setting.ai.tool-agent-reply", adminOnly: false, defaultRequiresConfirmation: true },

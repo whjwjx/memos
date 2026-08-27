@@ -803,6 +803,21 @@ func TestExtractTagsMemosTagV1(t *testing.T) {
 	}
 }
 
+func TestRemoveTagsSkipsLinkAndCodeContexts(t *testing.T) {
+	svc := NewService(WithTagExtension())
+	content := "hello #remove `#remove` [#remove](https://example.com/#remove) #keep"
+	updated, err := svc.RemoveTags([]byte(content), []string{"remove"})
+	require.NoError(t, err)
+	assert.NotContains(t, updated, "hello #remove")
+	assert.Contains(t, updated, "`#remove`")
+	assert.Contains(t, updated, "[#remove](https://example.com/#remove)")
+	assert.Contains(t, updated, "#keep")
+
+	tags, err := svc.ExtractTags([]byte(updated))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"keep"}, tags)
+}
+
 func TestExtractAllExpandsTagHierarchy(t *testing.T) {
 	svc := NewService(WithTagExtension())
 	data, err := svc.ExtractAll([]byte("#book/fiction/history #book"))

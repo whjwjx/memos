@@ -64,6 +64,9 @@ type Service interface {
 
 	// RenameTag renames all occurrences of oldTag to newTag in content
 	RenameTag(content []byte, oldTag, newTag string) (string, error)
+
+	// RemoveTags removes all occurrences of the given exact tag values from content
+	RemoveTags(content []byte, tags []string) (string, error)
 }
 
 // service implements the Service interface.
@@ -585,6 +588,60 @@ func (s *service) RenameTag(content []byte, oldTag, newTag string) (string, erro
 		output.Write(content[cursor:sourceRange.start])
 		output.WriteByte('#')
 		output.WriteString(newTag)
+		cursor = sourceRange.end
+	}
+	output.Write(content[cursor:])
+	return output.String(), nil
+}
+
+// RemoveTags removes all exact source tag occurrences from content.
+func (s *service) RemoveTags(content []byte, tags []string) (string, error) {
+	root, err := s.parse(content)
+	if err != nil {
+		return "", err
+	}
+
+	remove := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		if tag != "" {
+			remove[tag] = true
+		}
+	}
+	if len(remove) == 0 {
+		return string(content), nil
+	}
+
+	type sourceRange struct {
+		start int
+		end   int
+	}
+	var ranges []sourceRange
+	err = gast.Walk(root, func(n gast.Node, entering bool) (gast.WalkStatus, error) {
+		if !entering {
+			return gast.WalkContinue, nil
+		}
+
+		if tagNode, ok := asMemoTagNode(n); ok && remove[string(tagNode.Tag)] && len(tagNode.Source) > 0 {
+			ranges = append(ranges, sourceRange{start: tagNode.Pos(), end: tagNode.Pos() + len(tagNode.Source)})
+		}
+		return gast.WalkContinue, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(ranges) == 0 {
+		return string(content), nil
+	}
+
+	slices.SortFunc(ranges, func(left, right sourceRange) int { return cmp.Compare(left.start, right.start) })
+	var output bytes.Buffer
+	output.Grow(len(content))
+	cursor := 0
+	for _, sourceRange := range ranges {
+		if sourceRange.start < cursor {
+			continue
+		}
+		output.Write(content[cursor:sourceRange.start])
 		cursor = sourceRange.end
 	}
 	output.Write(content[cursor:])

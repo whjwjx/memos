@@ -61,6 +61,9 @@ func (*CreateMemoTool) Run(ctx context.Context, tc ToolContext, argsJSON string)
 		Content:    args.Content,
 		Visibility: visibility,
 	}
+	if err := rebuildMemoPayload(create); err != nil {
+		return "", err
+	}
 	if parentUID := strings.TrimSpace(args.ParentUID); parentUID != "" {
 		parentUIDCopy := parentUID
 		create.ParentUID = &parentUIDCopy
