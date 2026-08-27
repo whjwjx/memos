@@ -9,6 +9,7 @@ import type { VisibilitySelectorProps } from "../types";
 const VisibilitySelector = (props: VisibilitySelectorProps) => {
   const { value, onChange } = props;
   const compact = props.size === "compact";
+  const mobileIconOnly = props.mobileIconOnly;
   const t = useTranslate();
 
   const visibilityOptions = [
@@ -24,16 +25,28 @@ const VisibilitySelector = (props: VisibilitySelectorProps) => {
       <DropdownMenuTrigger
         render={
           <button
+            aria-label={currentLabel}
             className={cn(
-              "inline-flex items-center rounded-md hover:bg-accent transition-colors",
+              "inline-flex min-w-0 items-center rounded-md transition-colors hover:bg-accent",
               compact ? "px-1.5 py-[3px] text-[13px] leading-5 text-foreground/85" : "h-8 px-2 text-sm text-muted-foreground",
+              !compact && "max-w-[9rem] sm:max-w-none",
+              mobileIconOnly && !compact && "w-8 justify-center px-0 sm:w-auto sm:justify-start sm:px-2",
             )}
           />
         }
       >
-        <VisibilityIcon visibility={value} className={cn("opacity-60 mr-1.5", compact && "w-[13px]")} />
-        <span className="truncate">{currentLabel}</span>
-        <ChevronDownIcon className={cn("ml-0.5 opacity-60", compact ? "size-3.5 text-muted-foreground/70" : "w-4 h-4")} />
+        <VisibilityIcon
+          visibility={value}
+          className={cn("shrink-0 opacity-60", compact ? "mr-1.5 w-[13px]" : mobileIconOnly ? "mr-0 sm:mr-1.5" : "mr-1.5")}
+        />
+        <span className={cn("min-w-0 truncate", mobileIconOnly && "hidden sm:inline")}>{currentLabel}</span>
+        <ChevronDownIcon
+          className={cn(
+            "ml-0.5 shrink-0 opacity-60",
+            compact ? "size-3.5 text-muted-foreground/70" : "w-4 h-4",
+            mobileIconOnly && "hidden sm:block",
+          )}
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {visibilityOptions.map((option) => (

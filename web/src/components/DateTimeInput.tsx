@@ -19,7 +19,11 @@ const DateTimeInput: React.FC<Props> = ({ value, onChange }) => {
   return (
     <input
       type="datetime-local"
-      className={cn("px-1 bg-transparent rounded text-xs transition-all", "border-transparent outline-none focus:border-border", "border")}
+      className={cn(
+        "w-full min-w-0 px-1 bg-transparent rounded text-xs transition-all",
+        "border-transparent outline-none focus:border-border",
+        "border",
+      )}
       defaultValue={formatDate(value)}
       onBlur={(e) => {
         const inputValue = e.target.value;

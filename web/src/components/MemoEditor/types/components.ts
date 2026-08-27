@@ -96,6 +96,8 @@ export interface VisibilitySelectorProps {
   onOpenChange?: (open: boolean) => void;
   /** "compact" renders a 13px trigger that blends into dense surfaces like the memo detail rail. */
   size?: "default" | "compact";
+  /** Hide the trigger label on mobile to keep dense editor toolbars on one row. */
+  mobileIconOnly?: boolean;
 }
 
 export interface ScheduleSelectorProps {
@@ -103,4 +105,6 @@ export interface ScheduleSelectorProps {
   duration?: number;
   onChange: (scheduledTime?: Date, scheduledDuration?: number) => void;
   onOpenChange?: (open: boolean) => void;
+  /** Hide the trigger label on mobile to keep dense editor toolbars on one row. */
+  mobileIconOnly?: boolean;
 }
