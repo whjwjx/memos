@@ -53,6 +53,12 @@ var (
 				return
 			}
 
+			// Start writing logs to a daily file under the data directory; on
+			// failure the stderr-only logger keeps working.
+			if err := initLogFile(instanceProfile.Data); err != nil {
+				slog.Error("failed to initialize log file", "error", err)
+			}
+
 			ctx, cancel := context.WithCancel(context.Background())
 			dbDriver, err := db.NewDBDriver(instanceProfile)
 			if err != nil {
@@ -72,6 +78,10 @@ var (
 				slog.Error("failed to load deployment configuration", "error", err)
 				return
 			}
+
+			// Prune old log files right after startup and periodically while the
+			// server runs, always honoring the admin log retention setting.
+			startLogCleaner(ctx, instanceProfile.Data, storeInstance)
 
 			s, err := server.NewServer(ctx, instanceProfile, storeInstance)
 			if err != nil {

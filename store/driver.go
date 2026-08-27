@@ -11,6 +11,10 @@ type Driver interface {
 	GetDB() *sql.DB
 	Close() error
 
+	// Dialect reports the SQL dialect name ("sqlite", "mysql" or "postgres") so
+	// callers can adapt placeholder style and quoting for raw queries.
+	Dialect() string
+
 	IsInitialized(ctx context.Context) (bool, error)
 
 	// GetDatabaseSize returns the database size in bytes, or -1 if unavailable.

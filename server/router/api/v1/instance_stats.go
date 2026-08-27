@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -128,6 +129,48 @@ func (s *APIV1Service) computeInstanceStats(ctx context.Context) (*v1pb.Instance
 		return nil, errors.New("all instance stats subtasks failed")
 	}
 	return stats, nil
+}
+
+// GetInstanceLogStats returns statistics about the server log files under
+// {data}/logs. Admin only.
+func (s *APIV1Service) GetInstanceLogStats(ctx context.Context, _ *v1pb.GetInstanceLogStatsRequest) (*v1pb.InstanceLogStats, error) {
+	user, err := s.fetchCurrentUser(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get current user: %v", err)
+	}
+	if user == nil {
+		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
+	}
+	if user.Role != store.RoleAdmin {
+		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
+	}
+
+	logsDir := filepath.Join(s.Profile.Data, "logs")
+	entries, err := os.ReadDir(logsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &v1pb.InstanceLogStats{}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to read log directory: %v", err)
+	}
+
+	var fileCount int32
+	var totalBytes int64
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if !strings.HasPrefix(entry.Name(), "memos-") || !strings.HasSuffix(entry.Name(), ".log") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		fileCount++
+		totalBytes += info.Size()
+	}
+	return &v1pb.InstanceLogStats{FileCount: fileCount, TotalBytes: totalBytes}, nil
 }
 
 // walkLocalStorage returns the recursive size of dir in bytes.

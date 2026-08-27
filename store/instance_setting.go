@@ -47,6 +47,8 @@ func (s *Store) UpsertInstanceSetting(ctx context.Context, upsert *storepb.Insta
 		valueBytes, err = protojson.Marshal(upsert.GetNotificationSetting())
 	} else if upsert.Key == storepb.InstanceSettingKey_AI {
 		valueBytes, err = protojson.Marshal(upsert.GetAiSetting())
+	} else if upsert.Key == storepb.InstanceSettingKey_LOG {
+		valueBytes, err = protojson.Marshal(upsert.GetLogSetting())
 	} else {
 		return nil, errors.Errorf("unsupported instance setting key: %v", upsert.Key)
 	}
@@ -302,6 +304,27 @@ func (s *Store) GetInstanceNotificationSetting(ctx context.Context) (*storepb.In
 	return instanceNotificationSetting, nil
 }
 
+// GetInstanceLogSetting gets the server log retention settings for the
+// instance. Returns a zero-valued setting when nothing is persisted.
+func (s *Store) GetInstanceLogSetting(ctx context.Context) (*storepb.InstanceLogSetting, error) {
+	instanceSetting, err := s.GetInstanceSetting(ctx, &FindInstanceSetting{
+		Name: storepb.InstanceSettingKey_LOG.String(),
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get instance log setting")
+	}
+
+	instanceLogSetting := &storepb.InstanceLogSetting{}
+	if instanceSetting != nil {
+		instanceLogSetting = instanceSetting.GetLogSetting()
+	}
+	s.cacheInstanceSetting(ctx, &storepb.InstanceSetting{
+		Key:   storepb.InstanceSettingKey_LOG,
+		Value: &storepb.InstanceSetting_LogSetting{LogSetting: instanceLogSetting},
+	})
+	return instanceLogSetting, nil
+}
+
 // GetInstanceAISetting gets the AI provider settings for the instance.
 func (s *Store) GetInstanceAISetting(ctx context.Context) (*storepb.InstanceAISetting, error) {
 	instanceSetting, err := s.GetInstanceSetting(ctx, &FindInstanceSetting{
@@ -411,6 +434,12 @@ func convertInstanceSettingFromRaw(instanceSettingRaw *InstanceSetting) (*storep
 			return nil, err
 		}
 		instanceSetting.Value = &storepb.InstanceSetting_AiSetting{AiSetting: aiSetting}
+	case storepb.InstanceSettingKey_LOG.String():
+		logSetting := &storepb.InstanceLogSetting{}
+		if err := protojsonUnmarshaler.Unmarshal([]byte(instanceSettingRaw.Value), logSetting); err != nil {
+			return nil, err
+		}
+		instanceSetting.Value = &storepb.InstanceSetting_LogSetting{LogSetting: logSetting}
 	default:
 		// Skip unsupported instance setting key.
 		return nil, nil

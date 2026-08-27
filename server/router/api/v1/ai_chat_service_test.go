@@ -9,7 +9,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/usememos/memos/internal/ai/tools"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
+	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/server/auth"
 	"github.com/usememos/memos/store"
 	"github.com/usememos/memos/store/test"
@@ -84,4 +86,73 @@ func TestAIChatGetMissingReturnsNotFound(t *testing.T) {
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	require.Equal(t, codes.NotFound, st.Code())
+}
+
+func TestApplyToolConfigScopeIsolation(t *testing.T) {
+	s, user, ctx := newTestAIChatService(t)
+	defer s.Store.Close()
+	require.Equal(t, store.RoleUser, user.Role)
+
+	admin, err := s.Store.CreateUser(ctx, &store.User{
+		Username:     "chat-admin",
+		Role:         store.RoleAdmin,
+		PasswordHash: "hash",
+	})
+	require.NoError(t, err)
+
+	// Save per-tool config: search_memos disabled, delete_memo explicitly set to
+	// no confirmation (differs from its built-in default).
+	_, err = s.Store.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
+		Key: storepb.InstanceSettingKey_AI,
+		Value: &storepb.InstanceSetting_AiSetting{AiSetting: &storepb.InstanceAISetting{
+			Tools: map[string]*storepb.ToolConfig{
+				"search_memos": {Enabled: false},
+				"delete_memo":  {Enabled: true, RequiresConfirmation: false},
+			},
+		}},
+	})
+	require.NoError(t, err)
+
+	t.Run("non-admin cannot see admin-only tools", func(t *testing.T) {
+		registry := tools.NewRegistry()
+		s.applyToolConfig(ctx, registry, user.ID)
+
+		// Admin-only tools are removed entirely for non-admin users.
+		require.Nil(t, registry.Get("get_logs"))
+		require.Nil(t, registry.Get("query_db"))
+		// Disabled tools are removed entirely too.
+		require.Nil(t, registry.Get("search_memos"))
+		// Explicitly configured confirmation is honored.
+		require.False(t, registry.Get("delete_memo").RequiresConfirmation(""))
+		// Unconfigured tools keep their built-in behavior: mutating tools
+		// require confirmation, read-only ones don't.
+		require.True(t, registry.Get("create_memo").RequiresConfirmation(""))
+		require.False(t, registry.Get("get_comments").RequiresConfirmation(""))
+	})
+
+	t.Run("admin keeps admin-only tools", func(t *testing.T) {
+		registry := tools.NewRegistry()
+		s.applyToolConfig(ctx, registry, admin.ID)
+
+		require.NotNil(t, registry.Get("get_logs"))
+		require.NotNil(t, registry.Get("query_db"))
+		require.Nil(t, registry.Get("search_memos"))
+		require.False(t, registry.Get("delete_memo").RequiresConfirmation(""))
+	})
+
+	t.Run("no saved config keeps full default registry", func(t *testing.T) {
+		ctx2 := context.Background()
+		s2, user2, _ := newTestAIChatService(t)
+		defer s2.Store.Close()
+
+		registry := tools.NewRegistry()
+		s2.applyToolConfig(ctx2, registry, user2.ID)
+
+		// Non-admin still loses admin-only tools...
+		require.Nil(t, registry.Get("get_logs"))
+		require.Nil(t, registry.Get("query_db"))
+		// ...but all non-admin tools are enabled with built-in confirmation.
+		require.NotNil(t, registry.Get("search_memos"))
+		require.NotNil(t, registry.Get("create_memo"))
+	})
 }

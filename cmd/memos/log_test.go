@@ -4,8 +4,15 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	storepb "github.com/usememos/memos/proto/gen/store"
 )
 
 func TestParseSlogLevel(t *testing.T) {
@@ -103,5 +110,91 @@ func TestNewLoggerDoesNotMutateGlobalDefault(t *testing.T) {
 	_ = newLogger(slog.LevelError, &buf)
 	if slog.Default() != original {
 		t.Error("newLogger must not change slog.Default()")
+	}
+}
+
+func TestPruneOldLogs(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	now := time.Now()
+	old := now.AddDate(0, 0, -4)
+
+	files := map[string]time.Time{
+		"memos-old.log":     old, // must be removed (older than 3 days)
+		"memos-current.log": now, // must be kept (still fresh)
+		"user-file.txt":     old, // must be kept (not a memos log)
+	}
+	for name, modTime := range files {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644))
+		require.NoError(t, os.Chtimes(filepath.Join(dir, name), modTime, modTime))
+	}
+
+	pruneOldLogs(dir, 3)
+
+	_, err := os.Stat(filepath.Join(dir, "memos-old.log"))
+	require.True(t, os.IsNotExist(err), "old memos log should have been pruned")
+	_, err = os.Stat(filepath.Join(dir, "memos-current.log"))
+	require.NoError(t, err, "fresh memos log should be kept")
+	_, err = os.Stat(filepath.Join(dir, "user-file.txt"))
+	require.NoError(t, err, "non-memos file should be kept")
+}
+
+func TestLogCleanupDecision(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		setting   *storepb.InstanceLogSetting
+		wantPrune bool
+		wantDays  int
+	}{
+		{
+			name:      "missing setting falls back to default retention",
+			setting:   nil,
+			wantPrune: true,
+			wantDays:  defaultLogRetentionDays,
+		},
+		{
+			name: "disabled setting disables pruning",
+			setting: &storepb.InstanceLogSetting{
+				Enabled:       false,
+				RetentionDays: 30,
+			},
+			wantPrune: false,
+		},
+		{
+			name: "enabled setting uses configured retention",
+			setting: &storepb.InstanceLogSetting{
+				Enabled:       true,
+				RetentionDays: 30,
+			},
+			wantPrune: true,
+			wantDays:  30,
+		},
+		{
+			name: "enabled setting with unset days falls back to default",
+			setting: &storepb.InstanceLogSetting{
+				Enabled: true,
+			},
+			wantPrune: true,
+			wantDays:  defaultLogRetentionDays,
+		},
+		{
+			name: "enabled setting with zero days falls back to default",
+			setting: &storepb.InstanceLogSetting{
+				Enabled:       true,
+				RetentionDays: 0,
+			},
+			wantPrune: true,
+			wantDays:  defaultLogRetentionDays,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPrune, gotDays := logCleanupDecision(tt.setting)
+			require.Equal(t, tt.wantPrune, gotPrune)
+			require.Equal(t, tt.wantDays, gotDays)
+		})
 	}
 }

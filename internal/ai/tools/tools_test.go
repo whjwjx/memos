@@ -23,11 +23,26 @@ func TestRegistryContainsAllStage1Tools(t *testing.T) {
 		"manage_settings",
 		"agent_reply",
 		"auto_tag",
+		"query_db",
+		"get_logs",
 	} {
 		require.Truef(t, got[name], "registry missing tool %q", name)
 	}
 	// Names must be unique.
 	require.Len(t, r.Specs(), len(got))
+}
+
+func TestRegistryRemove(t *testing.T) {
+	t.Parallel()
+	r := tools.NewRegistry()
+	require.NotNil(t, r.Get("get_logs"))
+	r.Remove("get_logs")
+	require.Nil(t, r.Get("get_logs"))
+	for _, spec := range r.Specs() {
+		require.NotEqual(t, "get_logs", spec.Name)
+	}
+	// Removing a name that is not registered is a no-op.
+	r.Remove("does-not-exist")
 }
 
 func TestToolsRejectMissingRequiredArgs(t *testing.T) {

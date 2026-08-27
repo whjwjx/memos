@@ -189,9 +189,11 @@ const toTaggerConfig = (tagger: LocalTagger) =>
 // must match internal/ai/tools registry names. `description` is an i18n key
 // resolved with t() at render time.
 // Mirrors the tools actually registered by the backend (internal/ai/tools
-// NewRegistry). Only tools present here can be toggled; read-only/query tools
-// default to no confirmation while mutating ones (delete_memo, auto_tag,
-// agent_reply, manage_settings) default to requiring it.
+// NewRegistry). Only tools present here can be toggled. All tools default to
+// enabled, and mutating ones (create_memo, delete_memo, auto_tag, agent_reply,
+// manage_settings, query_db) default to requiring confirmation, while
+// read-only/query tools (search_memos, get_comments, get_logs) never require
+// it.
 // confirmEditable=false marks tools whose confirmation is fixed: read-only
 // tools never require confirmation, so the toggle is disabled in the UI.
 const toolRegistry: {
@@ -215,11 +217,19 @@ const toolRegistry: {
     defaultRequiresConfirmation: false,
     confirmEditable: false,
   },
-  { name: "create_memo", descriptionKey: "setting.ai.tool-create-memo", adminOnly: false, defaultRequiresConfirmation: false },
+  { name: "create_memo", descriptionKey: "setting.ai.tool-create-memo", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "manage_settings", descriptionKey: "setting.ai.tool-manage-settings", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "auto_tag", descriptionKey: "setting.ai.tool-auto-tag", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "agent_reply", descriptionKey: "setting.ai.tool-agent-reply", adminOnly: false, defaultRequiresConfirmation: true },
   { name: "delete_memo", descriptionKey: "setting.ai.tool-delete-memo", adminOnly: false, defaultRequiresConfirmation: true },
+  {
+    name: "get_logs",
+    descriptionKey: "setting.ai.tool-get-logs",
+    adminOnly: true,
+    defaultRequiresConfirmation: false,
+    confirmEditable: false,
+  },
+  { name: "query_db", descriptionKey: "setting.ai.tool-query-db", adminOnly: true, defaultRequiresConfirmation: true },
 ];
 
 type LocalChatAgent = {
@@ -273,7 +283,9 @@ const toLocalTool = (name: string, tool: InstanceSetting_ToolConfig | undefined)
   const def = toolRegistry.find((t) => t.name === name);
   return {
     name,
-    enabled: tool?.enabled ?? false,
+    // Tools without a persisted config are enabled by default, matching the
+    // backend (applyToolConfig only overrides persisted entries).
+    enabled: tool?.enabled ?? true,
     // Read-only tools never require confirmation; the toggle is locked off.
     requiresConfirmation:
       def?.confirmEditable === false ? false : (tool?.requiresConfirmation ?? def?.defaultRequiresConfirmation ?? false),

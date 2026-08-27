@@ -39,7 +39,7 @@ func (*CreateMemoTool) Spec() chat.ToolSpec {
 }
 
 func (*CreateMemoTool) RequiresConfirmation(_ string) bool {
-	return false
+	return true
 }
 
 func (*CreateMemoTool) Run(ctx context.Context, tc ToolContext, argsJSON string) (string, error) {

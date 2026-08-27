@@ -690,8 +690,13 @@ type SendMessageRequest struct {
 	// Populate when continuing after a confirmation. Ids of tool calls the user
 	// approved; the assistant executes them and continues the loop.
 	ApprovedToolCallIds []string `protobuf:"bytes,3,rep,name=approved_tool_call_ids,json=approvedToolCallIds,proto3" json:"approved_tool_call_ids,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Populate when continuing after a confirmation. Per-tool-call confirmations
+	// that carry the keyword the user typed to approve a sensitive write (e.g.
+	// "yes" for query_db update/delete). The assistant injects the keyword into
+	// the tool arguments before executing them.
+	ToolApprovals []*ToolApproval `protobuf:"bytes,4,rep,name=tool_approvals,json=toolApprovals,proto3" json:"tool_approvals,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SendMessageRequest) Reset() {
@@ -745,6 +750,69 @@ func (x *SendMessageRequest) GetApprovedToolCallIds() []string {
 	return nil
 }
 
+func (x *SendMessageRequest) GetToolApprovals() []*ToolApproval {
+	if x != nil {
+		return x.ToolApprovals
+	}
+	return nil
+}
+
+// ToolApproval carries the user's explicit confirmation for a sensitive tool
+// call that was gated behind a second confirmation step.
+type ToolApproval struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Id of the assistant tool call being approved.
+	ToolCallId string `protobuf:"bytes,1,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	// Keyword the user typed to confirm, e.g. "yes".
+	ConfirmKeyword string `protobuf:"bytes,2,opt,name=confirm_keyword,json=confirmKeyword,proto3" json:"confirm_keyword,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ToolApproval) Reset() {
+	*x = ToolApproval{}
+	mi := &file_api_v1_ai_chat_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolApproval) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolApproval) ProtoMessage() {}
+
+func (x *ToolApproval) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_chat_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolApproval.ProtoReflect.Descriptor instead.
+func (*ToolApproval) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_chat_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ToolApproval) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *ToolApproval) GetConfirmKeyword() string {
+	if x != nil {
+		return x.ConfirmKeyword
+	}
+	return ""
+}
+
 type SendMessageResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The assistant's reply text, if the turn finished without pending tools.
@@ -762,7 +830,7 @@ type SendMessageResponse struct {
 
 func (x *SendMessageResponse) Reset() {
 	*x = SendMessageResponse{}
-	mi := &file_api_v1_ai_chat_service_proto_msgTypes[12]
+	mi := &file_api_v1_ai_chat_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -774,7 +842,7 @@ func (x *SendMessageResponse) String() string {
 func (*SendMessageResponse) ProtoMessage() {}
 
 func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v1_ai_chat_service_proto_msgTypes[12]
+	mi := &file_api_v1_ai_chat_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -787,7 +855,7 @@ func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageResponse.ProtoReflect.Descriptor instead.
 func (*SendMessageResponse) Descriptor() ([]byte, []int) {
-	return file_api_v1_ai_chat_service_proto_rawDescGZIP(), []int{12}
+	return file_api_v1_ai_chat_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SendMessageResponse) GetContent() string {
@@ -868,11 +936,16 @@ const file_api_v1_ai_chat_service_proto_rawDesc = "" +
 	"\x19UpdateConversationRequest\x12C\n" +
 	"\fconversation\x18\x01 \x01(\v2\x1a.memos.api.v1.ConversationB\x03\xe0A\x02R\fconversation\x12;\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
-	"updateMask\"\x9b\x01\n" +
+	"updateMask\"\xe3\x01\n" +
 	"\x12SendMessageRequest\x12,\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x0econversationId\x12\x1d\n" +
 	"\acontent\x18\x02 \x01(\tB\x03\xe0A\x02R\acontent\x128\n" +
-	"\x16approved_tool_call_ids\x18\x03 \x03(\tB\x03\xe0A\x01R\x13approvedToolCallIds\"\xda\x01\n" +
+	"\x16approved_tool_call_ids\x18\x03 \x03(\tB\x03\xe0A\x01R\x13approvedToolCallIds\x12F\n" +
+	"\x0etool_approvals\x18\x04 \x03(\v2\x1a.memos.api.v1.ToolApprovalB\x03\xe0A\x01R\rtoolApprovals\"Y\n" +
+	"\fToolApproval\x12 \n" +
+	"\ftool_call_id\x18\x01 \x01(\tR\n" +
+	"toolCallId\x12'\n" +
+	"\x0fconfirm_keyword\x18\x02 \x01(\tR\x0econfirmKeyword\"\xda\x01\n" +
 	"\x13SendMessageResponse\x12\x18\n" +
 	"\acontent\x18\x01 \x01(\tR\acontent\x125\n" +
 	"\n" +
@@ -900,7 +973,7 @@ func file_api_v1_ai_chat_service_proto_rawDescGZIP() []byte {
 	return file_api_v1_ai_chat_service_proto_rawDescData
 }
 
-var file_api_v1_ai_chat_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_api_v1_ai_chat_service_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_api_v1_ai_chat_service_proto_goTypes = []any{
 	(*Conversation)(nil),               // 0: memos.api.v1.Conversation
 	(*ConversationMessage)(nil),        // 1: memos.api.v1.ConversationMessage
@@ -914,8 +987,9 @@ var file_api_v1_ai_chat_service_proto_goTypes = []any{
 	(*DeleteConversationResponse)(nil), // 9: memos.api.v1.DeleteConversationResponse
 	(*UpdateConversationRequest)(nil),  // 10: memos.api.v1.UpdateConversationRequest
 	(*SendMessageRequest)(nil),         // 11: memos.api.v1.SendMessageRequest
-	(*SendMessageResponse)(nil),        // 12: memos.api.v1.SendMessageResponse
-	(*fieldmaskpb.FieldMask)(nil),      // 13: google.protobuf.FieldMask
+	(*ToolApproval)(nil),               // 12: memos.api.v1.ToolApproval
+	(*SendMessageResponse)(nil),        // 13: memos.api.v1.SendMessageResponse
+	(*fieldmaskpb.FieldMask)(nil),      // 14: google.protobuf.FieldMask
 }
 var file_api_v1_ai_chat_service_proto_depIdxs = []int32{
 	2,  // 0: memos.api.v1.ConversationMessage.tool_calls:type_name -> memos.api.v1.ToolCall
@@ -923,26 +997,27 @@ var file_api_v1_ai_chat_service_proto_depIdxs = []int32{
 	0,  // 2: memos.api.v1.GetConversationResponse.conversation:type_name -> memos.api.v1.Conversation
 	1,  // 3: memos.api.v1.GetConversationResponse.messages:type_name -> memos.api.v1.ConversationMessage
 	0,  // 4: memos.api.v1.UpdateConversationRequest.conversation:type_name -> memos.api.v1.Conversation
-	13, // 5: memos.api.v1.UpdateConversationRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 6: memos.api.v1.SendMessageResponse.tool_calls:type_name -> memos.api.v1.ToolCall
-	1,  // 7: memos.api.v1.SendMessageResponse.messages:type_name -> memos.api.v1.ConversationMessage
-	3,  // 8: memos.api.v1.AIChatService.CreateConversation:input_type -> memos.api.v1.CreateConversationRequest
-	4,  // 9: memos.api.v1.AIChatService.ListConversations:input_type -> memos.api.v1.ListConversationsRequest
-	6,  // 10: memos.api.v1.AIChatService.GetConversation:input_type -> memos.api.v1.GetConversationRequest
-	8,  // 11: memos.api.v1.AIChatService.DeleteConversation:input_type -> memos.api.v1.DeleteConversationRequest
-	10, // 12: memos.api.v1.AIChatService.UpdateConversation:input_type -> memos.api.v1.UpdateConversationRequest
-	11, // 13: memos.api.v1.AIChatService.SendMessage:input_type -> memos.api.v1.SendMessageRequest
-	0,  // 14: memos.api.v1.AIChatService.CreateConversation:output_type -> memos.api.v1.Conversation
-	5,  // 15: memos.api.v1.AIChatService.ListConversations:output_type -> memos.api.v1.ListConversationsResponse
-	7,  // 16: memos.api.v1.AIChatService.GetConversation:output_type -> memos.api.v1.GetConversationResponse
-	9,  // 17: memos.api.v1.AIChatService.DeleteConversation:output_type -> memos.api.v1.DeleteConversationResponse
-	0,  // 18: memos.api.v1.AIChatService.UpdateConversation:output_type -> memos.api.v1.Conversation
-	12, // 19: memos.api.v1.AIChatService.SendMessage:output_type -> memos.api.v1.SendMessageResponse
-	14, // [14:20] is the sub-list for method output_type
-	8,  // [8:14] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	14, // 5: memos.api.v1.UpdateConversationRequest.update_mask:type_name -> google.protobuf.FieldMask
+	12, // 6: memos.api.v1.SendMessageRequest.tool_approvals:type_name -> memos.api.v1.ToolApproval
+	2,  // 7: memos.api.v1.SendMessageResponse.tool_calls:type_name -> memos.api.v1.ToolCall
+	1,  // 8: memos.api.v1.SendMessageResponse.messages:type_name -> memos.api.v1.ConversationMessage
+	3,  // 9: memos.api.v1.AIChatService.CreateConversation:input_type -> memos.api.v1.CreateConversationRequest
+	4,  // 10: memos.api.v1.AIChatService.ListConversations:input_type -> memos.api.v1.ListConversationsRequest
+	6,  // 11: memos.api.v1.AIChatService.GetConversation:input_type -> memos.api.v1.GetConversationRequest
+	8,  // 12: memos.api.v1.AIChatService.DeleteConversation:input_type -> memos.api.v1.DeleteConversationRequest
+	10, // 13: memos.api.v1.AIChatService.UpdateConversation:input_type -> memos.api.v1.UpdateConversationRequest
+	11, // 14: memos.api.v1.AIChatService.SendMessage:input_type -> memos.api.v1.SendMessageRequest
+	0,  // 15: memos.api.v1.AIChatService.CreateConversation:output_type -> memos.api.v1.Conversation
+	5,  // 16: memos.api.v1.AIChatService.ListConversations:output_type -> memos.api.v1.ListConversationsResponse
+	7,  // 17: memos.api.v1.AIChatService.GetConversation:output_type -> memos.api.v1.GetConversationResponse
+	9,  // 18: memos.api.v1.AIChatService.DeleteConversation:output_type -> memos.api.v1.DeleteConversationResponse
+	0,  // 19: memos.api.v1.AIChatService.UpdateConversation:output_type -> memos.api.v1.Conversation
+	13, // 20: memos.api.v1.AIChatService.SendMessage:output_type -> memos.api.v1.SendMessageResponse
+	15, // [15:21] is the sub-list for method output_type
+	9,  // [9:15] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_api_v1_ai_chat_service_proto_init() }
@@ -956,7 +1031,7 @@ func file_api_v1_ai_chat_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v1_ai_chat_service_proto_rawDesc), len(file_api_v1_ai_chat_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -16,6 +16,8 @@ import {
   InstanceSetting_NotificationSettingSchema,
   InstanceSetting_StorageSetting,
   InstanceSetting_StorageSettingSchema,
+  LogSetting,
+  LogSettingSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
 import { setManagedAttachmentInstanceUrl } from "@/utils/managed-attachment";
 
@@ -45,6 +47,7 @@ interface InstanceContextValue extends InstanceState {
   storageSetting: InstanceSetting_StorageSetting;
   notificationSetting: InstanceSetting_NotificationSetting;
   aiSetting: InstanceSetting_AISetting;
+  logSetting: LogSetting;
   initialize: () => Promise<void>;
   fetchSetting: (key: InstanceSetting_Key) => Promise<void>;
   fetchSettings: (keys: InstanceSetting_Key[]) => Promise<void>;
@@ -104,6 +107,14 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
       return setting.value.value;
     }
     return create(InstanceSetting_AISettingSchema, {});
+  }, [state.settings]);
+
+  const logSetting = useMemo((): LogSetting => {
+    const setting = state.settings.find((s) => s.name === `${instanceSettingNamePrefix}LOG`);
+    if (setting?.value.case === "logSetting") {
+      return setting.value.value;
+    }
+    return create(LogSettingSchema, {});
   }, [state.settings]);
 
   const initialize = useCallback(async () => {
@@ -212,6 +223,7 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
       storageSetting,
       notificationSetting,
       aiSetting,
+      logSetting,
       initialize,
       fetchSetting,
       fetchSettings,
@@ -224,6 +236,7 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
       storageSetting,
       notificationSetting,
       aiSetting,
+      logSetting,
       initialize,
       fetchSetting,
       fetchSettings,

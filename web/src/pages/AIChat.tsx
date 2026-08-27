@@ -77,22 +77,36 @@ const summarizeToolCall = (name: string, argsJSON: string): string => {
       return `查看评论：${String(args.memoUid ?? "")}`;
     case "search_memos":
       return `搜索：${String(args.query ?? "")}`;
+    case "query_db":
+      return `数据库操作：${String(args.operation ?? "")} ${String(args.table ?? "")}${args.operation === "select" ? `，最多 ${String(args.limit ?? 10)} 行` : ""}`;
+    case "get_logs":
+      return `读取日志：最近 ${String(args.limit ?? 50)} 行`;
     default:
       return preview(argsJSON);
   }
 };
 
+// queryDBWriteOps are the query_db operations that mutate the database and are
+// therefore gated behind a second confirmation keyword typed by the user.
+const QUERY_DB_WRITE_OPS = ["insert", "update", "delete"];
+
+// CONFIRM_KEYWORD is the exact keyword a user must type to approve a query_db
+// write operation. It must match the backend's confirmKeyword constant.
+const CONFIRM_KEYWORD = "yes";
+
 // ToolCallCard renders one tool call together with a readable summary. For
 // delete_memo it additionally fetches the target memo so the user sees the actual
-// content being removed (not just its uid). Once the user approves/rejects, the
-// card is kept (with a status badge) as a record instead of vanishing.
+// content being removed (not just its uid). query_db write operations require the
+// user to type the confirmation keyword "yes" before the approve button enables.
+// Once the user approves/rejects, the card is kept (with a status badge) as a
+// record instead of vanishing.
 const ToolCallCard = ({
   tc,
   onResolve,
   disabled,
 }: {
-  tc: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected" };
-  onResolve: (status: "approved" | "rejected") => void;
+  tc: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected"; confirmKeyword?: string };
+  onResolve: (status: "approved" | "rejected", confirmKeyword?: string) => void;
   disabled: boolean;
 }) => {
   let args: Record<string, unknown> = {};
@@ -102,6 +116,7 @@ const ToolCallCard = ({
     args = {};
   }
   const memoUid = typeof args.memoUid === "string" ? args.memoUid : undefined;
+  const isQueryDBWrite = tc.name === "query_db" && typeof args.operation === "string" && QUERY_DB_WRITE_OPS.includes(args.operation);
 
   const { data: memo } = useQuery({
     ...memoDetailQueryOptions(`memos/${memoUid}`),
@@ -109,6 +124,8 @@ const ToolCallCard = ({
   });
 
   const resolved = tc.status !== "pending";
+  const [keyword, setKeyword] = useState("");
+  const canApprove = !isQueryDBWrite || keyword.trim().toLowerCase() === CONFIRM_KEYWORD;
 
   return (
     <div className={cn("rounded-lg bg-background/70 p-2", resolved && "opacity-70")}>
@@ -118,7 +135,7 @@ const ToolCallCard = ({
         </div>
         {tc.status === "approved" && (
           <Badge variant="secondary" shape="pill" className="text-[11px]">
-            已批准
+            {tc.confirmKeyword ? `已批准（${tc.confirmKeyword}）` : "已批准"}
           </Badge>
         )}
         {tc.status === "rejected" && (
@@ -134,10 +151,22 @@ const ToolCallCard = ({
           <div className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{memo.content}</div>
         </div>
       )}
+      {!resolved && isQueryDBWrite && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder={`输入 ${CONFIRM_KEYWORD} 以确认写操作`}
+            disabled={disabled}
+            className="h-8 w-40 rounded-md border border-border bg-background px-2 text-xs"
+          />
+        </div>
+      )}
       <div className="mt-2 flex items-center gap-2">
         {!resolved && (
           <>
-            <Button size="sm" variant="default" onClick={() => onResolve("approved")} disabled={disabled}>
+            <Button size="sm" variant="default" onClick={() => onResolve("approved", keyword)} disabled={disabled || !canApprove}>
               批准
             </Button>
             <Button size="sm" variant="outline" onClick={() => onResolve("rejected")} disabled={disabled}>
@@ -155,8 +184,8 @@ const ConfirmationCard = ({
   onResolve,
   disabled,
 }: {
-  toolCalls: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected" }[];
-  onResolve: (id: string, status: "approved" | "rejected") => void;
+  toolCalls: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected"; confirmKeyword?: string }[];
+  onResolve: (id: string, status: "approved" | "rejected", confirmKeyword?: string) => void;
   disabled: boolean;
 }) => {
   const pendingCount = toolCalls.filter((tc) => tc.status === "pending").length;
@@ -187,7 +216,9 @@ const ConfirmationCard = ({
           已折叠 {toolCalls.length} 个操作记录，点击展开查看详情
         </Button>
       ) : (
-        toolCalls.map((tc) => <ToolCallCard key={tc.id} tc={tc} onResolve={(status) => onResolve(tc.id, status)} disabled={disabled} />)
+        toolCalls.map((tc) => (
+          <ToolCallCard key={tc.id} tc={tc} onResolve={(status, keyword) => onResolve(tc.id, status, keyword)} disabled={disabled} />
+        ))
       )}
     </div>
   );
@@ -246,15 +277,21 @@ const AIChat = () => {
 
   // Approve a single tool call: execute just that one (dangerous writes run
   // one-at-a-time) and mark the card as approved. The card stays visible.
+  // confirmKeyword carries the keyword typed on a second-factor confirmation
+  // card (e.g. "yes" for query_db writes) and is sent to the backend.
   const handleResolve = useCallback(
-    (id: string, status: "approved" | "rejected") => {
+    (id: string, status: "approved" | "rejected", confirmKeyword?: string) => {
       if (!conversationId) return;
-      resolveToolCall(id, status);
+      resolveToolCall(id, status, confirmKeyword);
       if (status === "approved") {
         // Send a fixed approval instruction (NOT a free-text user message) so the
         // model treats it as "the pending tool was approved" rather than a new
         // task, keeping behavior consistent across turns.
-        send({ content: "[用户已批准上述待确认工具，请直接执行并继续]", approvedToolCallIds: [id] });
+        send({
+          content: "[用户已批准上述待确认工具，请直接执行并继续]",
+          approvedToolCallIds: [id],
+          toolApprovals: confirmKeyword ? [{ toolCallId: id, confirmKeyword }] : [],
+        });
       }
       // Reject: just record the decision; the user can send a follow-up message
       // (or the assistant continues) without executing the tool.

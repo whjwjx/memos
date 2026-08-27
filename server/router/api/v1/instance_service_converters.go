@@ -36,6 +36,10 @@ func convertInstanceSettingFromStore(setting *storepb.InstanceSetting) *v1pb.Ins
 		instanceSetting.Value = &v1pb.InstanceSetting_AiSetting{
 			AiSetting: convertInstanceAISettingFromStore(setting.GetAiSetting()),
 		}
+	case *storepb.InstanceSetting_LogSetting:
+		instanceSetting.Value = &v1pb.InstanceSetting_LogSetting{
+			LogSetting: convertInstanceLogSettingFromStore(setting.GetLogSetting()),
+		}
 	default:
 		// Leave Value unset for unsupported setting variants.
 	}
@@ -75,10 +79,34 @@ func convertInstanceSettingToStore(setting *v1pb.InstanceSetting) *storepb.Insta
 		instanceSetting.Value = &storepb.InstanceSetting_AiSetting{
 			AiSetting: convertInstanceAISettingToStore(setting.GetAiSetting()),
 		}
+	case storepb.InstanceSettingKey_LOG:
+		instanceSetting.Value = &storepb.InstanceSetting_LogSetting{
+			LogSetting: convertInstanceLogSettingToStore(setting.GetLogSetting()),
+		}
 	default:
 		// Keep the default GeneralSetting value
 	}
 	return instanceSetting
+}
+
+func convertInstanceLogSettingFromStore(setting *storepb.InstanceLogSetting) *v1pb.LogSetting {
+	if setting == nil {
+		return nil
+	}
+	return &v1pb.LogSetting{
+		Enabled:       setting.Enabled,
+		RetentionDays: setting.RetentionDays,
+	}
+}
+
+func convertInstanceLogSettingToStore(setting *v1pb.LogSetting) *storepb.InstanceLogSetting {
+	if setting == nil {
+		return nil
+	}
+	return &storepb.InstanceLogSetting{
+		Enabled:       setting.Enabled,
+		RetentionDays: setting.RetentionDays,
+	}
 }
 
 func convertInstanceGeneralSettingFromStore(setting *storepb.InstanceGeneralSetting) *v1pb.InstanceSetting_GeneralSetting {

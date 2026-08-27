@@ -187,6 +187,22 @@ message SendMessageRequest {
   // Populate when continuing after a confirmation. Ids of tool calls the user
   // approved; the assistant executes them and continues the loop.
   repeated string approved_tool_call_ids = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Populate when continuing after a confirmation. Per-tool-call confirmations
+  // that carry the keyword the user typed to approve a sensitive write (e.g.
+  // "yes" for query_db update/delete). The assistant injects the keyword into
+  // the tool arguments before executing them.
+  repeated ToolApproval tool_approvals = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// ToolApproval carries the user's explicit confirmation for a sensitive tool
+// call that was gated behind a second confirmation step.
+message ToolApproval {
+  // Id of the assistant tool call being approved.
+  string tool_call_id = 1;
+
+  // Keyword the user typed to confirm, e.g. "yes".
+  string confirm_keyword = 2;
 }
 
 message SendMessageResponse {

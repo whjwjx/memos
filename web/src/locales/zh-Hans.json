@@ -617,7 +617,9 @@
       "tool-create-memo": "创建新 memo（需确认）。",
       "tool-agent-reply": "触发某条 memo 的 AI 评论（需确认）。",
       "tool-auto-tag": "为 memo 自动打标签（需确认）。",
-      "tool-delete-memo": "永久删除一条 memo（需确认）。"
+      "tool-delete-memo": "永久删除一条 memo（需确认）。",
+      "tool-get-logs": "读取最近的服务器日志（仅管理员）。",
+      "tool-query-db": "查询数据库，写操作需用户二次确认（仅管理员）。"
     },
     "preference": {
       "appearance-description": "选择当前账号使用的界面语言和外观主题。",
@@ -983,6 +985,22 @@
       "refresh": "刷新",
       "title": "资源统计",
       "unknown": "未知"
+    },
+    "log": {
+      "label": "日志",
+      "title": "日志管理",
+      "description": "管理数据目录下每日服务日志文件的保留策略。",
+      "retention-title": "自动清理",
+      "retention-description": "服务运行期间定时清理超过保留期限的每日日志文件。",
+      "enabled": "启用自动清理",
+      "enabled-description": "每小时清理一次超过保留天数的日志文件，无需重启服务。",
+      "retention-days": "保留天数",
+      "retention-days-description": "修改时间早于该天数的日志文件会被删除。",
+      "stats-title": "日志文件",
+      "file-count": "文件个数",
+      "total-size": "总大小",
+      "last-updated": "更新于 {{time}}",
+      "refresh": "刷新"
     }
   },
   "tag": {

@@ -469,6 +469,36 @@ func TestInstanceSettingAISetting(t *testing.T) {
 	ts.Close()
 }
 
+func TestInstanceSettingLogSetting(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ts := NewTestingStore(ctx, t)
+
+	logSetting, err := ts.GetInstanceLogSetting(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, logSetting)
+	require.False(t, logSetting.Enabled)
+	require.Equal(t, int32(0), logSetting.RetentionDays)
+
+	_, err = ts.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
+		Key: storepb.InstanceSettingKey_LOG,
+		Value: &storepb.InstanceSetting_LogSetting{
+			LogSetting: &storepb.InstanceLogSetting{
+				Enabled:       true,
+				RetentionDays: 7,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	logSetting, err = ts.GetInstanceLogSetting(ctx)
+	require.NoError(t, err)
+	require.True(t, logSetting.Enabled)
+	require.Equal(t, int32(7), logSetting.RetentionDays)
+
+	ts.Close()
+}
+
 func TestInstanceSettingListAll(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

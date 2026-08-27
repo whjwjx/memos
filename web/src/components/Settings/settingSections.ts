@@ -8,6 +8,7 @@ import {
   LibraryIcon,
   type LucideIcon,
   MailIcon,
+  ScrollTextIcon,
   Settings2Icon,
   TagsIcon,
   UserIcon,
@@ -18,6 +19,7 @@ import { type ComponentType } from "react";
 import AccessTokenSection from "@/components/Settings/AccessTokenSection";
 import AISection from "@/components/Settings/AISection";
 import InstanceSection from "@/components/Settings/InstanceSection";
+import LogSection from "@/components/Settings/LogSection";
 import MemberSection from "@/components/Settings/MemberSection";
 import MemoRelatedSettings from "@/components/Settings/MemoRelatedSettings";
 import MyAccountSection from "@/components/Settings/MyAccountSection";
@@ -43,7 +45,8 @@ export type SettingSectionKey =
   | "sso"
   | "tags"
   | "ai"
-  | "resource-stats";
+  | "resource-stats"
+  | "log";
 
 type SettingSectionScope = "basic" | "admin";
 
@@ -150,6 +153,14 @@ export const SETTINGS_SECTIONS: SettingSectionDefinition[] = [
     labelKey: "setting.resource-stats.label",
     icon: BarChart3Icon,
     component: ResourceStatsSection,
+  },
+  {
+    key: "log",
+    scope: "admin",
+    labelKey: "setting.log.label",
+    icon: ScrollTextIcon,
+    component: LogSection,
+    preloadSettingKeys: [InstanceSetting_Key.LOG],
   },
 ];
 
