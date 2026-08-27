@@ -372,6 +372,7 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 		Taggers:       make([]*v1pb.InstanceSetting_TaggerConfig, 0, len(setting.GetTaggers())),
 		ChatAgents:    make([]*v1pb.InstanceSetting_ChatAgentConfig, 0, len(setting.GetChatAgents())),
 		Tools:         make(map[string]*v1pb.InstanceSetting_ToolConfig, len(setting.GetTools())),
+		Memory:        convertMemoryConfigFromStore(setting.GetMemory()),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -455,6 +456,7 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 		Taggers:       make([]*storepb.TaggerConfig, 0, len(setting.GetTaggers())),
 		ChatAgents:    make([]*storepb.ChatAgentConfig, 0, len(setting.GetChatAgents())),
 		Tools:         make(map[string]*storepb.ToolConfig, len(setting.GetTools())),
+		Memory:        convertMemoryConfigToStore(setting.GetMemory()),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -522,6 +524,52 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 		}
 	}
 	return aiSetting
+}
+
+func convertMemoryConfigFromStore(config *storepb.MemoryConfig) *v1pb.InstanceSetting_MemoryConfig {
+	if config == nil {
+		return nil
+	}
+	memory := &v1pb.InstanceSetting_MemoryConfig{
+		Enabled: config.GetEnabled(),
+		Entries: make([]*v1pb.InstanceSetting_MemoryEntry, 0, len(config.GetEntries())),
+	}
+	for _, entry := range config.GetEntries() {
+		if entry == nil {
+			continue
+		}
+		memory.Entries = append(memory.Entries, &v1pb.InstanceSetting_MemoryEntry{
+			Id:        entry.GetId(),
+			Content:   entry.GetContent(),
+			CreatedBy: entry.GetCreatedBy(),
+			CreatedTs: entry.GetCreatedTs(),
+			UpdatedTs: entry.GetUpdatedTs(),
+		})
+	}
+	return memory
+}
+
+func convertMemoryConfigToStore(config *v1pb.InstanceSetting_MemoryConfig) *storepb.MemoryConfig {
+	if config == nil {
+		return nil
+	}
+	memory := &storepb.MemoryConfig{
+		Enabled: config.GetEnabled(),
+		Entries: make([]*storepb.MemoryEntry, 0, len(config.GetEntries())),
+	}
+	for _, entry := range config.GetEntries() {
+		if entry == nil {
+			continue
+		}
+		memory.Entries = append(memory.Entries, &storepb.MemoryEntry{
+			Id:        entry.GetId(),
+			Content:   entry.GetContent(),
+			CreatedBy: entry.GetCreatedBy(),
+			CreatedTs: entry.GetCreatedTs(),
+			UpdatedTs: entry.GetUpdatedTs(),
+		})
+	}
+	return memory
 }
 
 func convertTranscriptionConfigFromStore(setting *storepb.TranscriptionConfig) *v1pb.InstanceSetting_TranscriptionConfig {

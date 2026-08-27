@@ -611,6 +611,15 @@
       "chat-tool-confirm": "需确认",
       "chat-tool-toggle-aria": "切换工具 {{name}}",
       "chat-tool-confirm-toggle-aria": "切换工具 {{name}} 的确认设置",
+      "memory-title": "共享记忆",
+      "memory-description": "一份实例级的共享上下文库，会注入到每段对话中。仅管理员可编辑。",
+      "memory-enabled-label": "将共享记忆注入对话",
+      "memory-add-entry": "添加条目",
+      "memory-no-entries": "暂无记忆条目。",
+      "memory-entry-content": "内容",
+      "memory-entry-created-by": "创建者",
+      "memory-entry-placeholder": "输入一条上下文事实……",
+      "memory-entry-delete-aria": "删除记忆条目",
       "tool-search-memos": "按关键词搜索用户的 memos。",
       "tool-get-comments": "读取某条 memo 下的评论。",
       "tool-manage-settings": "修改用户或实例设置（需确认）。",
@@ -619,7 +628,8 @@
       "tool-auto-tag": "为 memo 自动打标签（需确认）。",
       "tool-delete-memo": "永久删除一条 memo（需确认）。",
       "tool-get-logs": "读取最近的服务器日志（仅管理员）。",
-      "tool-query-db": "查询数据库，写操作需用户二次确认（仅管理员）。"
+      "tool-query-db": "查询数据库，写操作需用户二次确认（仅管理员）。",
+      "tool-manage-memory": "查看与维护共享记忆库（仅管理员）。"
     },
     "preference": {
       "appearance-description": "选择当前账号使用的界面语言和外观主题。",

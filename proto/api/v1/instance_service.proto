@@ -321,6 +321,36 @@ message InstanceSetting {
     // assistant, keyed by tool name (e.g. "query_db"). Admin controls enable and
     // whether a tool requires a confirmation card before executing.
     map<string, ToolConfig> tools = 6;
+
+    // memory is the instance-wide shared context bank for the conversational
+    // assistant. When enabled, its entries are injected into every chat
+    // conversation's system prompt. Managed by the admin through the settings UI
+    // and by the admin-only manage_memory tool.
+    MemoryConfig memory = 7;
+  }
+
+  // MemoryConfig holds the shared context bank used by the AI chat assistant.
+  message MemoryConfig {
+    // enabled controls whether the shared memory is injected into chat.
+    bool enabled = 1;
+
+    // entries is the list of shared memory items. It is bounded to tens of items
+    // and stored inline in the AI instance setting.
+    repeated MemoryEntry entries = 2;
+  }
+
+  // MemoryEntry is a single item in the shared memory bank.
+  message MemoryEntry {
+    // id is a stable identifier for the entry.
+    string id = 1;
+    // content is the memory text injected into chat conversations.
+    string content = 2;
+    // created_by is the account that created the entry.
+    string created_by = 3;
+    // created_ts is the unix timestamp (seconds) of creation.
+    int64 created_ts = 4;
+    // updated_ts is the unix timestamp (seconds) of the last modification.
+    int64 updated_ts = 5;
   }
 
   // ChatAgentConfig describes a conversational assistant preset for the /ai-chat

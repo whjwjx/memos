@@ -714,6 +714,15 @@
       "chat-tool-confirm": "Confirm",
       "chat-tool-toggle-aria": "Toggle tool {{name}}",
       "chat-tool-confirm-toggle-aria": "Toggle confirmation for tool {{name}}",
+      "memory-title": "Shared memory",
+      "memory-description": "An instance-wide context bank injected into every conversation. Only admins can edit it.",
+      "memory-enabled-label": "Inject shared memory into conversations",
+      "memory-add-entry": "Add entry",
+      "memory-no-entries": "No memory entries yet.",
+      "memory-entry-content": "Content",
+      "memory-entry-created-by": "Created by",
+      "memory-entry-placeholder": "Enter a context fact...",
+      "memory-entry-delete-aria": "Delete memory entry",
       "tool-search-memos": "Search the user's memos by keyword.",
       "tool-get-comments": "Read comments under a memo.",
       "tool-manage-settings": "Change user or instance settings (needs confirmation).",
@@ -722,7 +731,8 @@
       "tool-auto-tag": "Auto-tag a memo (needs confirmation).",
       "tool-delete-memo": "Permanently delete a memo (needs confirmation).",
       "tool-get-logs": "Read recent server log lines (admin only).",
-      "tool-query-db": "Query the database; write operations need the user's explicit confirmation (admin only)."
+      "tool-query-db": "Query the database; write operations need the user's explicit confirmation (admin only).",
+      "tool-manage-memory": "Read and maintain the shared memory bank (admin only)."
     },
     "instance": {
       "access-description": "Control sign-up, authentication, profile editing, and calendar defaults for this instance.",

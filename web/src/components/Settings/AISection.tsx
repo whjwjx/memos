@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { isEqual } from "lodash-es";
-import { MoreVerticalIcon, PlusIcon } from "lucide-react";
+import { MoreVerticalIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { v4 as uuidv4 } from "uuid";
@@ -25,6 +25,10 @@ import {
   InstanceSetting_ChatAgentConfig,
   InstanceSetting_ChatAgentConfigSchema,
   InstanceSetting_Key,
+  InstanceSetting_MemoryConfig,
+  InstanceSetting_MemoryConfigSchema,
+  InstanceSetting_MemoryEntry,
+  InstanceSetting_MemoryEntrySchema,
   InstanceSetting_TaggerConfig,
   InstanceSetting_TaggerConfigSchema,
   InstanceSetting_ToolConfig,
@@ -230,6 +234,7 @@ const toolRegistry: {
     confirmEditable: false,
   },
   { name: "query_db", descriptionKey: "setting.ai.tool-query-db", adminOnly: true, defaultRequiresConfirmation: true },
+  { name: "manage_memory", descriptionKey: "setting.ai.tool-manage-memory", adminOnly: true, defaultRequiresConfirmation: true },
 ];
 
 type LocalChatAgent = {
@@ -298,6 +303,54 @@ const toToolConfig = (tool: LocalTool) =>
     requiresConfirmation: tool.requiresConfirmation,
   });
 
+type LocalMemoryEntry = {
+  id: string;
+  content: string;
+  createdBy: string;
+  createdTs: bigint;
+  updatedTs: bigint;
+};
+
+type LocalMemory = {
+  enabled: boolean;
+  entries: LocalMemoryEntry[];
+};
+
+const toLocalMemoryEntry = (entry: InstanceSetting_MemoryEntry): LocalMemoryEntry => ({
+  id: entry.id,
+  content: entry.content,
+  createdBy: entry.createdBy,
+  createdTs: entry.createdTs,
+  updatedTs: entry.updatedTs,
+});
+
+const toLocalMemory = (memory: InstanceSetting_MemoryConfig | undefined): LocalMemory => ({
+  enabled: memory?.enabled ?? false,
+  entries: (memory?.entries ?? []).map(toLocalMemoryEntry),
+});
+
+const newMemoryEntry = (): LocalMemoryEntry => ({
+  id: uuidv4(),
+  content: "",
+  createdBy: "",
+  createdTs: 0n,
+  updatedTs: 0n,
+});
+
+const toMemoryConfig = (memory: LocalMemory) =>
+  create(InstanceSetting_MemoryConfigSchema, {
+    enabled: memory.enabled,
+    entries: memory.entries.map((entry) =>
+      create(InstanceSetting_MemoryEntrySchema, {
+        id: entry.id,
+        content: entry.content.trim(),
+        createdBy: entry.createdBy,
+        createdTs: entry.createdTs,
+        updatedTs: entry.updatedTs,
+      }),
+    ),
+  });
+
 const toProviderConfig = (provider: LocalAIProvider) =>
   create(InstanceSetting_AIProviderConfigSchema, {
     id: provider.id,
@@ -342,6 +395,7 @@ const AISection = () => {
   const [tools, setTools] = useState<LocalTool[]>(() =>
     toolRegistry.map((tool) => toLocalTool(tool.name, originalSetting.tools[tool.name])),
   );
+  const [memory, setMemory] = useState<LocalMemory>(() => toLocalMemory(originalSetting.memory));
   const [editingProvider, setEditingProvider] = useState<LocalAIProvider | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<LocalAIProvider | undefined>();
   const [editingAgent, setEditingAgent] = useState<LocalAgent | undefined>();
@@ -368,6 +422,20 @@ const AISection = () => {
   useEffect(() => {
     setTools(toolRegistry.map((tool) => toLocalTool(tool.name, originalSetting.tools[tool.name])));
   }, [originalSetting.tools]);
+
+  // Only re-sync the memory draft when the server-side content actually changes
+  // (mirrors the transcription draft pattern above).
+  const lastSyncedMemory = useRef<LocalMemory>(toLocalMemory(originalSetting.memory));
+  useEffect(() => {
+    const next = toLocalMemory(originalSetting.memory);
+    if (!isEqual(lastSyncedMemory.current, next)) {
+      setMemory(next);
+      lastSyncedMemory.current = next;
+    }
+  }, [originalSetting.memory]);
+
+  const originalMemory = useMemo(() => toLocalMemory(originalSetting.memory), [originalSetting.memory]);
+  const memoryHasChanges = !isEqual(memory, originalMemory);
 
   // Only re-sync the transcription draft when the server-side content actually
   // changes — not on every originalSetting identity change. This prevents
@@ -402,6 +470,7 @@ const AISection = () => {
     nextChatAgents: LocalChatAgent[],
     nextTools: LocalTool[],
     errorContext: string,
+    nextMemory: LocalMemory = memory,
   ) => {
     const nextToolMap: Record<string, InstanceSetting_ToolConfig> = {};
     for (const tool of nextTools) {
@@ -420,6 +489,7 @@ const AISection = () => {
             taggers: nextTaggers.map(toTaggerConfig),
             chatAgents: nextChatAgents.map(toChatAgentConfig),
             tools: nextToolMap,
+            memory: toMemoryConfig(nextMemory),
           }),
         },
       }),
@@ -698,6 +768,40 @@ const AISection = () => {
     );
     if (!ok) return;
     setTools(nextTools);
+  };
+
+  const handleToggleMemoryEnabled = () => {
+    setMemory((prev) => ({ ...prev, enabled: !prev.enabled }));
+  };
+
+  const handleAddMemoryEntry = () => {
+    setMemory((prev) => ({ ...prev, entries: [...prev.entries, newMemoryEntry()] }));
+  };
+
+  const handleUpdateMemoryEntry = (id: string, content: string) => {
+    setMemory((prev) => ({
+      ...prev,
+      entries: prev.entries.map((entry) => (entry.id === id ? { ...entry, content } : entry)),
+    }));
+  };
+
+  const handleDeleteMemoryEntry = (id: string) => {
+    setMemory((prev) => ({ ...prev, entries: prev.entries.filter((entry) => entry.id !== id) }));
+  };
+
+  const handleSaveMemory = async () => {
+    const ok = await persistAISetting(
+      providers,
+      originalSetting.transcription,
+      agents,
+      taggers,
+      chatAgents,
+      tools,
+      "Update memory",
+      memory,
+    );
+    if (!ok) return;
+    lastSyncedMemory.current = memory;
   };
 
   return (
@@ -1079,6 +1183,72 @@ const AISection = () => {
           data={tools}
           emptyMessage={t("setting.ai.no-chat-tools")}
           getRowKey={(tool) => tool.name}
+        />
+      </SettingGroup>
+
+      <SettingGroup
+        title={t("setting.ai.memory-title")}
+        description={t("setting.ai.memory-description")}
+        showSeparator
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={handleAddMemoryEntry}>
+              <PlusIcon className="w-4 h-4 mr-2" />
+              {t("setting.ai.memory-add-entry")}
+            </Button>
+            <Button disabled={!memoryHasChanges} onClick={handleSaveMemory}>
+              {t("common.save")}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            className="size-4 accent-primary"
+            checked={memory.enabled}
+            onChange={handleToggleMemoryEnabled}
+            aria-label={t("setting.ai.memory-enabled-label")}
+          />
+          <span className="text-sm">{t("setting.ai.memory-enabled-label")}</span>
+        </div>
+        <SettingTable
+          columns={[
+            {
+              key: "content",
+              header: t("setting.ai.memory-entry-content"),
+              render: (_, entry: LocalMemoryEntry) => (
+                <Input
+                  value={entry.content}
+                  onChange={(e) => handleUpdateMemoryEntry(entry.id, e.target.value)}
+                  placeholder={t("setting.ai.memory-entry-placeholder")}
+                />
+              ),
+            },
+            {
+              key: "createdBy",
+              header: t("setting.ai.memory-entry-created-by"),
+              render: (_, entry: LocalMemoryEntry) => <span className="text-xs text-muted-foreground">{entry.createdBy || "-"}</span>,
+            },
+            {
+              key: "actions",
+              header: "",
+              className: "text-right",
+              render: (_, entry: LocalMemoryEntry) => (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteMemoryEntry(entry.id)}
+                  aria-label={t("setting.ai.memory-entry-delete-aria")}
+                >
+                  <Trash2Icon className="w-4 h-auto" />
+                </Button>
+              ),
+            },
+          ]}
+          data={memory.entries}
+          emptyMessage={t("setting.ai.memory-no-entries")}
+          getRowKey={(entry) => entry.id}
         />
       </SettingGroup>
 
