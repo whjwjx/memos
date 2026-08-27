@@ -3110,6 +3110,14 @@ components:
                         tools is the per-tool toggle and safety configuration for the conversational
                          assistant, keyed by tool name (e.g. "query_db"). Admin controls enable and
                          whether a tool requires a confirmation card before executing.
+                memory:
+                    allOf:
+                        - $ref: '#/components/schemas/InstanceSetting_MemoryConfig'
+                    description: |-
+                        memory is the instance-wide shared context bank for the conversational
+                         assistant. When enabled, its entries are injected into every chat
+                         conversation's system prompt. Managed by the admin through the settings UI
+                         and by the admin-only manage_memory tool.
             description: AI provider configuration settings.
         InstanceSetting_AgentConfig:
             type: object
@@ -3232,6 +3240,39 @@ components:
                         type: string
                     description: reactions is the list of reactions.
             description: Memo-related instance settings and policies.
+        InstanceSetting_MemoryConfig:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                    description: enabled controls whether the shared memory is injected into chat.
+                entries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/InstanceSetting_MemoryEntry'
+                    description: |-
+                        entries is the list of shared memory items. It is bounded to tens of items
+                         and stored inline in the AI instance setting.
+            description: MemoryConfig holds the shared context bank used by the AI chat assistant.
+        InstanceSetting_MemoryEntry:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: id is a stable identifier for the entry.
+                content:
+                    type: string
+                    description: content is the memory text injected into chat conversations.
+                createdBy:
+                    type: string
+                    description: created_by is the account that created the entry.
+                createdTs:
+                    type: string
+                    description: created_ts is the unix timestamp (seconds) of creation.
+                updatedTs:
+                    type: string
+                    description: updated_ts is the unix timestamp (seconds) of the last modification.
+            description: MemoryEntry is a single item in the shared memory bank.
         InstanceSetting_NotificationSetting:
             type: object
             properties:
@@ -4019,6 +4060,13 @@ components:
                     description: |-
                         Populate when continuing after a confirmation. Ids of tool calls the user
                          approved; the assistant executes them and continues the loop.
+                rejectedToolCallIds:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Populate when continuing after a confirmation. Ids of tool calls the user
+                         explicitly rejected; the assistant records them as skipped and continues.
                 toolApprovals:
                     type: array
                     items:

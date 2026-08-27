@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -21,6 +22,10 @@ const (
 	// maxToolRounds caps how many tool-call iterations a single turn may run
 	// before we stop and return whatever the model produced.
 	maxToolRounds = 8
+	// awaitingConfirmationPlaceholder marks a sensitive tool call that has not
+	// been decided by the user yet. It is persisted in the history and replaced
+	// by the real result (or a skipped note) once the user decides.
+	awaitingConfirmationPlaceholder = "awaiting user confirmation"
 )
 
 // AssistantRequest carries everything ToolLoop needs for one user turn.
@@ -45,6 +50,10 @@ type AssistantRequest struct {
 	// turn. Tool calls requiring confirmation are only executed when their id
 	// is present here.
 	ApprovedToolCallIDs []string
+	// RejectedToolCallIDs are the tool call ids the user explicitly rejected in
+	// a prior turn. Their pending placeholders are recorded as skipped and the
+	// loop continues without executing them.
+	RejectedToolCallIDs []string
 	// Approvals maps approved tool call ids to the keyword the user typed to
 	// confirm a sensitive write (e.g. "yes"). The keyword is injected into the
 	// tool arguments before execution so second-factor-gated tools can verify
@@ -79,6 +88,7 @@ func ToolLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*As
 
 func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*AssistantResponse, error) {
 	approved := toSet(req.ApprovedToolCallIDs)
+	rejected := toSet(req.RejectedToolCallIDs)
 
 	// Build the working message list: history + new user turn.
 	messages := make([]chat.Message, 0, len(req.History)+2)
@@ -90,24 +100,40 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 		registry = tools.NewRegistry()
 	}
 
-	// When the user approved pending tool calls from a prior turn, the
-	// orchestrator executes them directly (we never rely on the model
-	// re-issuing the call with a matching id). Their real results overwrite the
-	// placeholder tool messages in place (preserving a valid message order), and
-	// we force ToolChoiceNone so the model only produces a final answer.
-	if len(approved) > 0 {
+	// When the user decided pending tool calls from a prior turn (approved or
+	// rejected), the orchestrator applies those decisions directly — we never
+	// rely on the model re-issuing the call with a matching id. Approved calls
+	// are executed and their real results overwrite the placeholder tool
+	// messages in place (preserving a valid message order); rejected calls get
+	// a skipped note. Afterwards we force ToolChoiceNone (with no tool
+	// definitions and a flattened history) so the model only produces a final
+	// answer summarizing every decision.
+	if len(approved) > 0 || len(rejected) > 0 {
 		updated := applyApprovedResults(ctx, req, registry, approved, req.Approvals, messages)
+		updated = append(updated, applyRejectedResults(messages, rejected)...)
 		if len(updated) > 0 {
+			// Give the model no function-calling material to mimic: flatten the
+			// history so earlier assistant tool_calls and their tool results
+			// become plain text, and omit the tool definitions entirely. With no
+			// Tools list (and thus no tool_choice at all), the model cannot
+			// "demonstrate" another call — it can only produce a natural-language
+			// summary. This is far more robust than relying on tool_choice:"none",
+			// which some models (e.g. DeepSeek) ignore by echoing pseudo-XML.
+			flattened := flattenHistory(messages)
 			resp, err := model.Generate(ctx, chat.Request{
 				Model:      req.Model,
 				System:     req.System,
-				Messages:   messages,
+				Messages:   flattened,
 				ToolChoice: chat.ToolChoiceNone,
 			})
 			if err != nil {
 				return nil, errors.Wrap(err, "chat model generation failed")
 			}
-			return &AssistantResponse{Content: resp.Text, ToolMessages: updated}, nil
+			content := stripPseudoToolXML(resp.Text)
+			if content == "" {
+				content = summarizeApproved(updated)
+			}
+			return &AssistantResponse{Content: content, ToolMessages: updated}, nil
 		}
 	}
 
@@ -163,7 +189,7 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 					Role:       chat.RoleTool,
 					ToolCallID: tc.ID,
 					Name:       tc.Name,
-					Content:    "awaiting user confirmation",
+					Content:    awaitingConfirmationPlaceholder,
 				})
 				continue
 			}
@@ -248,6 +274,24 @@ func applyApprovedResults(ctx context.Context, req *AssistantRequest, registry *
 	return updated
 }
 
+// applyRejectedResults marks tool messages whose ids were explicitly rejected
+// by the user: their pending placeholder is replaced with a skipped note so the
+// history stays complete and the follow-up summary reflects the decision. It
+// returns the messages that were updated.
+func applyRejectedResults(messages []chat.Message, rejected map[string]bool) []chat.Message {
+	updated := make([]chat.Message, 0)
+	for i := range messages {
+		if messages[i].Role != chat.RoleTool || !rejected[messages[i].ToolCallID] {
+			continue
+		}
+		if strings.TrimSpace(messages[i].Content) == awaitingConfirmationPlaceholder {
+			messages[i].Content = "用户拒绝了该操作，未执行。"
+		}
+		updated = append(updated, messages[i])
+	}
+	return updated
+}
+
 // injectConfirmKeyword adds the user's typed confirmation keyword to a tool
 // call's arguments so a second-factor-gated tool can verify it. Non-JSON
 // arguments or an empty keyword are returned unchanged.
@@ -265,6 +309,63 @@ func injectConfirmKeyword(argsJSON, keyword string) string {
 		return argsJSON
 	}
 	return string(raw)
+}
+
+var (
+	pseudoToolCallBlockRe = regexp.MustCompile(`(?is)<tool_calls\b[^>]*>.*?</tool_calls>`)
+	pseudoInvokeBlockRe   = regexp.MustCompile(`(?is)<invoke\b[^>]*>.*?</invoke>`)
+)
+
+// stripPseudoToolXML removes tool-call XML that some models emit as plain text
+// instead of a native function call. Used as a last-resort guard on the
+// approval continuation so raw XML never reaches the user.
+func stripPseudoToolXML(content string) string {
+	cleaned := pseudoToolCallBlockRe.ReplaceAllString(content, "")
+	cleaned = pseudoInvokeBlockRe.ReplaceAllString(cleaned, "")
+	return strings.TrimSpace(cleaned)
+}
+
+// summarizeApproved builds a neutral completion line from the tool messages
+// whose results were written back, used when the model produces no usable text
+// (e.g. it only echoed XML that was stripped).
+func summarizeApproved(updated []chat.Message) string {
+	if len(updated) == 1 {
+		return fmt.Sprintf("已完成：%s", updated[0].Content)
+	}
+	return "已完成相关操作。"
+}
+
+// flattenHistory converts a message list into a purely conversational form:
+// assistant tool-call turns are dropped (their prose kept when present) and
+// tool-result messages become neutral system notes. This removes every trace
+// of the function-calling protocol from what the model sees, so a follow-up
+// generation cannot mimic pseudo-XML tool calls.
+func flattenHistory(messages []chat.Message) []chat.Message {
+	out := make([]chat.Message, 0, len(messages))
+	for _, m := range messages {
+		switch m.Role {
+		case chat.RoleTool:
+			name := m.Name
+			if name == "" {
+				name = "tool"
+			}
+			out = append(out, chat.Message{
+				Role:    chat.RoleSystem,
+				Content: fmt.Sprintf("[工具 %s] %s", name, m.Content),
+			})
+		case chat.RoleAssistant:
+			if len(m.ToolCalls) > 0 {
+				if strings.TrimSpace(m.Content) != "" {
+					out = append(out, chat.Message{Role: chat.RoleAssistant, Content: m.Content})
+				}
+			} else {
+				out = append(out, m)
+			}
+		default:
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // respToolCallsFromMessages extracts the last assistant tool-call turn so the

@@ -690,6 +690,9 @@ type SendMessageRequest struct {
 	// Populate when continuing after a confirmation. Ids of tool calls the user
 	// approved; the assistant executes them and continues the loop.
 	ApprovedToolCallIds []string `protobuf:"bytes,3,rep,name=approved_tool_call_ids,json=approvedToolCallIds,proto3" json:"approved_tool_call_ids,omitempty"`
+	// Populate when continuing after a confirmation. Ids of tool calls the user
+	// explicitly rejected; the assistant records them as skipped and continues.
+	RejectedToolCallIds []string `protobuf:"bytes,5,rep,name=rejected_tool_call_ids,json=rejectedToolCallIds,proto3" json:"rejected_tool_call_ids,omitempty"`
 	// Populate when continuing after a confirmation. Per-tool-call confirmations
 	// that carry the keyword the user typed to approve a sensitive write (e.g.
 	// "yes" for query_db update/delete). The assistant injects the keyword into
@@ -746,6 +749,13 @@ func (x *SendMessageRequest) GetContent() string {
 func (x *SendMessageRequest) GetApprovedToolCallIds() []string {
 	if x != nil {
 		return x.ApprovedToolCallIds
+	}
+	return nil
+}
+
+func (x *SendMessageRequest) GetRejectedToolCallIds() []string {
+	if x != nil {
+		return x.RejectedToolCallIds
 	}
 	return nil
 }
@@ -936,11 +946,12 @@ const file_api_v1_ai_chat_service_proto_rawDesc = "" +
 	"\x19UpdateConversationRequest\x12C\n" +
 	"\fconversation\x18\x01 \x01(\v2\x1a.memos.api.v1.ConversationB\x03\xe0A\x02R\fconversation\x12;\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
-	"updateMask\"\xe3\x01\n" +
+	"updateMask\"\x9d\x02\n" +
 	"\x12SendMessageRequest\x12,\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x0econversationId\x12\x1d\n" +
 	"\acontent\x18\x02 \x01(\tB\x03\xe0A\x02R\acontent\x128\n" +
-	"\x16approved_tool_call_ids\x18\x03 \x03(\tB\x03\xe0A\x01R\x13approvedToolCallIds\x12F\n" +
+	"\x16approved_tool_call_ids\x18\x03 \x03(\tB\x03\xe0A\x01R\x13approvedToolCallIds\x128\n" +
+	"\x16rejected_tool_call_ids\x18\x05 \x03(\tB\x03\xe0A\x01R\x13rejectedToolCallIds\x12F\n" +
 	"\x0etool_approvals\x18\x04 \x03(\v2\x1a.memos.api.v1.ToolApprovalB\x03\xe0A\x01R\rtoolApprovals\"Y\n" +
 	"\fToolApproval\x12 \n" +
 	"\ftool_call_id\x18\x01 \x01(\tR\n" +

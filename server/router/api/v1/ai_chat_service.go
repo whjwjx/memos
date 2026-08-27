@@ -3,6 +3,8 @@ package v1
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -28,7 +30,33 @@ import (
 const chatOperationalGuidance = `Operational guidance:
 - When the user requests a sensitive action such as deleting a memo, call the corresponding tool directly. Do NOT first ask the user to verbally confirm or reply "yes" — the client will present a confirmation card and only run the tool after the user approves there.
 - After a tool executes, briefly report the outcome in natural language. Do not repeat the raw tool result verbatim.
-- If you are unsure which memo the user means, use search_memos (with an empty query to list recent memos) to find it before acting.`
+- If you are unsure which memo the user means, use search_memos (with an empty query to list recent memos) to find it before acting.
+- Never write tool calls into your reply text — no XML or JSON such as <tool_calls> or <invoke name="..."> blocks, and no fenced JSON function-call snippets. Tool calls are made only through the API's native function-calling mechanism. Your reply must be plain natural-language text.`
+
+// buildMemoryContext returns the instance-wide shared memory block for the
+// system prompt, or an empty string when memory is disabled or empty.
+func (s *APIV1Service) buildMemoryContext(ctx context.Context) (string, error) {
+	setting, err := s.Store.GetInstanceAISetting(ctx)
+	if err != nil {
+		return "", err
+	}
+	if setting == nil {
+		return "", nil
+	}
+	memory := setting.GetMemory()
+	if memory == nil || !memory.GetEnabled() || len(memory.GetEntries()) == 0 {
+		return "", nil
+	}
+	var b strings.Builder
+	b.WriteString("Shared instance memory (context facts maintained by the admin; trust them when answering):\n")
+	for _, entry := range memory.GetEntries() {
+		if entry == nil {
+			continue
+		}
+		fmt.Fprintf(&b, "- %s\n", entry.GetContent())
+	}
+	return strings.TrimRight(b.String(), "\n"), nil
+}
 
 // AIChatService implements the conversational AI assistant with tool calling.
 // Its methods are defined on *APIV1Service so the shared Connect handler can
@@ -190,6 +218,14 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 	// only execute after the user approves there.
 	systemPrompt = strings.TrimSpace(systemPrompt + "\n\n" + chatOperationalGuidance)
 
+	// Inject the instance-wide shared memory bank when enabled. It provides
+	// admin-maintained context facts to every conversation.
+	if memoryContext, err := s.buildMemoryContext(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load shared memory: %v", err)
+	} else if memoryContext != "" {
+		systemPrompt = strings.TrimSpace(systemPrompt + "\n\n" + memoryContext)
+	}
+
 	registry := tools.NewRegistry()
 	// Honor the per-tool enable toggles from instance config and scope
 	// admin-only tools to admin accounts.
@@ -214,11 +250,19 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 		Registry:            registry,
 		ToolContext:         tools.ToolContext{UserID: conv.UserID, Store: s.Store},
 		ApprovedToolCallIDs: req.ApprovedToolCallIds,
+		RejectedToolCallIDs: req.RejectedToolCallIds,
 		Approvals:           approvals,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "chat loop failed: %v", err)
 	}
+
+	// Defensive guard: some models emit pseudo tool-call XML as plain text
+	// (usually when the confirmation continuation forbids further calls via
+	// tool_choice:none but the history still carries earlier tool_calls).
+	// Real tool calls travel through the structured field and are never in
+	// the content, so stripping them here is purely cosmetic.
+	resp.Content = sanitizeAssistantContent(resp.Content)
 
 	// Persist the assistant turn(s).
 	assistantMsg, err := s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
@@ -300,6 +344,25 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 	}
 
 	return connect.NewResponse(response), nil
+}
+
+var (
+	fakeToolCallBlockRe = regexp.MustCompile(`(?is)<tool_calls\b[^>]*>.*?</tool_calls>`)
+	fakeInvokeBlockRe   = regexp.MustCompile(`(?is)<invoke\b[^>]*>.*?</invoke>`)
+)
+
+// sanitizeAssistantContent strips pseudo tool-call XML that some models emit as
+// plain text instead of a native function call. It is a display-level guard:
+// after stripping, an empty remainder is replaced with a neutral confirmation
+// so the UI never shows a bare code block.
+func sanitizeAssistantContent(content string) string {
+	cleaned := fakeToolCallBlockRe.ReplaceAllString(content, "")
+	cleaned = fakeInvokeBlockRe.ReplaceAllString(cleaned, "")
+	cleaned = strings.TrimSpace(cleaned)
+	if cleaned == "" {
+		return "Done."
+	}
+	return cleaned
 }
 
 // findOwnedConversation resolves a conversation by uid and verifies ownership.
@@ -408,8 +471,9 @@ var readOnlyTools = map[string]bool{
 // the model's tool list. Keep in sync with the adminOnly entries in the
 // settings UI.
 var adminOnlyTools = map[string]bool{
-	"get_logs": true,
-	"query_db": true,
+	"get_logs":      true,
+	"query_db":      true,
+	"manage_memory": true,
 }
 
 // applyToolConfig applies the admin's per-tool toggles from instance settings
