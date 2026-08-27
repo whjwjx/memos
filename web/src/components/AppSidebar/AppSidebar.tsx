@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   ArrowRightIcon,
   BellIcon,
+  BookOpenCheckIcon,
   BotIcon,
   CalendarDaysIcon,
   ChevronDownIcon,
@@ -245,6 +246,46 @@ const ProfileMode = () => {
   );
 };
 
+const TimeNavigationSection = () => {
+  const t = useTranslate();
+  const location = useLocation();
+  const { setMobileOpen } = useAppSidebar();
+  const rows = [
+    {
+      path: ROUTES.CALENDAR,
+      label: t("common.calendar"),
+      icon: CalendarDaysIcon,
+    },
+    {
+      path: ROUTES.REVIEW,
+      label: t("review.title"),
+      icon: BookOpenCheckIcon,
+    },
+  ];
+
+  return (
+    <SidebarSection ariaLabel={`${t("common.calendar")} ${t("review.title")}`}>
+      {rows.map((row) => {
+        const active = location.pathname === row.path;
+        const Icon = row.icon;
+
+        return (
+          <Link
+            key={row.path}
+            to={row.path}
+            onClick={() => setMobileOpen(false)}
+            aria-current={active ? "page" : undefined}
+            className={cn(SIDEBAR_ROW_CLASSES, sidebarRowStateClasses(active))}
+          >
+            <Icon className={SIDEBAR_ROW_ICON_CLASSES} strokeWidth={1.8} />
+            <span className="truncate">{row.label}</span>
+          </Link>
+        );
+      })}
+    </SidebarSection>
+  );
+};
+
 const CollectionSidebarContent = ({ context }: { context: MemoStatsContext }) => {
   const t = useTranslate();
   const location = useLocation();
@@ -277,6 +318,7 @@ const CollectionSidebarContent = ({ context }: { context: MemoStatsContext }) =>
       <SidebarSection ariaLabel={t("common.statistics")}>
         <StatisticsView statisticsData={statistics} navigationTarget={filterTarget} onDateSelect={() => setMobileOpen(false)} />
       </SidebarSection>
+      {showViews && <TimeNavigationSection />}
       {showViews && <ViewsSection />}
       <TagsSection tagCount={tags} navigationTarget={filterTarget} scope={statsUserName ?? context} onSelect={() => setMobileOpen(false)} />
     </div>
@@ -662,13 +704,6 @@ const GlobalNavigation = () => {
 
   const items: GlobalNavItem[] = currentUser
     ? [
-        {
-          id: "calendar",
-          label: t("common.calendar"),
-          path: ROUTES.CALENDAR,
-          icon: CalendarDaysIcon,
-          active: location.pathname === ROUTES.CALENDAR,
-        },
         {
           id: "attachments",
           label: t("common.attachments"),

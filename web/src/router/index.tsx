@@ -24,6 +24,7 @@ const Inboxes = lazyWithReload(() => import("@/pages/Inboxes"));
 const MemoDetail = lazyWithReload(() => import("@/pages/MemoDetail"));
 const NotFound = lazyWithReload(() => import("@/pages/NotFound"));
 const PermissionDenied = lazyWithReload(() => import("@/pages/PermissionDenied"));
+const Review = lazyWithReload(() => import("@/pages/Review"));
 const Attachments = lazyWithReload(() => import("@/pages/Attachments"));
 const Setting = lazyWithReload(() => import("@/pages/Setting"));
 const AIChat = lazyWithReload(() => import("@/pages/AIChat"));
@@ -109,6 +110,7 @@ export const routeConfig: RouteObject[] = [
                 children: [
                   { path: Routes.ATTACHMENTS, element: <Attachments /> },
                   { path: Routes.CALENDAR, element: <Calendar /> },
+                  { path: Routes.REVIEW, element: <Review /> },
                   { path: Routes.INBOX, element: <Inboxes /> },
                   { path: Routes.SETTING, element: <Setting /> },
                   { path: Routes.AI_CHAT, element: <AIChat /> },

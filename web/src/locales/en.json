@@ -212,6 +212,7 @@
     "resize-sidebar": "Resize sidebar",
     "resources": "Resources",
     "restore": "Restore",
+    "review": "Review",
     "role": "Role",
     "save": "Save",
     "search": "Search",
@@ -522,6 +523,41 @@
     "reset-link-prompt": "Are you sure you want to reset the link? This will break all current link usages. THIS ACTION IS IRREVERSIBLE",
     "reset-resource-link": "Reset Resource Link",
     "unused-resources": "Unused resources"
+  },
+  "review": {
+    "candidate-count": "{{count}} candidates",
+    "content-range": "Content range",
+    "count-option": "{{count}}/day",
+    "daily-count": "Daily count",
+    "description": "A daily random set of your past memos, with the same core controls as flomo: content range, time range, and memo count.",
+    "empty-description": "Try a wider time range or a different tag.",
+    "empty-title": "No memos match this review setting",
+    "load-error": "Failed to load review memos.",
+    "loading": "Loading candidates…",
+    "next": "Next",
+    "open-settings": "Open review settings",
+    "previous": "Previous",
+    "progress": "{{current}}/{{total}}",
+    "select-tag": "Select tag",
+    "settings-description": "Set the content range, time range, and daily count for Daily Review.",
+    "settings-title": "Daily Review settings",
+    "shuffle": "Shuffle",
+    "tag-mode": {
+      "all": "All",
+      "exclude": "Exclude tag",
+      "include": "Include tag",
+      "untagged": "Untagged"
+    },
+    "time": {
+      "1m": "1 month",
+      "3m": "3 months",
+      "6m": "6 months",
+      "12m": "1 year",
+      "all": "All time"
+    },
+    "time-range": "Time range",
+    "title": "Review",
+    "today-count": "{{count}} today"
   },
   "router": {
     "back-to-top": "Back to Top",
