@@ -137,6 +137,9 @@ func TestUserTagSettings(t *testing.T) {
 					"private/.*": {
 						BlurContent: true,
 					},
+					"favorite": {
+						Pinned: true,
+					},
 				},
 			},
 		},
@@ -150,10 +153,12 @@ func TestUserTagSettings(t *testing.T) {
 	require.Equal(t, "users/tag-user/settings/TAGS", updated.Name)
 	require.Contains(t, updated.GetTagsSetting().GetTags(), "bug")
 	require.True(t, updated.GetTagsSetting().GetTags()["private/.*"].BlurContent)
+	require.True(t, updated.GetTagsSetting().GetTags()["favorite"].Pinned)
 
 	got, err := ts.Service.GetUserSetting(userCtx, &apiv1.GetUserSettingRequest{Name: "users/tag-user/settings/TAGS"})
 	require.NoError(t, err)
 	require.Contains(t, got.GetTagsSetting().GetTags(), "bug")
+	require.True(t, got.GetTagsSetting().GetTags()["favorite"].Pinned)
 
 	resp, err := ts.Service.ListUserSettings(userCtx, &apiv1.ListUserSettingsRequest{
 		Parent: apiv1server.BuildUserName(user.Username),

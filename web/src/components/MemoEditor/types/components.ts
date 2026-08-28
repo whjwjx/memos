@@ -23,6 +23,8 @@ export interface MemoEditorProps {
    * in edit mode (when `memo` is set).
    */
   defaultCreateTime?: Date;
+  /** Suggested markdown for an empty new memo, e.g. the active tag prefix from the current filter. */
+  suggestedContent?: string;
   onConfirm?: (memoName: string) => void;
   onCancel?: () => void;
   /** Reports save activity so external presentations can prevent dismissal mid-transaction. */

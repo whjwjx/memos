@@ -957,21 +957,24 @@ type ListMemosRequest struct {
 	OrderBy string `protobuf:"bytes,4,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	// Optional. A CEL expression to filter memos. Combine terms with && and ||.
 	// Available fields:
-	//   content (string), creator (string, e.g. "users/1"),
-	//   created_ts / updated_ts / scheduled_ts (timestamp), pinned (bool),
-	//   visibility (string: PRIVATE | PROTECTED | PUBLIC),
-	//   tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
-	//   has_task_list / has_link / has_code / has_incomplete_tasks (bool),
-	//   has_location (bool; true when the memo has a location attached).
-	//   scheduled_ts supports null comparison, e.g. `scheduled_ts != null` to
-	//   match memos that have a scheduled time.
+	//
+	//	content (string), creator (string, e.g. "users/1"),
+	//	created_ts / updated_ts / scheduled_ts (timestamp), pinned (bool),
+	//	visibility (string: PRIVATE | PROTECTED | PUBLIC),
+	//	tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
+	//	has_task_list / has_link / has_code / has_incomplete_tasks (bool),
+	//	has_location (bool; true when the memo has a location attached).
+	//	scheduled_ts supports null comparison, e.g. `scheduled_ts != null` to
+	//	match memos that have a scheduled time.
+	//
 	// Note: the time fields here are created_ts / updated_ts / scheduled_ts,
 	// which differ from the create_time / update_time / scheduled_time names
 	// used by order_by.
 	// Examples:
-	//   pinned == true && visibility == "PUBLIC"
-	//   tags.exists(t, t == "urgent")
-	//   content.contains("roadmap") && created_ts > now - duration("168h")
+	//
+	//	pinned == true && visibility == "PUBLIC"
+	//	tags.exists(t, t == "urgent")
+	//	content.contains("roadmap") && created_ts > now - duration("168h")
 	Filter string `protobuf:"bytes,5,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Optional. If true, show deleted memos in the response.
 	ShowDeleted   bool `protobuf:"varint,6,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`

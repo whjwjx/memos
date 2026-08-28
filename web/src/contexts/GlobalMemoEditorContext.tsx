@@ -2,9 +2,11 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { type ComponentType, createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { loadMemoEditor } from "@/components/MemoEditor/loader";
 import type { MemoEditorProps } from "@/components/MemoEditor/types";
+import { deriveSuggestedContentFromFilters } from "@/components/MemoEditor/utils/deriveSuggestedContent";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useAppSidebar } from "@/contexts/AppSidebarContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { type MemoFilter, useOptionalMemoFilterContext } from "@/contexts/MemoFilterContext";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { useTranslate } from "@/utils/i18n";
 
@@ -15,6 +17,7 @@ interface GlobalMemoEditorContextValue {
 }
 
 const GlobalMemoEditorContext = createContext<GlobalMemoEditorContextValue | null>(null);
+const EMPTY_FILTERS: MemoFilter[] = [];
 
 const isVisibleFocusTarget = (element: HTMLElement | null): element is HTMLElement => {
   if (!element?.isConnected || element.tabIndex < 0 || element.matches(":disabled, [aria-disabled='true']")) return false;
@@ -37,6 +40,10 @@ export function GlobalMemoEditorProvider({ children }: { children: ReactNode }) 
   const currentUserName = useCurrentUser()?.name;
   const { isUserSettingsInitialized } = useAuth();
   const { setMobileOpen, setQuickFindOpen } = useAppSidebar();
+  const memoFilterContext = useOptionalMemoFilterContext();
+  const filters = memoFilterContext?.filters ?? EMPTY_FILTERS;
+  const suggestedContent = useMemo(() => deriveSuggestedContentFromFilters(filters), [filters]);
+  const editorCacheKey = suggestedContent ? `global-memo-editor:${suggestedContent}` : "global-memo-editor";
   // Keyed by the user who opened it, so signing out closes the composer in the
   // same render and a different user signing in cannot resurrect it.
   const [openedFor, setOpenedFor] = useState<string>();
@@ -135,10 +142,12 @@ export function GlobalMemoEditorProvider({ children }: { children: ReactNode }) 
                 <DialogPrimitive.Title>{t("editor.new-memo")}</DialogPrimitive.Title>
               </VisuallyHidden>
               <EditorComponent
+                key={editorCacheKey}
                 autoFocus
                 initialFocusMode
-                cacheKey="global-memo-editor"
+                cacheKey={editorCacheKey}
                 placeholder={t("editor.any-thoughts")}
+                suggestedContent={suggestedContent}
                 onConfirm={closeEditor}
                 onCancel={closeEditor}
                 onFocusModeExit={requestCloseEditor}

@@ -370,7 +370,9 @@ type UserTagMetadata struct {
 	// When unset, the default tag color is used.
 	BackgroundColor *color.Color `protobuf:"bytes,1,opt,name=background_color,json=backgroundColor,proto3" json:"background_color,omitempty"`
 	// Whether memos with this tag should have their content blurred.
-	BlurContent   bool `protobuf:"varint,2,opt,name=blur_content,json=blurContent,proto3" json:"blur_content,omitempty"`
+	BlurContent bool `protobuf:"varint,2,opt,name=blur_content,json=blurContent,proto3" json:"blur_content,omitempty"`
+	// Whether this exact tag should be shown in the pinned tags section.
+	Pinned        bool `protobuf:"varint,3,opt,name=pinned,proto3" json:"pinned,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -415,6 +417,13 @@ func (x *UserTagMetadata) GetBackgroundColor() *color.Color {
 func (x *UserTagMetadata) GetBlurContent() bool {
 	if x != nil {
 		return x.BlurContent
+	}
+	return false
+}
+
+func (x *UserTagMetadata) GetPinned() bool {
+	if x != nil {
+		return x.Pinned
 	}
 	return false
 }
@@ -1061,10 +1070,11 @@ const file_store_user_setting_proto_rawDesc = "" +
 	"\x12calendar_day_start\x18\x05 \x01(\x05R\x10calendarDayStart\x12(\n" +
 	"\x10calendar_day_end\x18\x06 \x01(\x05R\x0ecalendarDayEnd\x120\n" +
 	"\x14show_comment_preview\x18\a \x01(\bR\x12showCommentPreview\x12;\n" +
-	"\x1acomment_indicator_on_hover\x18\b \x01(\bR\x17commentIndicatorOnHover\"s\n" +
+	"\x1acomment_indicator_on_hover\x18\b \x01(\bR\x17commentIndicatorOnHover\"\x8b\x01\n" +
 	"\x0fUserTagMetadata\x12=\n" +
 	"\x10background_color\x18\x01 \x01(\v2\x12.google.type.ColorR\x0fbackgroundColor\x12!\n" +
-	"\fblur_content\x18\x02 \x01(\bR\vblurContent\"\xa4\x01\n" +
+	"\fblur_content\x18\x02 \x01(\bR\vblurContent\x12\x16\n" +
+	"\x06pinned\x18\x03 \x01(\bR\x06pinned\"\xa4\x01\n" +
 	"\x0fTagsUserSetting\x12:\n" +
 	"\x04tags\x18\x01 \x03(\v2&.memos.store.TagsUserSetting.TagsEntryR\x04tags\x1aU\n" +
 	"\tTagsEntry\x12\x10\n" +

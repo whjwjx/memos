@@ -15,6 +15,7 @@ interface UseMemoSaveOptions {
   parentMemoName?: string;
   defaultVisibility?: Visibility;
   defaultCreateTime?: Date;
+  suggestedContent?: string;
   discardDraft: () => void;
   onConfirm?: (memoName: string) => void;
   onCancel?: () => void;
@@ -30,6 +31,7 @@ export function useMemoSave({
   parentMemoName,
   defaultVisibility,
   defaultCreateTime,
+  suggestedContent,
   discardDraft,
   onConfirm,
   onCancel,
@@ -74,6 +76,9 @@ export function useMemoSave({
       await Promise.all(invalidationPromises);
 
       dispatch(actions.reset());
+      if (!memoName && !parentMemoName && suggestedContent?.trim()) {
+        dispatch(actions.setContent(suggestedContent));
+      }
       if (!memoName && defaultVisibility) {
         dispatch(actions.setMetadata({ visibility: defaultVisibility }));
       }
@@ -108,6 +113,7 @@ export function useMemoSave({
     onConfirm,
     parentMemoName,
     queryClient,
+    suggestedContent,
     t,
   ]);
 }

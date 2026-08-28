@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import MemoEditor from "@/components/MemoEditor";
 import { deriveDefaultCreateTimeFromFilters } from "@/components/MemoEditor/utils/deriveDefaultCreateTime";
+import { deriveSuggestedContentFromFilters } from "@/components/MemoEditor/utils/deriveSuggestedContent";
 import MemoView from "@/components/MemoView";
 import PagedMemoList, { getMemoKey } from "@/components/PagedMemoList";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +19,8 @@ const Home = () => {
   const { isUserSettingsInitialized } = useAuth();
   const { filters } = useMemoFilterContext();
   const defaultCreateTime = useMemo(() => deriveDefaultCreateTimeFromFilters(filters), [filters]);
+  const suggestedContent = useMemo(() => deriveSuggestedContentFromFilters(filters), [filters]);
+  const editorCacheKey = suggestedContent ? `home-memo-editor:${suggestedContent}` : "home-memo-editor";
 
   const memoFilter = useMemoFilters({
     creatorName: user?.name,
@@ -45,10 +48,12 @@ const Home = () => {
 
             return (
               <MemoEditor
+                key={editorCacheKey}
                 className={useGrid ? undefined : "mb-2"}
-                cacheKey="home-memo-editor"
+                cacheKey={editorCacheKey}
                 placeholder={t("editor.any-thoughts")}
                 defaultCreateTime={defaultCreateTime}
+                suggestedContent={suggestedContent}
               />
             );
           }}

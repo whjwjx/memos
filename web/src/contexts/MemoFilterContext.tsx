@@ -170,5 +170,9 @@ export function useMemoFilterContext() {
   return context;
 }
 
+export function useOptionalMemoFilterContext() {
+  return useContext(MemoFilterContext);
+}
+
 // Alias for backwards compatibility during migration
 export const useMemoFilter = useMemoFilterContext;
