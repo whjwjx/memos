@@ -12,6 +12,7 @@ interface UseMemoInitOptions {
   autoFocus?: boolean;
   defaultVisibility?: Visibility;
   defaultCreateTime?: Date;
+  suggestedContent?: string;
 }
 
 export const useMemoInit = ({
@@ -22,6 +23,7 @@ export const useMemoInit = ({
   autoFocus,
   defaultVisibility,
   defaultCreateTime,
+  suggestedContent,
 }: UseMemoInitOptions) => {
   const { actions, dispatch } = useEditorContext();
   const initializedRef = useRef(false);
@@ -40,6 +42,8 @@ export const useMemoInit = ({
       const cachedDraft = cacheService.loadDraft(key);
       if (cachedDraft.content) {
         dispatch(actions.setContent(cachedDraft.content));
+      } else if (cachedDraft.attachments.length === 0 && suggestedContent?.trim()) {
+        dispatch(actions.setContent(suggestedContent));
       }
       if (cachedDraft.attachments.length > 0) {
         dispatch(actions.setMetadata({ attachments: cachedDraft.attachments }));
@@ -71,7 +75,7 @@ export const useMemoInit = ({
         clearTimeout(restoreCursorTimer);
       }
     };
-  }, [memo, cacheKey, username, autoFocus, defaultVisibility, defaultCreateTime, actions, dispatch, editorRef]);
+  }, [memo, cacheKey, username, autoFocus, defaultVisibility, defaultCreateTime, suggestedContent, actions, dispatch, editorRef]);
 
   return { isInitialized };
 };

@@ -480,6 +480,8 @@ message UserSetting {
     google.type.Color background_color = 1 [(google.api.field_behavior) = OPTIONAL];
     // Whether memos with this tag should have their content blurred.
     bool blur_content = 2 [(google.api.field_behavior) = OPTIONAL];
+    // Whether this exact tag should be shown in the pinned tags section.
+    bool pinned = 3 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // User-specific tag metadata.

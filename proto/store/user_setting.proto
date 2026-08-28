@@ -66,6 +66,8 @@ message UserTagMetadata {
   google.type.Color background_color = 1;
   // Whether memos with this tag should have their content blurred.
   bool blur_content = 2;
+  // Whether this exact tag should be shown in the pinned tags section.
+  bool pinned = 3;
 }
 
 message TagsUserSetting {

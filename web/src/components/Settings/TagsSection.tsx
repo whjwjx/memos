@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { isEqual } from "lodash-es";
-import { EyeOffIcon, PaletteIcon, PlusIcon, TagIcon, TrashIcon } from "lucide-react";
+import { ArrowUpToLineIcon, EyeOffIcon, PaletteIcon, PlusIcon, TagIcon, TrashIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
@@ -38,14 +38,17 @@ const hexToColor = (hex: string) =>
 interface LocalTagMeta {
   color?: string;
   blur: boolean;
+  pinned: boolean;
 }
 
 const toLocalTagMeta = (meta: {
   backgroundColor?: { red?: number; green?: number; blue?: number };
   blurContent: boolean;
+  pinned: boolean;
 }): LocalTagMeta => ({
   color: colorToHex(meta.backgroundColor),
   blur: meta.blurContent,
+  pinned: meta.pinned,
 });
 
 const TagsSection = () => {
@@ -62,6 +65,7 @@ const TagsSection = () => {
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState<string | undefined>(undefined);
   const [newTagBlur, setNewTagBlur] = useState(false);
+  const [newTagPinned, setNewTagPinned] = useState(false);
 
   // Sync local state when the fetched setting arrives (the fetch is async and
   // completes after mount, so localTags would be empty without this sync).
@@ -98,6 +102,10 @@ const TagsSection = () => {
     setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], blur } }));
   };
 
+  const handlePinnedChange = (tagName: string, pinned: boolean) => {
+    setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], pinned } }));
+  };
+
   const handleClearColor = (tagName: string) => {
     setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], color: undefined } }));
   };
@@ -121,10 +129,11 @@ const TagsSection = () => {
       toast.error(t("setting.tags.invalid-regex"));
       return;
     }
-    setLocalTags((prev) => ({ ...prev, [name]: { color: newTagColor, blur: newTagBlur } }));
+    setLocalTags((prev) => ({ ...prev, [name]: { color: newTagColor, blur: newTagBlur, pinned: newTagPinned } }));
     setNewTagName("");
     setNewTagColor(undefined);
     setNewTagBlur(false);
+    setNewTagPinned(false);
   };
 
   const handleSave = async () => {
@@ -133,6 +142,7 @@ const TagsSection = () => {
         name,
         create(UserSetting_TagMetadataSchema, {
           blurContent: meta.blur,
+          pinned: meta.pinned,
           ...(meta.color ? { backgroundColor: hexToColor(meta.color) } : {}),
         }),
       ]),
@@ -171,7 +181,7 @@ const TagsSection = () => {
               </Button>
             </div>
 
-            <div className="grid gap-2 lg:grid-cols-[minmax(16rem,1fr)_auto_auto] lg:items-center">
+            <div className="grid gap-2 lg:grid-cols-[minmax(16rem,1fr)_auto_auto_auto] lg:items-center">
               <div className="min-w-0">
                 <Input
                   className="font-mono"
@@ -210,6 +220,12 @@ const TagsSection = () => {
                 <span>{t("setting.tags.blur-content")}</span>
                 <Switch checked={newTagBlur} onCheckedChange={setNewTagBlur} />
               </label>
+
+              <label className="flex h-8 items-center gap-2 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground">
+                <ArrowUpToLineIcon className="size-4" />
+                <span>{t("setting.tags.pin-tag")}</span>
+                <Switch checked={newTagPinned} onCheckedChange={setNewTagPinned} />
+              </label>
             </div>
           </div>
         </SettingPanel>
@@ -230,7 +246,7 @@ const TagsSection = () => {
           ) : (
             <>
               {configuredEntries.map((row) => (
-                <div key={row.name} className="grid gap-3 px-3 py-3 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto] lg:items-center">
+                <div key={row.name} className="grid gap-3 px-3 py-3 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto_auto] lg:items-center">
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <TagIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -265,6 +281,12 @@ const TagsSection = () => {
                     <EyeOffIcon className="size-4" />
                     {t("setting.tags.blur-content")}
                     <Switch checked={localTags[row.name].blur} onCheckedChange={(checked) => handleBlurChange(row.name, checked)} />
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <ArrowUpToLineIcon className="size-4" />
+                    {t("setting.tags.pin-tag")}
+                    <Switch checked={localTags[row.name].pinned} onCheckedChange={(checked) => handlePinnedChange(row.name, checked)} />
                   </label>
 
                   <Button variant="ghost" size="sm" onClick={() => handleRemoveTag(row.name)} aria-label={t("common.delete")}>

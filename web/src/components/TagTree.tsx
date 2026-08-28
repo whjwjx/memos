@@ -1,4 +1,4 @@
-import { ChevronRightIcon, HashIcon } from "lucide-react";
+import { ArrowUpToLineIcon, ChevronRightIcon, HashIcon } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import {
   SIDEBAR_ROW_BOX_CLASSES,
@@ -27,6 +27,8 @@ interface Props {
   /** Identifies whose tags these are, so expansion persists per tenant rather than per browser. */
   scope: string;
   onTagClick: (tag: string) => void;
+  onTogglePin?: (tag: string) => void;
+  pinningTag?: string;
 }
 
 /** Persisted per scope: which branches are open, and the selection already revealed. */
@@ -94,9 +96,11 @@ interface TagItemProps {
   expanded: ReadonlySet<string>;
   onTagClick: (tag: string) => void;
   onToggle: (path: string) => void;
+  onTogglePin?: (tag: string) => void;
+  pinningTag?: string;
 }
 
-const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle }: TagItemProps) => {
+const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle, onTogglePin, pinningTag }: TagItemProps) => {
   const t = useTranslate();
   const isTag = tag.amount !== undefined;
   const isActive = activeTag === tag.text;
@@ -152,6 +156,21 @@ const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle }: TagI
             <Chevron open={open} />
           </button>
         )}
+        {isTag && onTogglePin && (
+          <button
+            type="button"
+            aria-label={`${t("common.pin")} #${tag.text}`}
+            title={`${t("common.pin")} #${tag.text}`}
+            disabled={pinningTag === tag.text}
+            className={cn(
+              "-mr-1 flex size-6 shrink-0 scale-95 items-center justify-center rounded text-muted-foreground transition-[background-color,color,opacity,scale] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-40 md:opacity-0 md:group-hover:scale-100 md:group-hover:opacity-100 md:focus-visible:scale-100 md:focus-visible:opacity-100",
+              SIDEBAR_ROW_FOCUS_CLASSES,
+            )}
+            onClick={() => onTogglePin(tag.text)}
+          >
+            <ArrowUpToLineIcon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
+          </button>
+        )}
         {isTag && hasSubTags && (
           // A tag row's label filters, so its disclosure needs a control of its own.
           <button
@@ -180,6 +199,8 @@ const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle }: TagI
               expanded={expanded}
               onTagClick={onTagClick}
               onToggle={onToggle}
+              onTogglePin={onTogglePin}
+              pinningTag={pinningTag}
             />
           ))}
         </div>
@@ -188,7 +209,7 @@ const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle }: TagI
   );
 };
 
-const TagTree = ({ tagAmounts, activeTag, scope, onTagClick }: Props) => {
+const TagTree = ({ tagAmounts, activeTag, scope, onTagClick, onTogglePin, pinningTag }: Props) => {
   const t = useTranslate();
   const tags = useMemo(() => buildTagTree(tagAmounts), [tagAmounts]);
   // Scoped per tenant: the paths are one account's tag names, so another user's profile tree
@@ -230,6 +251,8 @@ const TagTree = ({ tagAmounts, activeTag, scope, onTagClick }: Props) => {
           expanded={expanded}
           onTagClick={onTagClick}
           onToggle={handleToggle}
+          onTogglePin={onTogglePin}
+          pinningTag={pinningTag}
         />
       ))}
     </div>

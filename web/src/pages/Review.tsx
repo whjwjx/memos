@@ -1,6 +1,6 @@
 import { useDirection } from "@base-ui/react/direction-provider";
 import { ChevronLeftIcon, ChevronRightIcon, LoaderCircleIcon, RefreshCwIcon, Settings2Icon, TagsIcon } from "lucide-react";
-import { type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { MentionResolutionProvider } from "@/components/MemoContent/MentionResolutionContext";
 import MemoView from "@/components/MemoView";
 import { Button } from "@/components/ui/button";
@@ -52,10 +52,16 @@ const REVIEW_COOLDOWN_DAYS = 7;
 const REVIEW_SWIPE_DISTANCE_PX = 48;
 const REVIEW_SWIPE_MAX_VERTICAL_PX = 72;
 const REVIEW_SWIPE_AXIS_RATIO = 1.2;
+const REVIEW_SWIPE_DRAG_LIMIT_PX = 110;
+const REVIEW_CARD_EXIT_DISTANCE_PX = 88;
+const REVIEW_CARD_ENTER_DISTANCE_PX = 44;
+const REVIEW_CARD_EXIT_MS = 150;
 const DEFAULT_SETTINGS: ReviewSettings = { tagMode: "all", tagName: "", timeRange: "all", count: 8 };
 const TAG_MODES: ReviewTagMode[] = ["all", "include", "exclude", "untagged"];
 const TIME_RANGES: ReviewTimeRange[] = ["all", "12m", "6m", "3m", "1m"];
 const REVIEW_COUNTS: ReviewCount[] = [4, 8, 12, 16, 20, 24];
+type ReviewMotionPhase = "idle" | "leaving" | "entering";
+type ReviewMotionDirection = -1 | 0 | 1;
 
 const isReviewTagMode = (value: unknown): value is ReviewTagMode => typeof value === "string" && TAG_MODES.includes(value as ReviewTagMode);
 const isReviewTimeRange = (value: unknown): value is ReviewTimeRange =>
@@ -341,6 +347,13 @@ const Review = () => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [reviewMotion, setReviewMotion] = useState<{ phase: ReviewMotionPhase; direction: ReviewMotionDirection }>({
+    phase: "idle",
+    direction: 0,
+  });
   const { data: tagCounts = {} } = useTagCounts(true);
   const tagOptions = useMemo(() => Object.keys(tagCounts).sort((left, right) => left.localeCompare(right)), [tagCounts]);
   const selectedTagName = tagOptions.includes(settings.tagName) ? settings.tagName : "";
@@ -393,12 +406,53 @@ const Review = () => {
     }
   }, [reviewMemos, setStoredHistory, todayKey]);
 
+  useEffect(() => {
+    return () => {
+      if (animationTimerRef.current) {
+        clearTimeout(animationTimerRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  const startCardTransition = (nextIndex: number, visualDirection: Exclude<ReviewMotionDirection, 0>) => {
+    if (nextIndex === activeIndex || reviewMotion.phase !== "idle") {
+      setDragOffset(0);
+      return;
+    }
+
+    if (animationTimerRef.current) {
+      clearTimeout(animationTimerRef.current);
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    setDragOffset(0);
+    setReviewMotion({ phase: "leaving", direction: visualDirection });
+    animationTimerRef.current = setTimeout(() => {
+      setActiveIndex(nextIndex);
+      setReviewMotion({ phase: "entering", direction: visualDirection });
+      animationFrameRef.current = requestAnimationFrame(() => {
+        animationFrameRef.current = requestAnimationFrame(() => {
+          setReviewMotion({ phase: "idle", direction: 0 });
+          animationFrameRef.current = null;
+        });
+      });
+    }, REVIEW_CARD_EXIT_MS);
+  };
+
   const goToPrevious = () => {
-    setActiveIndex((current) => Math.max(current - 1, 0));
+    const nextIndex = Math.max(activeIndex - 1, 0);
+    startCardTransition(nextIndex, direction === "rtl" ? -1 : 1);
   };
 
   const goToNext = () => {
-    setActiveIndex((current) => Math.min(current + 1, reviewMemos.length - 1));
+    const nextIndex = Math.min(activeIndex + 1, reviewMemos.length - 1);
+    startCardTransition(nextIndex, direction === "rtl" ? 1 : -1);
   };
 
   const updateSettings = (patch: Partial<ReviewSettings>) => {
@@ -441,17 +495,40 @@ const Review = () => {
     }
 
     swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+    setDragOffset(0);
+  };
+
+  const handleTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    const start = swipeStartRef.current;
+    const touch = event.touches[0];
+    if (!start || !touch || reviewMotion.phase !== "idle") {
+      return;
+    }
+
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    if (absX < 4 || absX / Math.max(absY, 1) < 0.8) {
+      setDragOffset(0);
+      return;
+    }
+
+    const limitedOffset = Math.sign(deltaX) * Math.min(absX, REVIEW_SWIPE_DRAG_LIMIT_PX);
+    setDragOffset(limitedOffset);
   };
 
   const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
     const start = swipeStartRef.current;
     swipeStartRef.current = null;
     if (!start || reviewMemos.length <= 1) {
+      setDragOffset(0);
       return;
     }
 
     const touch = event.changedTouches[0];
     if (!touch) {
+      setDragOffset(0);
       return;
     }
 
@@ -463,12 +540,32 @@ const Review = () => {
       absX >= REVIEW_SWIPE_DISTANCE_PX && absY <= REVIEW_SWIPE_MAX_VERTICAL_PX && absX / Math.max(absY, 1) >= REVIEW_SWIPE_AXIS_RATIO;
 
     if (!isHorizontalSwipe) {
+      setDragOffset(0);
       return;
     }
 
     const forward = direction === "rtl" ? deltaX > 0 : deltaX < 0;
     forward ? goToNext() : goToPrevious();
   };
+
+  const isDragging = reviewMotion.phase === "idle" && dragOffset !== 0;
+  const reviewCardStyle: CSSProperties =
+    reviewMotion.phase === "leaving"
+      ? {
+          opacity: 0,
+          transform: `translateX(${reviewMotion.direction * REVIEW_CARD_EXIT_DISTANCE_PX}px) scale(0.98)`,
+        }
+      : reviewMotion.phase === "entering"
+        ? {
+            opacity: 0.35,
+            transform: `translateX(${-reviewMotion.direction * REVIEW_CARD_ENTER_DISTANCE_PX}px) scale(0.985)`,
+          }
+        : isDragging
+          ? {
+              opacity: 1 - Math.min(Math.abs(dragOffset) / 420, 0.18),
+              transform: `translateX(${dragOffset}px) rotate(${dragOffset / 38}deg)`,
+            }
+          : {};
 
   return (
     <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-3xl flex-col pb-8">
@@ -490,19 +587,29 @@ const Review = () => {
               className="relative w-full max-w-xl touch-pan-y select-none overscroll-x-contain"
               data-review-swipe-area="true"
               onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               onTouchCancel={() => {
                 swipeStartRef.current = null;
+                setDragOffset(0);
               }}
             >
               <div className="absolute inset-x-5 top-3 h-full rounded-xl border border-border/60 bg-background/65" />
               <div className="absolute inset-x-10 top-6 h-full rounded-xl border border-border/50 bg-background/45" />
-              <MemoView
-                memo={activeMemo}
-                parentPage="/review"
-                showPinned
-                className="relative z-10 mb-0 min-h-[min(32rem,calc(100vh-14rem))] rounded-xl bg-card px-5 py-4 shadow-lg sm:px-6 sm:py-5"
-              />
+              <div
+                className={cn(
+                  "relative z-10 transition-[opacity,transform] duration-200 ease-out will-change-transform motion-reduce:transition-none",
+                  isDragging && "transition-none",
+                )}
+                style={reviewCardStyle}
+              >
+                <MemoView
+                  memo={activeMemo}
+                  parentPage="/review"
+                  showPinned
+                  className="mb-0 min-h-[min(32rem,calc(100vh-14rem))] rounded-xl bg-card px-5 py-4 shadow-lg sm:px-6 sm:py-5"
+                />
+              </div>
             </div>
           </MentionResolutionProvider>
         ) : (

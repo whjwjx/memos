@@ -3110,7 +3110,9 @@ type UserSetting_TagMetadata struct {
 	// When unset, the default tag color is used.
 	BackgroundColor *color.Color `protobuf:"bytes,1,opt,name=background_color,json=backgroundColor,proto3" json:"background_color,omitempty"`
 	// Whether memos with this tag should have their content blurred.
-	BlurContent   bool `protobuf:"varint,2,opt,name=blur_content,json=blurContent,proto3" json:"blur_content,omitempty"`
+	BlurContent bool `protobuf:"varint,2,opt,name=blur_content,json=blurContent,proto3" json:"blur_content,omitempty"`
+	// Whether this exact tag should be shown in the pinned tags section.
+	Pinned        bool `protobuf:"varint,3,opt,name=pinned,proto3" json:"pinned,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3155,6 +3157,13 @@ func (x *UserSetting_TagMetadata) GetBackgroundColor() *color.Color {
 func (x *UserSetting_TagMetadata) GetBlurContent() bool {
 	if x != nil {
 		return x.BlurContent
+	}
+	return false
+}
+
+func (x *UserSetting_TagMetadata) GetPinned() bool {
+	if x != nil {
+		return x.Pinned
 	}
 	return false
 }
@@ -3487,7 +3496,7 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x13.memos.api.v1.StateB\x03\xe0A\x01R\x05state\x12\x1b\n" +
 	"\x06filter\x18\x02 \x01(\tB\x03\xe0A\x01R\x06filter\"I\n" +
 	"\x18ListAllUserStatsResponse\x12-\n" +
-	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\xcc\t\n" +
+	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\xea\t\n" +
 	"\vUserSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12S\n" +
 	"\x0fgeneral_setting\x18\x02 \x01(\v2(.memos.api.v1.UserSetting.GeneralSettingH\x00R\x0egeneralSetting\x12V\n" +
@@ -3501,10 +3510,11 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x12calendar_day_start\x18\x06 \x01(\x05B\x03\xe0A\x01R\x10calendarDayStart\x12-\n" +
 	"\x10calendar_day_end\x18\a \x01(\x05B\x03\xe0A\x01R\x0ecalendarDayEnd\x125\n" +
 	"\x14show_comment_preview\x18\b \x01(\bB\x03\xe0A\x01R\x12showCommentPreview\x12@\n" +
-	"\x1acomment_indicator_on_hover\x18\t \x01(\bB\x03\xe0A\x01R\x17commentIndicatorOnHover\x1ay\n" +
+	"\x1acomment_indicator_on_hover\x18\t \x01(\bB\x03\xe0A\x01R\x17commentIndicatorOnHover\x1a\x96\x01\n" +
 	"\vTagMetadata\x12B\n" +
 	"\x10background_color\x18\x01 \x01(\v2\x12.google.type.ColorB\x03\xe0A\x01R\x0fbackgroundColor\x12&\n" +
-	"\fblur_content\x18\x02 \x01(\bB\x03\xe0A\x01R\vblurContent\x1a\xb7\x01\n" +
+	"\fblur_content\x18\x02 \x01(\bB\x03\xe0A\x01R\vblurContent\x12\x1b\n" +
+	"\x06pinned\x18\x03 \x01(\bB\x03\xe0A\x01R\x06pinned\x1a\xb7\x01\n" +
 	"\vTagsSetting\x12H\n" +
 	"\x04tags\x18\x01 \x03(\v2/.memos.api.v1.UserSetting.TagsSetting.TagsEntryB\x03\xe0A\x01R\x04tags\x1a^\n" +
 	"\tTagsEntry\x12\x10\n" +

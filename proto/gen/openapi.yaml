@@ -908,18 +908,26 @@ paths:
             parameters:
                 - name: pageSize
                   in: query
-                  description: "Optional. The maximum number of memos to return.\r\n The service may return fewer than this value.\r\n If unspecified, at most 50 memos will be returned.\r\n The maximum value is 1000; values above 1000 will be coerced to 1000."
+                  description: |-
+                    Optional. The maximum number of memos to return.
+                     The service may return fewer than this value.
+                     If unspecified, at most 50 memos will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
                     format: int32
                 - name: pageToken
                   in: query
-                  description: "Optional. A page token, received from a previous `ListMemos` call.\r\n Provide this to retrieve the subsequent page."
+                  description: |-
+                    Optional. A page token, received from a previous `ListMemos` call.
+                     Provide this to retrieve the subsequent page.
                   schema:
                     type: string
                 - name: state
                   in: query
-                  description: "Optional. The state of the memos to list.\r\n Default to `NORMAL`. Set to `ARCHIVED` to list archived memos."
+                  description: |-
+                    Optional. The state of the memos to list.
+                     Default to `NORMAL`. Set to `ARCHIVED` to list archived memos.
                   schema:
                     enum:
                         - STATE_UNSPECIFIED
@@ -929,12 +937,36 @@ paths:
                     format: enum
                 - name: orderBy
                   in: query
-                  description: "Optional. The order to sort results by.\r\n Default to \"create_time desc\".\r\n Supports comma-separated list of fields following AIP-132.\r\n Example: \"pinned desc, create_time desc\" or \"update_time asc\"\r\n Supported fields: pinned, create_time, update_time, name.\r\n Note: order_by uses create_time / update_time, while the filter\r\n expression uses created_ts / updated_ts for the same timestamps."
+                  description: |-
+                    Optional. The order to sort results by.
+                     Default to "create_time desc".
+                     Supports comma-separated list of fields following AIP-132.
+                     Example: "pinned desc, create_time desc" or "update_time asc"
+                     Supported fields: pinned, create_time, update_time, name.
+                     Note: order_by uses create_time / update_time, while the filter
+                     expression uses created_ts / updated_ts for the same timestamps.
                   schema:
                     type: string
                 - name: filter
                   in: query
-                  description: "Optional. A CEL expression to filter memos. Combine terms with && and ||.\r\n Available fields:\r\n   content (string), creator (string, e.g. \"users/1\"),\r\n   created_ts / updated_ts / scheduled_ts (timestamp), pinned (bool),\r\n   visibility (string: PRIVATE | PROTECTED | PUBLIC),\r\n   tags (list<string>; match with `\"work\" in tags`, not `tag == \"work\"`),\r\n   has_task_list / has_link / has_code / has_incomplete_tasks (bool),\r\n   has_location (bool; true when the memo has a location attached).\r\n   scheduled_ts supports null comparison, e.g. `scheduled_ts != null` to\r\n   match memos that have a scheduled time.\r\n Note: the time fields here are created_ts / updated_ts / scheduled_ts,\r\n which differ from the create_time / update_time / scheduled_time names\r\n used by order_by.\r\n Examples:\r\n   pinned == true && visibility == \"PUBLIC\"\r\n   tags.exists(t, t == \"urgent\")\r\n   content.contains(\"roadmap\") && created_ts > now - duration(\"168h\")"
+                  description: |-
+                    Optional. A CEL expression to filter memos. Combine terms with && and ||.
+                     Available fields:
+                       content (string), creator (string, e.g. "users/1"),
+                       created_ts / updated_ts / scheduled_ts (timestamp), pinned (bool),
+                       visibility (string: PRIVATE | PROTECTED | PUBLIC),
+                       tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
+                       has_task_list / has_link / has_code / has_incomplete_tasks (bool),
+                       has_location (bool; true when the memo has a location attached).
+                       scheduled_ts supports null comparison, e.g. `scheduled_ts != null` to
+                       match memos that have a scheduled time.
+                     Note: the time fields here are created_ts / updated_ts / scheduled_ts,
+                     which differ from the create_time / update_time / scheduled_time names
+                     used by order_by.
+                     Examples:
+                       pinned == true && visibility == "PUBLIC"
+                       tags.exists(t, t == "urgent")
+                       content.contains("roadmap") && created_ts > now - duration("168h")
                   schema:
                     type: string
                 - name: showDeleted
@@ -958,12 +990,18 @@ paths:
         post:
             tags:
                 - MemoService
-            description: "CreateMemo creates a memo. The request body is a Memo; set its content\r\n (Markdown) and visibility (PRIVATE | PROTECTED | PUBLIC, default PRIVATE).\r\n The memo is owned by the authenticated user; requires authentication."
+            description: |-
+                CreateMemo creates a memo. The request body is a Memo; set its content
+                 (Markdown) and visibility (PRIVATE | PROTECTED | PUBLIC, default PRIVATE).
+                 The memo is owned by the authenticated user; requires authentication.
             operationId: MemoService_CreateMemo
             parameters:
                 - name: memoId
                   in: query
-                  description: "Optional. The memo ID to use for this memo.\r\n If empty, a unique ID will be generated.\r\n Format: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,34}[a-zA-Z0-9])?$"
+                  description: |-
+                    Optional. The memo ID to use for this memo.
+                     If empty, a unique ID will be generated.
+                     Format: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,34}[a-zA-Z0-9])?$
                   schema:
                     type: string
             requestBody:
@@ -1197,7 +1235,10 @@ paths:
         patch:
             tags:
                 - MemoService
-            description: "SetMemoAttachments replaces the full set of attachments on a memo with the\r\n provided list (not an append). Pass the complete desired set; an empty list\r\n clears all attachments. Idempotent."
+            description: |-
+                SetMemoAttachments replaces the full set of attachments on a memo with the
+                 provided list (not an append). Pass the complete desired set; an empty list
+                 clears all attachments. Idempotent.
             operationId: MemoService_SetMemoAttachments
             parameters:
                 - name: memo
@@ -1437,7 +1478,10 @@ paths:
         patch:
             tags:
                 - MemoService
-            description: "SetMemoRelations replaces the full set of relations on a memo with the\r\n provided list (not an append). Pass the complete desired set; an empty list\r\n clears all relations. Idempotent."
+            description: |-
+                SetMemoRelations replaces the full set of relations on a memo with the
+                 provided list (not an append). Pass the complete desired set; an empty list
+                 clears all relations. Idempotent.
             operationId: MemoService_SetMemoRelations
             parameters:
                 - name: memo
@@ -1622,7 +1666,11 @@ paths:
         post:
             tags:
                 - MemoService
-            description: "AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by\r\n every enabled tagger configured instance-wide. Requires authentication as\r\n the memo creator, or admin privileges. No-op (rejected) when no tagger is\r\n enabled, or when the memo is readonly/archived."
+            description: |-
+                AutoTagMemo enqueues AI auto-tagging tasks for a memo. The memo is tagged by
+                 every enabled tagger configured instance-wide. Requires authentication as
+                 the memo creator, or admin privileges. No-op (rejected) when no tagger is
+                 enabled, or when the memo is readonly/archived.
             operationId: MemoService_AutoTagMemo
             parameters:
                 - name: memo
@@ -1654,7 +1702,9 @@ paths:
         get:
             tags:
                 - MemoService
-            description: "GetSharedMemo resolves a share token to its memo. No authentication required.\r\n Returns NOT_FOUND if the token is invalid or expired."
+            description: |-
+                GetSharedMemo resolves a share token to its memo. No authentication required.
+                 Returns NOT_FOUND if the token is invalid or expired.
             operationId: MemoService_GetSharedMemo
             parameters:
                 - name: shareToken
@@ -2758,7 +2808,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "Required. The resource name of the memo to auto-tag.\r\n Format: memos/{memo}"
+                    description: |-
+                        Required. The resource name of the memo to auto-tag.
+                         Format: memos/{memo}
         AutoTagMemoResponse:
             type: object
             properties: {}
@@ -3831,7 +3883,9 @@ components:
                     description: The list of memos.
                 nextPageToken:
                     type: string
-                    description: "A token that can be sent as `page_token` to retrieve the next page.\r\n If this field is omitted, there are no subsequent pages."
+                    description: |-
+                        A token that can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
         ListPersonalAccessTokensResponse:
             type: object
             properties:
@@ -3965,7 +4019,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The resource name of the memo.\r\n Format: memos/{memo}, where memo is the user-defined UID."
+                    description: |-
+                        The resource name of the memo.
+                         Format: memos/{memo}, where memo is the user-defined UID.
                 state:
                     enum:
                         - STATE_UNSPECIFIED
@@ -3977,14 +4033,20 @@ components:
                 creator:
                     readOnly: true
                     type: string
-                    description: "The name of the creator.\r\n Format: users/{user}"
+                    description: |-
+                        The name of the creator.
+                         Format: users/{user}
                 createTime:
                     type: string
-                    description: "The creation timestamp.\r\n If not set on creation, the server will set it to the current time."
+                    description: |-
+                        The creation timestamp.
+                         If not set on creation, the server will set it to the current time.
                     format: date-time
                 updateTime:
                     type: string
-                    description: "The last update timestamp.\r\n If not set on creation, the server will set it to the current time."
+                    description: |-
+                        The last update timestamp.
+                         If not set on creation, the server will set it to the current time.
                     format: date-time
                 content:
                     type: string
@@ -3996,7 +4058,10 @@ components:
                         - PROTECTED
                         - PUBLIC
                     type: string
-                    description: "The visibility of the memo.\r\n One of PRIVATE (creator only), PROTECTED (signed-in users), or\r\n PUBLIC (anyone). Defaults to PRIVATE on creation when unspecified."
+                    description: |-
+                        The visibility of the memo.
+                         One of PRIVATE (creator only), PROTECTED (signed-in users), or
+                         PUBLIC (anyone). Defaults to PRIVATE on creation when unspecified.
                     format: enum
                 tags:
                     readOnly: true
@@ -4031,7 +4096,9 @@ components:
                 parent:
                     readOnly: true
                     type: string
-                    description: "Output only. The name of the parent memo.\r\n Format: memos/{memo}"
+                    description: |-
+                        Output only. The name of the parent memo.
+                         Format: memos/{memo}
                 snippet:
                     readOnly: true
                     type: string
@@ -4042,7 +4109,10 @@ components:
                     description: Optional. The location of the memo.
                 scheduledTime:
                     type: string
-                    description: "Optional. The scheduled time of the memo. When set, the memo appears on\r\n the calendar at this time. A memo with a scheduled time is treated as a\r\n schedule (todo) item."
+                    description: |-
+                        Optional. The scheduled time of the memo. When set, the memo appears on
+                         the calendar at this time. A memo with a scheduled time is treated as a
+                         schedule (todo) item.
                     format: date-time
                 scheduledDuration:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
@@ -4085,7 +4155,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The resource name of the memo.\r\n Format: memos/{memo}"
+                    description: |-
+                        The resource name of the memo.
+                         Format: memos/{memo}
                 snippet:
                     readOnly: true
                     type: string
@@ -4213,7 +4285,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The resource name of the share. Format: memos/{memo}/shares/{share}\r\n The {share} segment is the opaque token used in the share URL."
+                    description: |-
+                        The resource name of the share. Format: memos/{memo}/shares/{share}
+                         The {share} segment is the opaque token used in the share URL.
                 createTime:
                     readOnly: true
                     type: string
@@ -4221,7 +4295,9 @@ components:
                     format: date-time
                 expireTime:
                     type: string
-                    description: "Optional. When set, the share link stops working after this time.\r\n If unset, the link never expires."
+                    description: |-
+                        Optional. When set, the share link stops working after this time.
+                         If unset, the link never expires.
                     format: date-time
             description: MemoShare is an access grant that permits read-only access to a memo via an opaque bearer token.
         MemoView:
@@ -4383,11 +4459,15 @@ components:
                 name:
                     readOnly: true
                     type: string
-                    description: "The resource name of the reaction.\r\n Format: memos/{memo}/reactions/{reaction}"
+                    description: |-
+                        The resource name of the reaction.
+                         Format: memos/{memo}/reactions/{reaction}
                 creator:
                     readOnly: true
                     type: string
-                    description: "The resource name of the creator.\r\n Format: users/{user}"
+                    description: |-
+                        The resource name of the creator.
+                         Format: users/{user}
                 reactionType:
                     type: string
                     description: "Required. The type of reaction (e.g., \"\U0001F44D\", \"❤️\", \"\U0001F604\")."
@@ -4474,7 +4554,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "Required. The resource name of the memo.\r\n Format: memos/{memo}"
+                    description: |-
+                        Required. The resource name of the memo.
+                         Format: memos/{memo}
                 attachments:
                     type: array
                     items:
@@ -4488,7 +4570,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "Required. The resource name of the memo.\r\n Format: memos/{memo}"
+                    description: |-
+                        Required. The resource name of the memo.
+                         Format: memos/{memo}
                 relations:
                     type: array
                     items:
@@ -4786,7 +4870,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "Required. The resource name of the memo.\r\n Format: memos/{memo}"
+                    description: |-
+                        Required. The resource name of the memo.
+                         Format: memos/{memo}
                 reaction:
                     allOf:
                         - $ref: '#/components/schemas/Reaction'
@@ -4995,10 +5081,15 @@ components:
                 backgroundColor:
                     allOf:
                         - $ref: '#/components/schemas/Color'
-                    description: "Optional background color for the tag label.\r\n When unset, the default tag color is used."
+                    description: |-
+                        Optional background color for the tag label.
+                         When unset, the default tag color is used.
                 blurContent:
                     type: boolean
                     description: Whether memos with this tag should have their content blurred.
+                pinned:
+                    type: boolean
+                    description: Whether this exact tag should be shown in the pinned tags section.
             description: Tag metadata for user-specific display rules.
         UserSetting_TagsSetting:
             type: object

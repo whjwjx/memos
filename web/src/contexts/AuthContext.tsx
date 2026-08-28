@@ -213,6 +213,10 @@ export function useAuth() {
   return context;
 }
 
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}
+
 // Convenience hook for just the current user
 export function useCurrentUserFromAuth() {
   const { currentUser } = useAuth();
