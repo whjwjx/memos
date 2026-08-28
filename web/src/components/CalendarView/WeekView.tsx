@@ -1,10 +1,12 @@
 import dayjs from "dayjs";
+import { CheckCircle2Icon, CircleIcon } from "lucide-react";
 import { type ReactNode, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTodayDate } from "@/components/ActivityCalendar/hooks";
 import useMediaQuery from "@/hooks/useMediaQuery";
 import i18n from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
+import { MemoScheduleOccurrence_Status } from "@/types/proto/api/v1/memo_service_pb";
 import { type ScheduledItem, type ScheduleTimeRange } from "@/utils/schedule";
 import { calcDragRange, type DragMode, MIN_DURATION_MIN } from "./drag-utils";
 
@@ -27,6 +29,7 @@ interface WeekViewProps {
   onUpdateSchedule: (memoName: string, patch: { scheduledTime: Date; scheduledDuration?: number }) => void;
   onDropTodo: (memoName: string, targetTime: Date) => void;
   onOpenMemoEditor: (memo: Memo) => void;
+  onToggleOccurrence: (item: ScheduledItem) => void;
   /** 活跃日区间的开始分钟数（0-1440），默认 0。周视图只渲染该区间，区间外的时间隐藏。 */
   dayStartMin?: number;
   /** 活跃日区间的结束分钟数（0-1440），默认 1440。 */
@@ -49,6 +52,7 @@ export const WeekView = ({
   onUpdateSchedule,
   onDropTodo,
   onOpenMemoEditor,
+  onToggleOccurrence,
   dayStartMin = 0,
   dayEndMin = 1440,
 }: WeekViewProps) => {
@@ -312,29 +316,64 @@ export const WeekView = ({
                   if (!layout) {
                     return null;
                   }
+                  const isDone = item.status === MemoScheduleOccurrence_Status.DONE;
+                  const isRecurring = item.recurring ?? false;
+                  const blockKey = `${item.memo.name}-${item.occurrenceTime?.toISOString() ?? range.start.toISOString()}`;
                   return (
                     <div
-                      key={item.memo.name}
+                      key={blockKey}
                       role="button"
                       tabIndex={0}
                       className={cn(
-                        "group absolute inset-x-0.5 cursor-grab overflow-hidden rounded-md border border-primary/20 bg-primary/10 px-1.5 py-1 text-left hover:bg-primary/15 active:cursor-grabbing",
+                        "group absolute inset-x-0.5 overflow-hidden rounded-md border border-primary/20 bg-primary/10 px-1.5 py-1 text-left hover:bg-primary/15",
+                        isRecurring ? "cursor-default" : "cursor-grab active:cursor-grabbing",
+                        isDone && "border-muted bg-muted/40 text-muted-foreground",
                         isDragging && "opacity-40",
                       )}
                       style={{ top: layout.top, height: layout.height }}
-                      onPointerDown={isDesktop ? (event) => beginDrag(event, item.memo.name, "move") : undefined}
+                      onPointerDown={isDesktop && !isRecurring ? (event) => beginDrag(event, item.memo.name, "move") : undefined}
                       onDoubleClick={() => onOpenMemoEditor(item.memo)}
                     >
-                      <div className="truncate text-[10px] font-medium text-primary">{formatBlockTime(range)}</div>
-                      <div className="truncate text-[10px] text-muted-foreground">{stripMarkdown(item.memo.content)}</div>
-                      <div
-                        className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize max-md:hidden"
-                        onPointerDown={(event) => beginDrag(event, item.memo.name, "resizeStart")}
-                      />
-                      <div
-                        className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize max-md:hidden"
-                        onPointerDown={(event) => beginDrag(event, item.memo.name, "resizeEnd")}
-                      />
+                      <div className="flex min-w-0 items-start gap-1">
+                        <button
+                          type="button"
+                          aria-label={isDone ? "Mark pending" : "Mark done"}
+                          aria-pressed={isDone}
+                          className={cn(
+                            "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full text-primary transition-colors",
+                            isDone ? "text-primary" : "text-muted-foreground hover:text-primary",
+                          )}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleOccurrence(item);
+                          }}
+                          onPointerDown={(event) => event.stopPropagation()}
+                        >
+                          {isDone ? <CheckCircle2Icon className="size-4" /> : <CircleIcon className="size-4" />}
+                        </button>
+                        <div className="min-w-0">
+                          <div
+                            className={cn("truncate text-[10px] font-medium text-primary", isDone && "text-muted-foreground line-through")}
+                          >
+                            {formatBlockTime(range)}
+                          </div>
+                          <div className={cn("truncate text-[10px] text-muted-foreground", isDone && "line-through")}>
+                            {stripMarkdown(item.memo.content)}
+                          </div>
+                        </div>
+                      </div>
+                      {!isRecurring && (
+                        <>
+                          <div
+                            className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize max-md:hidden"
+                            onPointerDown={(event) => beginDrag(event, item.memo.name, "resizeStart")}
+                          />
+                          <div
+                            className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize max-md:hidden"
+                            onPointerDown={(event) => beginDrag(event, item.memo.name, "resizeEnd")}
+                          />
+                        </>
+                      )}
                     </div>
                   );
                 })}

@@ -517,6 +517,10 @@ func TestMemoScheduledFields(t *testing.T) {
 	require.Len(t, memoList, 1)
 	require.NotNil(t, memoList[0].ScheduledTime)
 	require.Equal(t, scheduledTime, *memoList[0].ScheduledTime)
+	hasScheduledTime := true
+	memoList, err = ts.ListMemos(ctx, &store.FindMemo{CreatorID: &user.ID, HasScheduledTime: &hasScheduledTime})
+	require.NoError(t, err)
+	require.Len(t, memoList, 1)
 
 	// Update the schedule.
 	newTime := int64(1755986400)
@@ -545,6 +549,100 @@ func TestMemoScheduledFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, got.ScheduledTime)
 	require.Nil(t, got.ScheduledDuration)
+	memoList, err = ts.ListMemos(ctx, &store.FindMemo{CreatorID: &user.ID, HasScheduledTime: &hasScheduledTime})
+	require.NoError(t, err)
+	require.Empty(t, memoList)
 
 	ts.Close()
+}
+
+func TestMemoScheduleRecurrenceAndOccurrences(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ts := NewTestingStore(ctx, t)
+	user, err := createTestingHostUser(ctx, ts)
+	require.NoError(t, err)
+
+	scheduledTime := int64(1798425600) // 2026-12-28 08:00:00 UTC
+	scheduledDuration := int64(1800)
+	recurrence := &store.MemoScheduleRecurrence{
+		Frequency:  store.MemoScheduleRecurrenceWeekly,
+		DaysOfWeek: []int32{1, 2, 3, 4, 5},
+		Interval:   1,
+		Timezone:   "Asia/Shanghai",
+	}
+
+	memo, err := ts.CreateMemo(ctx, &store.Memo{
+		UID:                 "recurring-scheduled-memo",
+		CreatorID:           user.ID,
+		Content:             "recurring content",
+		Visibility:          store.Public,
+		ScheduledTime:       &scheduledTime,
+		ScheduledDuration:   &scheduledDuration,
+		ScheduledRecurrence: recurrence,
+	})
+	require.NoError(t, err)
+	require.Equal(t, recurrence, memo.ScheduledRecurrence)
+
+	got, err := ts.GetMemo(ctx, &store.FindMemo{ID: &memo.ID})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, recurrence, got.ScheduledRecurrence)
+
+	list, err := ts.ListMemos(ctx, &store.FindMemo{CreatorID: &user.ID})
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	require.Equal(t, recurrence, list[0].ScheduledRecurrence)
+
+	doneTime := scheduledTime
+	completedTs := scheduledTime + 120
+	occurrence, err := ts.UpsertMemoScheduleOccurrence(ctx, &store.MemoScheduleOccurrence{
+		MemoID:         memo.ID,
+		OccurrenceTime: doneTime,
+		Status:         store.MemoScheduleOccurrenceDone,
+		CompletedTs:    completedTs,
+	})
+	require.NoError(t, err)
+	require.Equal(t, memo.ID, occurrence.MemoID)
+	require.Equal(t, doneTime, occurrence.OccurrenceTime)
+	require.Equal(t, store.MemoScheduleOccurrenceDone, occurrence.Status)
+	require.Equal(t, completedTs, occurrence.CompletedTs)
+
+	statusList := []store.MemoScheduleOccurrenceStatus{store.MemoScheduleOccurrenceDone}
+	rows, err := ts.ListMemoScheduleOccurrences(ctx, &store.FindMemoScheduleOccurrence{
+		MemoID:     &memo.ID,
+		TimeAfter:  &scheduledTime,
+		TimeBefore: ptrInt64(scheduledTime + 1),
+		StatusList: statusList,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, completedTs, rows[0].CompletedTs)
+
+	err = ts.DeleteMemoScheduleOccurrence(ctx, &store.DeleteMemoScheduleOccurrence{
+		MemoID:         &memo.ID,
+		OccurrenceTime: &doneTime,
+	})
+	require.NoError(t, err)
+	rows, err = ts.ListMemoScheduleOccurrences(ctx, &store.FindMemoScheduleOccurrence{MemoID: &memo.ID})
+	require.NoError(t, err)
+	require.Empty(t, rows)
+
+	_, err = ts.UpsertMemoScheduleOccurrence(ctx, &store.MemoScheduleOccurrence{
+		MemoID:         memo.ID,
+		OccurrenceTime: doneTime,
+		Status:         store.MemoScheduleOccurrenceDone,
+	})
+	require.NoError(t, err)
+	err = ts.DeleteMemo(ctx, &store.DeleteMemo{ID: memo.ID})
+	require.NoError(t, err)
+	rows, err = ts.ListMemoScheduleOccurrences(ctx, &store.FindMemoScheduleOccurrence{MemoID: &memo.ID})
+	require.NoError(t, err)
+	require.Empty(t, rows)
+
+	ts.Close()
+}
+
+func ptrInt64(value int64) *int64 {
+	return &value
 }

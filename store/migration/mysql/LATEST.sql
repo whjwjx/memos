@@ -41,7 +41,8 @@ CREATE TABLE `memo` (
   `pinned` BOOLEAN NOT NULL DEFAULT FALSE,
   `payload` JSON NOT NULL,
   `scheduled_time` BIGINT DEFAULT NULL,
-  `scheduled_duration` BIGINT DEFAULT NULL
+  `scheduled_duration` BIGINT DEFAULT NULL,
+  `scheduled_recurrence` JSON DEFAULT NULL
 );
 
 -- memo_relation
@@ -155,6 +156,22 @@ CREATE TABLE `memo_tag_task` (
 );
 
 CREATE INDEX `idx_memo_tag_task_status_due` ON `memo_tag_task`(`status`, `due_at`);
+
+-- memo_schedule_occurrence
+CREATE TABLE `memo_schedule_occurrence` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `memo_id` INT NOT NULL,
+  `occurrence_time` BIGINT NOT NULL,
+  `status` VARCHAR(32) NOT NULL,
+  `completed_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `updated_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  UNIQUE (`memo_id`, `occurrence_time`),
+  FOREIGN KEY (`memo_id`) REFERENCES `memo`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_memo_schedule_occurrence_status` CHECK (`status` IN ('DONE'))
+);
+
+CREATE INDEX `idx_memo_schedule_occurrence_memo_time` ON `memo_schedule_occurrence`(`memo_id`, `occurrence_time`);
 
 -- conversation stores an AI chat session owned by a single user.
 CREATE TABLE `conversation` (

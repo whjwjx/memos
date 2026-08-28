@@ -42,6 +42,15 @@ const (
 	MemoServiceGetMemoProcedure = "/memos.api.v1.MemoService/GetMemo"
 	// MemoServiceUpdateMemoProcedure is the fully-qualified name of the MemoService's UpdateMemo RPC.
 	MemoServiceUpdateMemoProcedure = "/memos.api.v1.MemoService/UpdateMemo"
+	// MemoServiceListMemoScheduleOccurrencesProcedure is the fully-qualified name of the MemoService's
+	// ListMemoScheduleOccurrences RPC.
+	MemoServiceListMemoScheduleOccurrencesProcedure = "/memos.api.v1.MemoService/ListMemoScheduleOccurrences"
+	// MemoServiceGetMemoScheduleStatsProcedure is the fully-qualified name of the MemoService's
+	// GetMemoScheduleStats RPC.
+	MemoServiceGetMemoScheduleStatsProcedure = "/memos.api.v1.MemoService/GetMemoScheduleStats"
+	// MemoServiceUpsertMemoScheduleOccurrenceProcedure is the fully-qualified name of the MemoService's
+	// UpsertMemoScheduleOccurrence RPC.
+	MemoServiceUpsertMemoScheduleOccurrenceProcedure = "/memos.api.v1.MemoService/UpsertMemoScheduleOccurrence"
 	// MemoServiceDeleteMemoProcedure is the fully-qualified name of the MemoService's DeleteMemo RPC.
 	MemoServiceDeleteMemoProcedure = "/memos.api.v1.MemoService/DeleteMemo"
 	// MemoServiceSetMemoAttachmentsProcedure is the fully-qualified name of the MemoService's
@@ -105,6 +114,12 @@ type MemoServiceClient interface {
 	GetMemo(context.Context, *connect.Request[v1.GetMemoRequest]) (*connect.Response[v1.Memo], error)
 	// UpdateMemo updates a memo.
 	UpdateMemo(context.Context, *connect.Request[v1.UpdateMemoRequest]) (*connect.Response[v1.Memo], error)
+	// ListMemoScheduleOccurrences lists scheduled memo occurrences in a time range.
+	ListMemoScheduleOccurrences(context.Context, *connect.Request[v1.ListMemoScheduleOccurrencesRequest]) (*connect.Response[v1.ListMemoScheduleOccurrencesResponse], error)
+	// GetMemoScheduleStats returns completion statistics for one scheduled memo.
+	GetMemoScheduleStats(context.Context, *connect.Request[v1.GetMemoScheduleStatsRequest]) (*connect.Response[v1.MemoScheduleStats], error)
+	// UpsertMemoScheduleOccurrence records or clears completion for one scheduled occurrence.
+	UpsertMemoScheduleOccurrence(context.Context, *connect.Request[v1.UpsertMemoScheduleOccurrenceRequest]) (*connect.Response[v1.MemoScheduleOccurrence], error)
 	// DeleteMemo deletes a memo.
 	DeleteMemo(context.Context, *connect.Request[v1.DeleteMemoRequest]) (*connect.Response[emptypb.Empty], error)
 	// SetMemoAttachments replaces the full set of attachments on a memo with the
@@ -182,6 +197,24 @@ func NewMemoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+MemoServiceUpdateMemoProcedure,
 			connect.WithSchema(memoServiceMethods.ByName("UpdateMemo")),
+			connect.WithClientOptions(opts...),
+		),
+		listMemoScheduleOccurrences: connect.NewClient[v1.ListMemoScheduleOccurrencesRequest, v1.ListMemoScheduleOccurrencesResponse](
+			httpClient,
+			baseURL+MemoServiceListMemoScheduleOccurrencesProcedure,
+			connect.WithSchema(memoServiceMethods.ByName("ListMemoScheduleOccurrences")),
+			connect.WithClientOptions(opts...),
+		),
+		getMemoScheduleStats: connect.NewClient[v1.GetMemoScheduleStatsRequest, v1.MemoScheduleStats](
+			httpClient,
+			baseURL+MemoServiceGetMemoScheduleStatsProcedure,
+			connect.WithSchema(memoServiceMethods.ByName("GetMemoScheduleStats")),
+			connect.WithClientOptions(opts...),
+		),
+		upsertMemoScheduleOccurrence: connect.NewClient[v1.UpsertMemoScheduleOccurrenceRequest, v1.MemoScheduleOccurrence](
+			httpClient,
+			baseURL+MemoServiceUpsertMemoScheduleOccurrenceProcedure,
+			connect.WithSchema(memoServiceMethods.ByName("UpsertMemoScheduleOccurrence")),
 			connect.WithClientOptions(opts...),
 		),
 		deleteMemo: connect.NewClient[v1.DeleteMemoRequest, emptypb.Empty](
@@ -291,27 +324,30 @@ func NewMemoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // memoServiceClient implements MemoServiceClient.
 type memoServiceClient struct {
-	createMemo           *connect.Client[v1.CreateMemoRequest, v1.Memo]
-	listMemos            *connect.Client[v1.ListMemosRequest, v1.ListMemosResponse]
-	getMemo              *connect.Client[v1.GetMemoRequest, v1.Memo]
-	updateMemo           *connect.Client[v1.UpdateMemoRequest, v1.Memo]
-	deleteMemo           *connect.Client[v1.DeleteMemoRequest, emptypb.Empty]
-	setMemoAttachments   *connect.Client[v1.SetMemoAttachmentsRequest, emptypb.Empty]
-	listMemoAttachments  *connect.Client[v1.ListMemoAttachmentsRequest, v1.ListMemoAttachmentsResponse]
-	setMemoRelations     *connect.Client[v1.SetMemoRelationsRequest, emptypb.Empty]
-	listMemoRelations    *connect.Client[v1.ListMemoRelationsRequest, v1.ListMemoRelationsResponse]
-	createMemoComment    *connect.Client[v1.CreateMemoCommentRequest, v1.Memo]
-	autoTagMemo          *connect.Client[v1.AutoTagMemoRequest, v1.AutoTagMemoResponse]
-	listMemoComments     *connect.Client[v1.ListMemoCommentsRequest, v1.ListMemoCommentsResponse]
-	listMemoReactions    *connect.Client[v1.ListMemoReactionsRequest, v1.ListMemoReactionsResponse]
-	upsertMemoReaction   *connect.Client[v1.UpsertMemoReactionRequest, v1.Reaction]
-	deleteMemoReaction   *connect.Client[v1.DeleteMemoReactionRequest, emptypb.Empty]
-	createMemoShare      *connect.Client[v1.CreateMemoShareRequest, v1.MemoShare]
-	listMemoShares       *connect.Client[v1.ListMemoSharesRequest, v1.ListMemoSharesResponse]
-	deleteMemoShare      *connect.Client[v1.DeleteMemoShareRequest, emptypb.Empty]
-	getSharedMemo        *connect.Client[v1.GetSharedMemoRequest, v1.Memo]
-	getLinkMetadata      *connect.Client[v1.GetLinkMetadataRequest, v1.LinkMetadata]
-	batchGetLinkMetadata *connect.Client[v1.BatchGetLinkMetadataRequest, v1.BatchGetLinkMetadataResponse]
+	createMemo                   *connect.Client[v1.CreateMemoRequest, v1.Memo]
+	listMemos                    *connect.Client[v1.ListMemosRequest, v1.ListMemosResponse]
+	getMemo                      *connect.Client[v1.GetMemoRequest, v1.Memo]
+	updateMemo                   *connect.Client[v1.UpdateMemoRequest, v1.Memo]
+	listMemoScheduleOccurrences  *connect.Client[v1.ListMemoScheduleOccurrencesRequest, v1.ListMemoScheduleOccurrencesResponse]
+	getMemoScheduleStats         *connect.Client[v1.GetMemoScheduleStatsRequest, v1.MemoScheduleStats]
+	upsertMemoScheduleOccurrence *connect.Client[v1.UpsertMemoScheduleOccurrenceRequest, v1.MemoScheduleOccurrence]
+	deleteMemo                   *connect.Client[v1.DeleteMemoRequest, emptypb.Empty]
+	setMemoAttachments           *connect.Client[v1.SetMemoAttachmentsRequest, emptypb.Empty]
+	listMemoAttachments          *connect.Client[v1.ListMemoAttachmentsRequest, v1.ListMemoAttachmentsResponse]
+	setMemoRelations             *connect.Client[v1.SetMemoRelationsRequest, emptypb.Empty]
+	listMemoRelations            *connect.Client[v1.ListMemoRelationsRequest, v1.ListMemoRelationsResponse]
+	createMemoComment            *connect.Client[v1.CreateMemoCommentRequest, v1.Memo]
+	autoTagMemo                  *connect.Client[v1.AutoTagMemoRequest, v1.AutoTagMemoResponse]
+	listMemoComments             *connect.Client[v1.ListMemoCommentsRequest, v1.ListMemoCommentsResponse]
+	listMemoReactions            *connect.Client[v1.ListMemoReactionsRequest, v1.ListMemoReactionsResponse]
+	upsertMemoReaction           *connect.Client[v1.UpsertMemoReactionRequest, v1.Reaction]
+	deleteMemoReaction           *connect.Client[v1.DeleteMemoReactionRequest, emptypb.Empty]
+	createMemoShare              *connect.Client[v1.CreateMemoShareRequest, v1.MemoShare]
+	listMemoShares               *connect.Client[v1.ListMemoSharesRequest, v1.ListMemoSharesResponse]
+	deleteMemoShare              *connect.Client[v1.DeleteMemoShareRequest, emptypb.Empty]
+	getSharedMemo                *connect.Client[v1.GetSharedMemoRequest, v1.Memo]
+	getLinkMetadata              *connect.Client[v1.GetLinkMetadataRequest, v1.LinkMetadata]
+	batchGetLinkMetadata         *connect.Client[v1.BatchGetLinkMetadataRequest, v1.BatchGetLinkMetadataResponse]
 }
 
 // CreateMemo calls memos.api.v1.MemoService.CreateMemo.
@@ -332,6 +368,21 @@ func (c *memoServiceClient) GetMemo(ctx context.Context, req *connect.Request[v1
 // UpdateMemo calls memos.api.v1.MemoService.UpdateMemo.
 func (c *memoServiceClient) UpdateMemo(ctx context.Context, req *connect.Request[v1.UpdateMemoRequest]) (*connect.Response[v1.Memo], error) {
 	return c.updateMemo.CallUnary(ctx, req)
+}
+
+// ListMemoScheduleOccurrences calls memos.api.v1.MemoService.ListMemoScheduleOccurrences.
+func (c *memoServiceClient) ListMemoScheduleOccurrences(ctx context.Context, req *connect.Request[v1.ListMemoScheduleOccurrencesRequest]) (*connect.Response[v1.ListMemoScheduleOccurrencesResponse], error) {
+	return c.listMemoScheduleOccurrences.CallUnary(ctx, req)
+}
+
+// GetMemoScheduleStats calls memos.api.v1.MemoService.GetMemoScheduleStats.
+func (c *memoServiceClient) GetMemoScheduleStats(ctx context.Context, req *connect.Request[v1.GetMemoScheduleStatsRequest]) (*connect.Response[v1.MemoScheduleStats], error) {
+	return c.getMemoScheduleStats.CallUnary(ctx, req)
+}
+
+// UpsertMemoScheduleOccurrence calls memos.api.v1.MemoService.UpsertMemoScheduleOccurrence.
+func (c *memoServiceClient) UpsertMemoScheduleOccurrence(ctx context.Context, req *connect.Request[v1.UpsertMemoScheduleOccurrenceRequest]) (*connect.Response[v1.MemoScheduleOccurrence], error) {
+	return c.upsertMemoScheduleOccurrence.CallUnary(ctx, req)
 }
 
 // DeleteMemo calls memos.api.v1.MemoService.DeleteMemo.
@@ -431,6 +482,12 @@ type MemoServiceHandler interface {
 	GetMemo(context.Context, *connect.Request[v1.GetMemoRequest]) (*connect.Response[v1.Memo], error)
 	// UpdateMemo updates a memo.
 	UpdateMemo(context.Context, *connect.Request[v1.UpdateMemoRequest]) (*connect.Response[v1.Memo], error)
+	// ListMemoScheduleOccurrences lists scheduled memo occurrences in a time range.
+	ListMemoScheduleOccurrences(context.Context, *connect.Request[v1.ListMemoScheduleOccurrencesRequest]) (*connect.Response[v1.ListMemoScheduleOccurrencesResponse], error)
+	// GetMemoScheduleStats returns completion statistics for one scheduled memo.
+	GetMemoScheduleStats(context.Context, *connect.Request[v1.GetMemoScheduleStatsRequest]) (*connect.Response[v1.MemoScheduleStats], error)
+	// UpsertMemoScheduleOccurrence records or clears completion for one scheduled occurrence.
+	UpsertMemoScheduleOccurrence(context.Context, *connect.Request[v1.UpsertMemoScheduleOccurrenceRequest]) (*connect.Response[v1.MemoScheduleOccurrence], error)
 	// DeleteMemo deletes a memo.
 	DeleteMemo(context.Context, *connect.Request[v1.DeleteMemoRequest]) (*connect.Response[emptypb.Empty], error)
 	// SetMemoAttachments replaces the full set of attachments on a memo with the
@@ -504,6 +561,24 @@ func NewMemoServiceHandler(svc MemoServiceHandler, opts ...connect.HandlerOption
 		MemoServiceUpdateMemoProcedure,
 		svc.UpdateMemo,
 		connect.WithSchema(memoServiceMethods.ByName("UpdateMemo")),
+		connect.WithHandlerOptions(opts...),
+	)
+	memoServiceListMemoScheduleOccurrencesHandler := connect.NewUnaryHandler(
+		MemoServiceListMemoScheduleOccurrencesProcedure,
+		svc.ListMemoScheduleOccurrences,
+		connect.WithSchema(memoServiceMethods.ByName("ListMemoScheduleOccurrences")),
+		connect.WithHandlerOptions(opts...),
+	)
+	memoServiceGetMemoScheduleStatsHandler := connect.NewUnaryHandler(
+		MemoServiceGetMemoScheduleStatsProcedure,
+		svc.GetMemoScheduleStats,
+		connect.WithSchema(memoServiceMethods.ByName("GetMemoScheduleStats")),
+		connect.WithHandlerOptions(opts...),
+	)
+	memoServiceUpsertMemoScheduleOccurrenceHandler := connect.NewUnaryHandler(
+		MemoServiceUpsertMemoScheduleOccurrenceProcedure,
+		svc.UpsertMemoScheduleOccurrence,
+		connect.WithSchema(memoServiceMethods.ByName("UpsertMemoScheduleOccurrence")),
 		connect.WithHandlerOptions(opts...),
 	)
 	memoServiceDeleteMemoHandler := connect.NewUnaryHandler(
@@ -618,6 +693,12 @@ func NewMemoServiceHandler(svc MemoServiceHandler, opts ...connect.HandlerOption
 			memoServiceGetMemoHandler.ServeHTTP(w, r)
 		case MemoServiceUpdateMemoProcedure:
 			memoServiceUpdateMemoHandler.ServeHTTP(w, r)
+		case MemoServiceListMemoScheduleOccurrencesProcedure:
+			memoServiceListMemoScheduleOccurrencesHandler.ServeHTTP(w, r)
+		case MemoServiceGetMemoScheduleStatsProcedure:
+			memoServiceGetMemoScheduleStatsHandler.ServeHTTP(w, r)
+		case MemoServiceUpsertMemoScheduleOccurrenceProcedure:
+			memoServiceUpsertMemoScheduleOccurrenceHandler.ServeHTTP(w, r)
 		case MemoServiceDeleteMemoProcedure:
 			memoServiceDeleteMemoHandler.ServeHTTP(w, r)
 		case MemoServiceSetMemoAttachmentsProcedure:
@@ -675,6 +756,18 @@ func (UnimplementedMemoServiceHandler) GetMemo(context.Context, *connect.Request
 
 func (UnimplementedMemoServiceHandler) UpdateMemo(context.Context, *connect.Request[v1.UpdateMemoRequest]) (*connect.Response[v1.Memo], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.UpdateMemo is not implemented"))
+}
+
+func (UnimplementedMemoServiceHandler) ListMemoScheduleOccurrences(context.Context, *connect.Request[v1.ListMemoScheduleOccurrencesRequest]) (*connect.Response[v1.ListMemoScheduleOccurrencesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.ListMemoScheduleOccurrences is not implemented"))
+}
+
+func (UnimplementedMemoServiceHandler) GetMemoScheduleStats(context.Context, *connect.Request[v1.GetMemoScheduleStatsRequest]) (*connect.Response[v1.MemoScheduleStats], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.GetMemoScheduleStats is not implemented"))
+}
+
+func (UnimplementedMemoServiceHandler) UpsertMemoScheduleOccurrence(context.Context, *connect.Request[v1.UpsertMemoScheduleOccurrenceRequest]) (*connect.Response[v1.MemoScheduleOccurrence], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.UpsertMemoScheduleOccurrence is not implemented"))
 }
 
 func (UnimplementedMemoServiceHandler) DeleteMemo(context.Context, *connect.Request[v1.DeleteMemoRequest]) (*connect.Response[emptypb.Empty], error) {

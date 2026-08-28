@@ -43,6 +43,14 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 		fields = append(fields, "scheduled_duration")
 		args = append(args, *create.ScheduledDuration)
 	}
+	if create.ScheduledRecurrence != nil {
+		recurrence, err := store.MarshalMemoScheduleRecurrence(create.ScheduledRecurrence)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, "scheduled_recurrence")
+		args = append(args, recurrence)
+	}
 
 	stmt := "INSERT INTO memo (" + strings.Join(fields, ", ") + ") VALUES (" + placeholders(len(args)) + ") RETURNING id, created_ts, updated_ts, row_status"
 	if err := d.db.QueryRowContext(ctx, stmt, args...).Scan(
@@ -103,6 +111,13 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		}
 		where = append(where, fmt.Sprintf("memo.visibility in (%s)", strings.Join(holders, ", ")))
 	}
+	if v := find.HasScheduledTime; v != nil {
+		if *v {
+			where = append(where, "memo.scheduled_time IS NOT NULL")
+		} else {
+			where = append(where, "memo.scheduled_time IS NULL")
+		}
+	}
 	if find.ExcludeComments {
 		where = append(where, "memo_relation.related_memo_id IS NULL")
 	}
@@ -134,6 +149,7 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		`memo.payload AS payload`,
 		`memo.scheduled_time AS scheduled_time`,
 		`memo.scheduled_duration AS scheduled_duration`,
+		`memo.scheduled_recurrence AS scheduled_recurrence`,
 		`CASE WHEN parent_memo.uid IS NOT NULL THEN parent_memo.uid ELSE NULL END AS parent_uid`,
 	}
 	if !find.ExcludeContent {
@@ -166,6 +182,7 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		var payloadBytes []byte
 		var scheduledTime sql.NullInt64
 		var scheduledDuration sql.NullInt64
+		var scheduledRecurrence sql.NullString
 		dests := []any{
 			&memo.ID,
 			&memo.UID,
@@ -178,6 +195,7 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 			&payloadBytes,
 			&scheduledTime,
 			&scheduledDuration,
+			&scheduledRecurrence,
 			&memo.ParentUID,
 		}
 		if !find.ExcludeContent {
@@ -196,6 +214,13 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		}
 		if scheduledDuration.Valid {
 			memo.ScheduledDuration = &scheduledDuration.Int64
+		}
+		if scheduledRecurrence.Valid {
+			recurrence, err := store.UnmarshalMemoScheduleRecurrence(scheduledRecurrence.String)
+			if err != nil {
+				return nil, err
+			}
+			memo.ScheduledRecurrence = recurrence
 		}
 		list = append(list, &memo)
 	}

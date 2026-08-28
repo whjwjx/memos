@@ -1,6 +1,6 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import dayjs from "dayjs";
-import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
+import { type Memo, type MemoScheduleOccurrence, MemoScheduleOccurrence_Status } from "@/types/proto/api/v1/memo_service_pb";
 
 export interface ScheduleTimeRange {
   start: Date;
@@ -10,6 +10,9 @@ export interface ScheduleTimeRange {
 export interface ScheduledItem {
   memo: Memo;
   range: ScheduleTimeRange;
+  occurrenceTime?: Date;
+  status?: MemoScheduleOccurrence_Status;
+  recurring?: boolean;
 }
 
 export const getScheduleTimeRange = (memo: Memo): ScheduleTimeRange | undefined => {
@@ -21,6 +24,24 @@ export const getScheduleTimeRange = (memo: Memo): ScheduleTimeRange | undefined 
   return {
     start,
     end: durationMs > 0 ? new Date(start.getTime() + durationMs) : undefined,
+  };
+};
+
+export const getScheduleOccurrenceTimeRange = (occurrence: MemoScheduleOccurrence): ScheduledItem | undefined => {
+  if (!occurrence.memoDetail || !occurrence.occurrenceTime) {
+    return undefined;
+  }
+  const start = timestampDate(occurrence.occurrenceTime);
+  const durationMs = occurrence.scheduledDuration ? Number(occurrence.scheduledDuration.seconds) * 1000 : 0;
+  return {
+    memo: occurrence.memoDetail,
+    range: {
+      start,
+      end: durationMs > 0 ? new Date(start.getTime() + durationMs) : undefined,
+    },
+    occurrenceTime: start,
+    status: occurrence.status || MemoScheduleOccurrence_Status.PENDING,
+    recurring: occurrence.recurring,
   };
 };
 

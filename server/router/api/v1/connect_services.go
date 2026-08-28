@@ -343,6 +343,30 @@ func (s *ConnectServiceHandler) UpdateMemo(ctx context.Context, req *connect.Req
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) ListMemoScheduleOccurrences(ctx context.Context, req *connect.Request[v1pb.ListMemoScheduleOccurrencesRequest]) (*connect.Response[v1pb.ListMemoScheduleOccurrencesResponse], error) {
+	resp, err := s.APIV1Service.ListMemoScheduleOccurrences(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) GetMemoScheduleStats(ctx context.Context, req *connect.Request[v1pb.GetMemoScheduleStatsRequest]) (*connect.Response[v1pb.MemoScheduleStats], error) {
+	resp, err := s.APIV1Service.GetMemoScheduleStats(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) UpsertMemoScheduleOccurrence(ctx context.Context, req *connect.Request[v1pb.UpsertMemoScheduleOccurrenceRequest]) (*connect.Response[v1pb.MemoScheduleOccurrence], error) {
+	resp, err := s.APIV1Service.UpsertMemoScheduleOccurrence(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 func (s *ConnectServiceHandler) DeleteMemo(ctx context.Context, req *connect.Request[v1pb.DeleteMemoRequest]) (*connect.Response[emptypb.Empty], error) {
 	resp, err := s.APIV1Service.DeleteMemo(ctx, req.Msg)
 	if err != nil {

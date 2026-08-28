@@ -1,9 +1,15 @@
+import { create } from "@bufbuild/protobuf";
 import dayjs from "dayjs";
-import { CalendarClockIcon, ChevronDownIcon, Trash2Icon } from "lucide-react";
+import { CalendarClockIcon, ChevronDownIcon, RepeatIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import DateTimeInput from "@/components/DateTimeInput";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import {
+  type MemoScheduleRecurrence,
+  MemoScheduleRecurrence_Frequency,
+  MemoScheduleRecurrenceSchema,
+} from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import type { ScheduleSelectorProps } from "../types";
 
@@ -15,6 +21,10 @@ const DURATION_OPTIONS = [
 ] as const;
 
 const DEFAULT_DURATION = 3600;
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const WEEKENDS = [0, 6];
+
+type RepeatPreset = "none" | "daily" | "weekdays" | "weekends" | "custom";
 
 function nextHour(date: Date): Date {
   const d = new Date(date);
@@ -23,10 +33,65 @@ function nextHour(date: Date): Date {
   return d;
 }
 
+function getTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+function createDailyRecurrence(): MemoScheduleRecurrence {
+  return create(MemoScheduleRecurrenceSchema, {
+    frequency: MemoScheduleRecurrence_Frequency.DAILY,
+    interval: 1,
+    timezone: getTimezone(),
+  });
+}
+
+function createWeeklyRecurrence(daysOfWeek: number[]): MemoScheduleRecurrence {
+  return create(MemoScheduleRecurrenceSchema, {
+    frequency: MemoScheduleRecurrence_Frequency.WEEKLY,
+    daysOfWeek,
+    interval: 1,
+    timezone: getTimezone(),
+  });
+}
+
+function sameDays(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) return false;
+  const a = [...left].sort((x, y) => x - y);
+  const b = [...right].sort((x, y) => x - y);
+  return a.every((value, index) => value === b[index]);
+}
+
+function getRepeatPreset(recurrence?: MemoScheduleRecurrence): RepeatPreset {
+  if (!recurrence) return "none";
+  if (recurrence.frequency === MemoScheduleRecurrence_Frequency.DAILY) return "daily";
+  if (recurrence.frequency !== MemoScheduleRecurrence_Frequency.WEEKLY) return "none";
+  if (sameDays(recurrence.daysOfWeek, WEEKDAYS)) return "weekdays";
+  if (sameDays(recurrence.daysOfWeek, WEEKENDS)) return "weekends";
+  return "custom";
+}
+
 const ScheduleSelector = (props: ScheduleSelectorProps) => {
-  const { value, duration, onChange, onOpenChange, mobileIconOnly } = props;
+  const { value, duration, recurrence, onChange, onOpenChange, mobileIconOnly } = props;
   const t = useTranslate();
   const [open, setOpen] = useState(false);
+  const repeatPreset = getRepeatPreset(recurrence);
+  const weekdayLabels = [
+    t("common.days.sun"),
+    t("common.days.mon"),
+    t("common.days.tue"),
+    t("common.days.wed"),
+    t("common.days.thu"),
+    t("common.days.fri"),
+    t("common.days.sat"),
+  ];
+
+  const emitChange = (next?: Date, nextDuration?: number, nextRecurrence?: MemoScheduleRecurrence) => {
+    if (nextRecurrence) {
+      onChange(next, nextDuration, nextRecurrence);
+    } else {
+      onChange(next, nextDuration);
+    }
+  };
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -34,18 +99,49 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
   };
 
   const handleSetTime = (date: Date) => {
-    onChange(date, duration ?? DEFAULT_DURATION);
+    emitChange(date, duration ?? DEFAULT_DURATION, recurrence);
   };
 
   const handleSetDuration = (next: number) => {
     if (value) {
-      onChange(value, next);
+      emitChange(value, next, recurrence);
     }
   };
 
   const handleClear = () => {
-    onChange(undefined, undefined);
+    emitChange(undefined, undefined);
     handleOpenChange(false);
+  };
+
+  const handleRepeatPreset = (preset: RepeatPreset) => {
+    if (!value) {
+      return;
+    }
+    const nextDuration = duration ?? DEFAULT_DURATION;
+    if (preset === "none") {
+      emitChange(value, nextDuration);
+    } else if (preset === "daily") {
+      emitChange(value, nextDuration, createDailyRecurrence());
+    } else if (preset === "weekdays") {
+      emitChange(value, nextDuration, createWeeklyRecurrence(WEEKDAYS));
+    } else if (preset === "weekends") {
+      emitChange(value, nextDuration, createWeeklyRecurrence(WEEKENDS));
+    } else {
+      const initialDay = value.getDay();
+      emitChange(value, nextDuration, createWeeklyRecurrence(recurrence?.daysOfWeek.length ? recurrence.daysOfWeek : [initialDay]));
+    }
+  };
+
+  const handleToggleCustomDay = (day: number) => {
+    if (!value) {
+      return;
+    }
+    const currentDays = recurrence?.frequency === MemoScheduleRecurrence_Frequency.WEEKLY ? recurrence.daysOfWeek : [value.getDay()];
+    const nextDays = currentDays.includes(day) ? currentDays.filter((value) => value !== day) : [...currentDays, day];
+    if (nextDays.length === 0) {
+      return;
+    }
+    emitChange(value, duration ?? DEFAULT_DURATION, createWeeklyRecurrence(nextDays));
   };
 
   const label = value ? dayjs(value).format("MM/DD HH:mm") : t("memo.schedule.set");
@@ -96,6 +192,56 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.repeat")}</span>
+                <div className="grid grid-cols-2 gap-1">
+                  {(["none", "daily", "weekdays", "weekends"] as const).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleRepeatPreset(preset)}
+                      className={cn(
+                        "inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
+                        repeatPreset === preset ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
+                      )}
+                    >
+                      {preset !== "none" && <RepeatIcon className="size-3" />}
+                      {t(`memo.schedule.repeat-${preset}`)}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRepeatPreset("custom")}
+                  className={cn(
+                    "rounded-md border px-2 py-1 text-xs transition-colors",
+                    repeatPreset === "custom" ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
+                  )}
+                >
+                  {t("memo.schedule.repeat-custom")}
+                </button>
+                {repeatPreset === "custom" && (
+                  <div className="flex flex-wrap gap-1">
+                    {weekdayLabels.map((label, index) => {
+                      const selected = recurrence?.daysOfWeek.includes(index) ?? false;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => handleToggleCustomDay(index)}
+                          className={cn(
+                            "size-7 rounded-md border text-xs transition-colors",
+                            selected ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
+                          )}
+                          aria-pressed={selected}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <button
                 type="button"

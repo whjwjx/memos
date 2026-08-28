@@ -153,6 +153,15 @@ func applyMemoUpdate(ctx context.Context, executor memoUpdateExecer, update *sto
 	} else if v := update.ScheduledDuration; v != nil {
 		appendValue("scheduled_duration", *v)
 	}
+	if update.ClearScheduledRecurrence {
+		set = append(set, "scheduled_recurrence = NULL")
+	} else if v := update.ScheduledRecurrence; v != nil {
+		recurrence, err := store.MarshalMemoScheduleRecurrence(v)
+		if err != nil {
+			return err
+		}
+		appendValue("scheduled_recurrence", recurrence)
+	}
 	if v := update.Payload; v != nil {
 		payload, err := protojson.Marshal(v)
 		if err != nil {

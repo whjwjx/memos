@@ -44,6 +44,21 @@ service MemoService {
     };
     option (google.api.method_signature) = "memo,update_mask";
   }
+  // ListMemoScheduleOccurrences lists scheduled memo occurrences in a time range.
+  rpc ListMemoScheduleOccurrences(ListMemoScheduleOccurrencesRequest) returns (ListMemoScheduleOccurrencesResponse) {
+    option (google.api.http) = {get: "/api/v1/memos/-/scheduleOccurrences"};
+  }
+  // GetMemoScheduleStats returns completion statistics for one scheduled memo.
+  rpc GetMemoScheduleStats(GetMemoScheduleStatsRequest) returns (MemoScheduleStats) {
+    option (google.api.http) = {get: "/api/v1/{memo=memos/*}/scheduleStats"};
+  }
+  // UpsertMemoScheduleOccurrence records or clears completion for one scheduled occurrence.
+  rpc UpsertMemoScheduleOccurrence(UpsertMemoScheduleOccurrenceRequest) returns (MemoScheduleOccurrence) {
+    option (google.api.http) = {
+      post: "/api/v1/{memo=memos/*}/scheduleOccurrences"
+      body: "*"
+    };
+  }
   // DeleteMemo deletes a memo.
   rpc DeleteMemo(DeleteMemoRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/api/v1/{name=memos/*}"};
@@ -284,6 +299,10 @@ message Memo {
   // memo is treated as a point event. Must be positive when set.
   optional google.protobuf.Duration scheduled_duration = 20 [(google.api.field_behavior) = OPTIONAL];
 
+  // Optional. The recurrence rule for the scheduled memo. When set,
+  // scheduled_time is used as the first occurrence and time-of-day anchor.
+  optional MemoScheduleRecurrence scheduled_recurrence = 21 [(google.api.field_behavior) = OPTIONAL];
+
   // Computed properties of a memo.
   message Property {
     bool has_link = 1;
@@ -293,6 +312,94 @@ message Memo {
     // The title extracted from the first H1 heading, if present.
     string title = 5;
   }
+}
+
+message MemoScheduleRecurrence {
+  // The recurrence cadence.
+  enum Frequency {
+    FREQUENCY_UNSPECIFIED = 0;
+    DAILY = 1;
+    WEEKLY = 2;
+  }
+
+  // Required. The recurrence cadence.
+  Frequency frequency = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. Weekdays for weekly recurrence. Values use Sunday=0 through Saturday=6.
+  repeated int32 days_of_week = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Repeat interval. Defaults to 1 when unset.
+  int32 interval = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Last occurrence time allowed by this rule.
+  optional google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. IANA timezone used to expand this rule. Defaults to UTC when unset.
+  string timezone = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message MemoScheduleOccurrence {
+  // The per-occurrence completion state.
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PENDING = 1;
+    DONE = 2;
+  }
+
+  // The scheduled memo resource name.
+  // Format: memos/{memo}
+  string memo = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "memos.api.v1/Memo"}
+  ];
+
+  // The time for this occurrence.
+  google.protobuf.Timestamp occurrence_time = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. The duration for this occurrence.
+  google.protobuf.Duration scheduled_duration = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // The occurrence status. PENDING means no persisted completion exists.
+  Status status = 4 [(google.api.field_behavior) = REQUIRED];
+
+  // Whether this occurrence was produced by a recurrence rule.
+  bool recurring = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The memo backing this occurrence.
+  Memo memo_detail = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The time when this occurrence was completed.
+  google.protobuf.Timestamp completed_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message MemoScheduleStats {
+  // The scheduled memo resource name.
+  // Format: memos/{memo}
+  string memo = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "memos.api.v1/Memo"}
+  ];
+
+  // The number of occurrences due in the requested range.
+  int32 expected_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The number of completed occurrences in the requested range.
+  int32 completed_count = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The number of due occurrences in the range without completion.
+  int32 missed_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Completed occurrences divided by due occurrences in the requested range.
+  double completion_rate = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The current streak across scheduled days in the requested range.
+  int32 current_streak = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The longest streak across scheduled days in the requested range.
+  int32 longest_streak = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The last completion time in the requested range.
+  google.protobuf.Timestamp last_completed_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message Location {
@@ -388,6 +495,49 @@ message UpdateMemoRequest {
 
   // Required. The list of fields to update.
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListMemoScheduleOccurrencesRequest {
+  // Required. Inclusive range start.
+  google.protobuf.Timestamp start_time = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. Exclusive range end.
+  google.protobuf.Timestamp end_time = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListMemoScheduleOccurrencesResponse {
+  // The scheduled occurrences in the requested range.
+  repeated MemoScheduleOccurrence occurrences = 1;
+}
+
+message GetMemoScheduleStatsRequest {
+  // Required. The scheduled memo resource name.
+  // Format: memos/{memo}
+  string memo = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "memos.api.v1/Memo"}
+  ];
+
+  // Required. Inclusive range start.
+  google.protobuf.Timestamp start_time = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. Exclusive range end.
+  google.protobuf.Timestamp end_time = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpsertMemoScheduleOccurrenceRequest {
+  // Required. The scheduled memo resource name.
+  // Format: memos/{memo}
+  string memo = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "memos.api.v1/Memo"}
+  ];
+
+  // Required. The occurrence time to update.
+  google.protobuf.Timestamp occurrence_time = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. The new completion state. Use PENDING to clear a previously persisted completion.
+  MemoScheduleOccurrence.Status status = 3 [(google.api.field_behavior) = REQUIRED];
 }
 
 message DeleteMemoRequest {

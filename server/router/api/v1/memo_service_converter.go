@@ -56,6 +56,9 @@ func (s *APIV1Service) convertMemoFromStoreWithCreators(ctx context.Context, mem
 	if memo.ScheduledDuration != nil {
 		memoMessage.ScheduledDuration = durationpb.New(time.Duration(*memo.ScheduledDuration) * time.Second)
 	}
+	if memo.ScheduledRecurrence != nil {
+		memoMessage.ScheduledRecurrence = convertScheduleRecurrenceFromStore(memo.ScheduledRecurrence)
+	}
 
 	if memo.ParentUID != nil {
 		parentName := buildMemoName(*memo.ParentUID)
@@ -351,6 +354,51 @@ func convertLocationToStore(location *v1pb.Location) *storepb.MemoPayload_Locati
 		Latitude:    location.Latitude,
 		Longitude:   location.Longitude,
 	}
+}
+
+func convertScheduleRecurrenceFromStore(recurrence *store.MemoScheduleRecurrence) *v1pb.MemoScheduleRecurrence {
+	if recurrence == nil {
+		return nil
+	}
+	message := &v1pb.MemoScheduleRecurrence{
+		DaysOfWeek: append([]int32(nil), recurrence.DaysOfWeek...),
+		Interval:   recurrence.Interval,
+		Timezone:   recurrence.Timezone,
+	}
+	switch recurrence.Frequency {
+	case store.MemoScheduleRecurrenceDaily:
+		message.Frequency = v1pb.MemoScheduleRecurrence_DAILY
+	case store.MemoScheduleRecurrenceWeekly:
+		message.Frequency = v1pb.MemoScheduleRecurrence_WEEKLY
+	default:
+		message.Frequency = v1pb.MemoScheduleRecurrence_FREQUENCY_UNSPECIFIED
+	}
+	if recurrence.Until != nil {
+		message.Until = timestamppb.New(time.Unix(*recurrence.Until, 0))
+	}
+	return message
+}
+
+func convertScheduleRecurrenceToStore(recurrence *v1pb.MemoScheduleRecurrence) *store.MemoScheduleRecurrence {
+	if recurrence == nil {
+		return nil
+	}
+	message := &store.MemoScheduleRecurrence{
+		DaysOfWeek: append([]int32(nil), recurrence.DaysOfWeek...),
+		Interval:   recurrence.Interval,
+		Timezone:   recurrence.Timezone,
+	}
+	switch recurrence.Frequency {
+	case v1pb.MemoScheduleRecurrence_DAILY:
+		message.Frequency = store.MemoScheduleRecurrenceDaily
+	case v1pb.MemoScheduleRecurrence_WEEKLY:
+		message.Frequency = store.MemoScheduleRecurrenceWeekly
+	}
+	if recurrence.Until != nil && recurrence.Until.IsValid() {
+		until := recurrence.Until.AsTime().Unix()
+		message.Until = &until
+	}
+	return message
 }
 
 func convertVisibilityFromStore(visibility store.Visibility) v1pb.Visibility {
