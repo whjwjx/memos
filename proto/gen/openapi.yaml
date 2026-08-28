@@ -185,7 +185,10 @@ paths:
         post:
             tags:
                 - AIService
-            description: "TestAIProvider verifies that an instance AI provider can reach its chat\r\n model endpoint and authenticate. Returns the provider's reply so the\r\n caller can confirm end-to-end connectivity."
+            description: |-
+                TestAIProvider verifies that an instance AI provider can reach its chat
+                 model endpoint and authenticate. Returns the provider's reply so the
+                 caller can confirm end-to-end connectivity.
             operationId: AIService_TestAIProvider
             requestBody:
                 content:
@@ -1032,6 +1035,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/memos/-/scheduleOccurrences:
+        get:
+            tags:
+                - MemoService
+            description: ListMemoScheduleOccurrences lists scheduled memo occurrences in a time range.
+            operationId: MemoService_ListMemoScheduleOccurrences
+            parameters:
+                - name: startTime
+                  in: query
+                  description: Required. Inclusive range start.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: endTime
+                  in: query
+                  description: Required. Exclusive range end.
+                  schema:
+                    type: string
+                    format: date-time
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMemoScheduleOccurrencesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/memos/{memo}:
         get:
             tags:
@@ -1421,6 +1456,76 @@ paths:
                 "200":
                     description: OK
                     content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/memos/{memo}/scheduleOccurrences:
+        post:
+            tags:
+                - MemoService
+            description: UpsertMemoScheduleOccurrence records or clears completion for one scheduled occurrence.
+            operationId: MemoService_UpsertMemoScheduleOccurrence
+            parameters:
+                - name: memo
+                  in: path
+                  description: The memo id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpsertMemoScheduleOccurrenceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MemoScheduleOccurrence'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/memos/{memo}/scheduleStats:
+        get:
+            tags:
+                - MemoService
+            description: GetMemoScheduleStats returns completion statistics for one scheduled memo.
+            operationId: MemoService_GetMemoScheduleStats
+            parameters:
+                - name: memo
+                  in: path
+                  description: The memo id.
+                  required: true
+                  schema:
+                    type: string
+                - name: startTime
+                  in: query
+                  description: Required. Inclusive range start.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: endTime
+                  in: query
+                  description: Required. Exclusive range end.
+                  schema:
+                    type: string
+                    format: date-time
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MemoScheduleStats'
                 default:
                     description: Default error response
                     content:
@@ -3692,6 +3797,14 @@ components:
                 nextPageToken:
                     type: string
                     description: A token for the next page of results.
+        ListMemoScheduleOccurrencesResponse:
+            type: object
+            properties:
+                occurrences:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MemoScheduleOccurrence'
+                    description: The scheduled occurrences in the requested range.
         ListMemoSharesResponse:
             type: object
             properties:
@@ -3934,7 +4047,15 @@ components:
                 scheduledDuration:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
                     type: string
-                    description: "Optional. The scheduled duration of the memo in seconds. When unset, the\r\n memo is treated as a point event. Must be positive when set."
+                    description: |-
+                        Optional. The scheduled duration of the memo in seconds. When unset, the
+                         memo is treated as a point event. Must be positive when set.
+                scheduledRecurrence:
+                    allOf:
+                        - $ref: '#/components/schemas/MemoScheduleRecurrence'
+                    description: |-
+                        Optional. The recurrence rule for the scheduled memo. When set,
+                         scheduled_time is used as the first occurrence and time-of-day anchor.
         MemoRelation:
             required:
                 - memo
@@ -3970,6 +4091,123 @@ components:
                     type: string
                     description: Output only. The snippet of the memo content. Plain text only.
             description: Memo reference in relations.
+        MemoScheduleOccurrence:
+            required:
+                - memo
+                - occurrenceTime
+                - status
+            type: object
+            properties:
+                memo:
+                    type: string
+                    description: |-
+                        The scheduled memo resource name.
+                         Format: memos/{memo}
+                occurrenceTime:
+                    type: string
+                    description: The time for this occurrence.
+                    format: date-time
+                scheduledDuration:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: Optional. The duration for this occurrence.
+                status:
+                    enum:
+                        - STATUS_UNSPECIFIED
+                        - PENDING
+                        - DONE
+                    type: string
+                    description: The occurrence status. PENDING means no persisted completion exists.
+                    format: enum
+                recurring:
+                    readOnly: true
+                    type: boolean
+                    description: Whether this occurrence was produced by a recurrence rule.
+                memoDetail:
+                    readOnly: true
+                    allOf:
+                        - $ref: '#/components/schemas/Memo'
+                    description: Output only. The memo backing this occurrence.
+                completedTime:
+                    readOnly: true
+                    type: string
+                    description: Output only. The time when this occurrence was completed.
+                    format: date-time
+        MemoScheduleRecurrence:
+            required:
+                - frequency
+            type: object
+            properties:
+                frequency:
+                    enum:
+                        - FREQUENCY_UNSPECIFIED
+                        - DAILY
+                        - WEEKLY
+                    type: string
+                    description: Required. The recurrence cadence.
+                    format: enum
+                daysOfWeek:
+                    type: array
+                    items:
+                        type: integer
+                        format: int32
+                    description: Optional. Weekdays for weekly recurrence. Values use Sunday=0 through Saturday=6.
+                interval:
+                    type: integer
+                    description: Optional. Repeat interval. Defaults to 1 when unset.
+                    format: int32
+                until:
+                    type: string
+                    description: Optional. Last occurrence time allowed by this rule.
+                    format: date-time
+                timezone:
+                    type: string
+                    description: Optional. IANA timezone used to expand this rule. Defaults to UTC when unset.
+        MemoScheduleStats:
+            required:
+                - memo
+            type: object
+            properties:
+                memo:
+                    type: string
+                    description: |-
+                        The scheduled memo resource name.
+                         Format: memos/{memo}
+                expectedCount:
+                    readOnly: true
+                    type: integer
+                    description: The number of occurrences due in the requested range.
+                    format: int32
+                completedCount:
+                    readOnly: true
+                    type: integer
+                    description: The number of completed occurrences in the requested range.
+                    format: int32
+                missedCount:
+                    readOnly: true
+                    type: integer
+                    description: The number of due occurrences in the range without completion.
+                    format: int32
+                completionRate:
+                    readOnly: true
+                    type: number
+                    description: Completed occurrences divided by due occurrences in the requested range.
+                    format: double
+                currentStreak:
+                    readOnly: true
+                    type: integer
+                    description: The current streak across scheduled days in the requested range.
+                    format: int32
+                longestStreak:
+                    readOnly: true
+                    type: integer
+                    description: The longest streak across scheduled days in the requested range.
+                    format: int32
+                lastCompletedTime:
+                    readOnly: true
+                    type: string
+                    description: The last completion time in the requested range.
+                    format: date-time
         MemoShare:
             type: object
             properties:
@@ -4390,7 +4628,9 @@ components:
                     description: Required. The instance AI provider ID to test.
                 model:
                     type: string
-                    description: "Optional. The provider-specific model id to use for the probe. If omitted,\r\n the provider's default chat model is used."
+                    description: |-
+                        Optional. The provider-specific model id to use for the probe. If omitted,
+                         the provider's default chat model is used.
         TestAIProviderResponse:
             type: object
             properties:
@@ -4551,6 +4791,30 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Reaction'
                     description: Required. The reaction to upsert.
+        UpsertMemoScheduleOccurrenceRequest:
+            required:
+                - memo
+                - occurrenceTime
+                - status
+            type: object
+            properties:
+                memo:
+                    type: string
+                    description: |-
+                        Required. The scheduled memo resource name.
+                         Format: memos/{memo}
+                occurrenceTime:
+                    type: string
+                    description: Required. The occurrence time to update.
+                    format: date-time
+                status:
+                    enum:
+                        - STATUS_UNSPECIFIED
+                        - PENDING
+                        - DONE
+                    type: string
+                    description: Required. The new completion state. Use PENDING to clear a previously persisted completion.
+                    format: enum
         User:
             required:
                 - role

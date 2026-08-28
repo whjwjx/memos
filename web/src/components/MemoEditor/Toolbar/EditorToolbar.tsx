@@ -33,6 +33,7 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
   const visibility = useEditorSelector((s) => s.metadata.visibility);
   const scheduledTime = useEditorSelector((s) => s.metadata.scheduledTime);
   const scheduledDuration = useEditorSelector((s) => s.metadata.scheduledDuration);
+  const scheduledRecurrence = useEditorSelector((s) => s.metadata.scheduledRecurrence);
   const blockedMessage = valid
     ? undefined
     : blockedReason
@@ -51,8 +52,8 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
     dispatch(actions.setMetadata({ visibility: next }));
   };
 
-  const handleScheduleChange = (next?: Date, nextDuration?: number) => {
-    dispatch(actions.setMetadata({ scheduledTime: next, scheduledDuration: nextDuration }));
+  const handleScheduleChange = (next?: Date, nextDuration?: number, nextRecurrence?: typeof scheduledRecurrence) => {
+    dispatch(actions.setMetadata({ scheduledTime: next, scheduledDuration: nextDuration, scheduledRecurrence: nextRecurrence }));
   };
 
   return (
@@ -71,7 +72,13 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
           onInsertImages={onInsertImages}
         />
         <VisibilitySelector value={visibility} onChange={handleVisibilityChange} mobileIconOnly />
-        <ScheduleSelector value={scheduledTime} duration={scheduledDuration} onChange={handleScheduleChange} mobileIconOnly />
+        <ScheduleSelector
+          value={scheduledTime}
+          duration={scheduledDuration}
+          recurrence={scheduledRecurrence}
+          onChange={handleScheduleChange}
+          mobileIconOnly
+        />
       </div>
 
       <div className="flex shrink-0 flex-row items-center justify-end gap-2">

@@ -128,6 +128,7 @@
     "no-time-todos": "Unscheduled todos",
     "no-todos": "No todos yet",
     "previous-month": "Previous month",
+    "schedule-load-error": "Schedule loading failed. Showing available one-time schedules where possible.",
     "week": "Week"
   },
   "translation": {
@@ -481,7 +482,17 @@
     "schedule": {
       "clear": "Clear schedule",
       "duration": "Duration",
+      "repeat": "Repeat",
+      "repeat-custom": "Custom days",
+      "repeat-daily": "Daily",
+      "repeat-none": "Does not repeat",
+      "repeat-weekdays": "Weekdays",
+      "repeat-weekends": "Weekends",
       "set": "Schedule",
+      "stats-completed": "Completed in 30 days",
+      "stats-current-streak": "Current streak",
+      "stats-longest-streak": "Longest streak",
+      "stats-rate": "Completion rate",
       "time": "Time",
       "today": "Today",
       "tomorrow": "Tomorrow"

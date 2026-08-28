@@ -20,27 +20,30 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MemoService_CreateMemo_FullMethodName           = "/memos.api.v1.MemoService/CreateMemo"
-	MemoService_ListMemos_FullMethodName            = "/memos.api.v1.MemoService/ListMemos"
-	MemoService_GetMemo_FullMethodName              = "/memos.api.v1.MemoService/GetMemo"
-	MemoService_UpdateMemo_FullMethodName           = "/memos.api.v1.MemoService/UpdateMemo"
-	MemoService_DeleteMemo_FullMethodName           = "/memos.api.v1.MemoService/DeleteMemo"
-	MemoService_SetMemoAttachments_FullMethodName   = "/memos.api.v1.MemoService/SetMemoAttachments"
-	MemoService_ListMemoAttachments_FullMethodName  = "/memos.api.v1.MemoService/ListMemoAttachments"
-	MemoService_SetMemoRelations_FullMethodName     = "/memos.api.v1.MemoService/SetMemoRelations"
-	MemoService_ListMemoRelations_FullMethodName    = "/memos.api.v1.MemoService/ListMemoRelations"
-	MemoService_CreateMemoComment_FullMethodName    = "/memos.api.v1.MemoService/CreateMemoComment"
-	MemoService_AutoTagMemo_FullMethodName          = "/memos.api.v1.MemoService/AutoTagMemo"
-	MemoService_ListMemoComments_FullMethodName     = "/memos.api.v1.MemoService/ListMemoComments"
-	MemoService_ListMemoReactions_FullMethodName    = "/memos.api.v1.MemoService/ListMemoReactions"
-	MemoService_UpsertMemoReaction_FullMethodName   = "/memos.api.v1.MemoService/UpsertMemoReaction"
-	MemoService_DeleteMemoReaction_FullMethodName   = "/memos.api.v1.MemoService/DeleteMemoReaction"
-	MemoService_CreateMemoShare_FullMethodName      = "/memos.api.v1.MemoService/CreateMemoShare"
-	MemoService_ListMemoShares_FullMethodName       = "/memos.api.v1.MemoService/ListMemoShares"
-	MemoService_DeleteMemoShare_FullMethodName      = "/memos.api.v1.MemoService/DeleteMemoShare"
-	MemoService_GetSharedMemo_FullMethodName        = "/memos.api.v1.MemoService/GetSharedMemo"
-	MemoService_GetLinkMetadata_FullMethodName      = "/memos.api.v1.MemoService/GetLinkMetadata"
-	MemoService_BatchGetLinkMetadata_FullMethodName = "/memos.api.v1.MemoService/BatchGetLinkMetadata"
+	MemoService_CreateMemo_FullMethodName                   = "/memos.api.v1.MemoService/CreateMemo"
+	MemoService_ListMemos_FullMethodName                    = "/memos.api.v1.MemoService/ListMemos"
+	MemoService_GetMemo_FullMethodName                      = "/memos.api.v1.MemoService/GetMemo"
+	MemoService_UpdateMemo_FullMethodName                   = "/memos.api.v1.MemoService/UpdateMemo"
+	MemoService_ListMemoScheduleOccurrences_FullMethodName  = "/memos.api.v1.MemoService/ListMemoScheduleOccurrences"
+	MemoService_GetMemoScheduleStats_FullMethodName         = "/memos.api.v1.MemoService/GetMemoScheduleStats"
+	MemoService_UpsertMemoScheduleOccurrence_FullMethodName = "/memos.api.v1.MemoService/UpsertMemoScheduleOccurrence"
+	MemoService_DeleteMemo_FullMethodName                   = "/memos.api.v1.MemoService/DeleteMemo"
+	MemoService_SetMemoAttachments_FullMethodName           = "/memos.api.v1.MemoService/SetMemoAttachments"
+	MemoService_ListMemoAttachments_FullMethodName          = "/memos.api.v1.MemoService/ListMemoAttachments"
+	MemoService_SetMemoRelations_FullMethodName             = "/memos.api.v1.MemoService/SetMemoRelations"
+	MemoService_ListMemoRelations_FullMethodName            = "/memos.api.v1.MemoService/ListMemoRelations"
+	MemoService_CreateMemoComment_FullMethodName            = "/memos.api.v1.MemoService/CreateMemoComment"
+	MemoService_AutoTagMemo_FullMethodName                  = "/memos.api.v1.MemoService/AutoTagMemo"
+	MemoService_ListMemoComments_FullMethodName             = "/memos.api.v1.MemoService/ListMemoComments"
+	MemoService_ListMemoReactions_FullMethodName            = "/memos.api.v1.MemoService/ListMemoReactions"
+	MemoService_UpsertMemoReaction_FullMethodName           = "/memos.api.v1.MemoService/UpsertMemoReaction"
+	MemoService_DeleteMemoReaction_FullMethodName           = "/memos.api.v1.MemoService/DeleteMemoReaction"
+	MemoService_CreateMemoShare_FullMethodName              = "/memos.api.v1.MemoService/CreateMemoShare"
+	MemoService_ListMemoShares_FullMethodName               = "/memos.api.v1.MemoService/ListMemoShares"
+	MemoService_DeleteMemoShare_FullMethodName              = "/memos.api.v1.MemoService/DeleteMemoShare"
+	MemoService_GetSharedMemo_FullMethodName                = "/memos.api.v1.MemoService/GetSharedMemo"
+	MemoService_GetLinkMetadata_FullMethodName              = "/memos.api.v1.MemoService/GetLinkMetadata"
+	MemoService_BatchGetLinkMetadata_FullMethodName         = "/memos.api.v1.MemoService/BatchGetLinkMetadata"
 )
 
 // MemoServiceClient is the client API for MemoService service.
@@ -57,6 +60,12 @@ type MemoServiceClient interface {
 	GetMemo(ctx context.Context, in *GetMemoRequest, opts ...grpc.CallOption) (*Memo, error)
 	// UpdateMemo updates a memo.
 	UpdateMemo(ctx context.Context, in *UpdateMemoRequest, opts ...grpc.CallOption) (*Memo, error)
+	// ListMemoScheduleOccurrences lists scheduled memo occurrences in a time range.
+	ListMemoScheduleOccurrences(ctx context.Context, in *ListMemoScheduleOccurrencesRequest, opts ...grpc.CallOption) (*ListMemoScheduleOccurrencesResponse, error)
+	// GetMemoScheduleStats returns completion statistics for one scheduled memo.
+	GetMemoScheduleStats(ctx context.Context, in *GetMemoScheduleStatsRequest, opts ...grpc.CallOption) (*MemoScheduleStats, error)
+	// UpsertMemoScheduleOccurrence records or clears completion for one scheduled occurrence.
+	UpsertMemoScheduleOccurrence(ctx context.Context, in *UpsertMemoScheduleOccurrenceRequest, opts ...grpc.CallOption) (*MemoScheduleOccurrence, error)
 	// DeleteMemo deletes a memo.
 	DeleteMemo(ctx context.Context, in *DeleteMemoRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// SetMemoAttachments replaces the full set of attachments on a memo with the
@@ -143,6 +152,36 @@ func (c *memoServiceClient) UpdateMemo(ctx context.Context, in *UpdateMemoReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Memo)
 	err := c.cc.Invoke(ctx, MemoService_UpdateMemo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoServiceClient) ListMemoScheduleOccurrences(ctx context.Context, in *ListMemoScheduleOccurrencesRequest, opts ...grpc.CallOption) (*ListMemoScheduleOccurrencesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMemoScheduleOccurrencesResponse)
+	err := c.cc.Invoke(ctx, MemoService_ListMemoScheduleOccurrences_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoServiceClient) GetMemoScheduleStats(ctx context.Context, in *GetMemoScheduleStatsRequest, opts ...grpc.CallOption) (*MemoScheduleStats, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MemoScheduleStats)
+	err := c.cc.Invoke(ctx, MemoService_GetMemoScheduleStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoServiceClient) UpsertMemoScheduleOccurrence(ctx context.Context, in *UpsertMemoScheduleOccurrenceRequest, opts ...grpc.CallOption) (*MemoScheduleOccurrence, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MemoScheduleOccurrence)
+	err := c.cc.Invoke(ctx, MemoService_UpsertMemoScheduleOccurrence_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +372,12 @@ type MemoServiceServer interface {
 	GetMemo(context.Context, *GetMemoRequest) (*Memo, error)
 	// UpdateMemo updates a memo.
 	UpdateMemo(context.Context, *UpdateMemoRequest) (*Memo, error)
+	// ListMemoScheduleOccurrences lists scheduled memo occurrences in a time range.
+	ListMemoScheduleOccurrences(context.Context, *ListMemoScheduleOccurrencesRequest) (*ListMemoScheduleOccurrencesResponse, error)
+	// GetMemoScheduleStats returns completion statistics for one scheduled memo.
+	GetMemoScheduleStats(context.Context, *GetMemoScheduleStatsRequest) (*MemoScheduleStats, error)
+	// UpsertMemoScheduleOccurrence records or clears completion for one scheduled occurrence.
+	UpsertMemoScheduleOccurrence(context.Context, *UpsertMemoScheduleOccurrenceRequest) (*MemoScheduleOccurrence, error)
 	// DeleteMemo deletes a memo.
 	DeleteMemo(context.Context, *DeleteMemoRequest) (*emptypb.Empty, error)
 	// SetMemoAttachments replaces the full set of attachments on a memo with the
@@ -396,6 +441,15 @@ func (UnimplementedMemoServiceServer) GetMemo(context.Context, *GetMemoRequest) 
 }
 func (UnimplementedMemoServiceServer) UpdateMemo(context.Context, *UpdateMemoRequest) (*Memo, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateMemo not implemented")
+}
+func (UnimplementedMemoServiceServer) ListMemoScheduleOccurrences(context.Context, *ListMemoScheduleOccurrencesRequest) (*ListMemoScheduleOccurrencesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMemoScheduleOccurrences not implemented")
+}
+func (UnimplementedMemoServiceServer) GetMemoScheduleStats(context.Context, *GetMemoScheduleStatsRequest) (*MemoScheduleStats, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMemoScheduleStats not implemented")
+}
+func (UnimplementedMemoServiceServer) UpsertMemoScheduleOccurrence(context.Context, *UpsertMemoScheduleOccurrenceRequest) (*MemoScheduleOccurrence, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpsertMemoScheduleOccurrence not implemented")
 }
 func (UnimplementedMemoServiceServer) DeleteMemo(context.Context, *DeleteMemoRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteMemo not implemented")
@@ -537,6 +591,60 @@ func _MemoService_UpdateMemo_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MemoServiceServer).UpdateMemo(ctx, req.(*UpdateMemoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MemoService_ListMemoScheduleOccurrences_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMemoScheduleOccurrencesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoServiceServer).ListMemoScheduleOccurrences(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoService_ListMemoScheduleOccurrences_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoServiceServer).ListMemoScheduleOccurrences(ctx, req.(*ListMemoScheduleOccurrencesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MemoService_GetMemoScheduleStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMemoScheduleStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoServiceServer).GetMemoScheduleStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoService_GetMemoScheduleStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoServiceServer).GetMemoScheduleStats(ctx, req.(*GetMemoScheduleStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MemoService_UpsertMemoScheduleOccurrence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpsertMemoScheduleOccurrenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoServiceServer).UpsertMemoScheduleOccurrence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoService_UpsertMemoScheduleOccurrence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoServiceServer).UpsertMemoScheduleOccurrence(ctx, req.(*UpsertMemoScheduleOccurrenceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -869,6 +977,18 @@ var MemoService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateMemo",
 			Handler:    _MemoService_UpdateMemo_Handler,
+		},
+		{
+			MethodName: "ListMemoScheduleOccurrences",
+			Handler:    _MemoService_ListMemoScheduleOccurrences_Handler,
+		},
+		{
+			MethodName: "GetMemoScheduleStats",
+			Handler:    _MemoService_GetMemoScheduleStats_Handler,
+		},
+		{
+			MethodName: "UpsertMemoScheduleOccurrence",
+			Handler:    _MemoService_UpsertMemoScheduleOccurrence_Handler,
 		},
 		{
 			MethodName: "DeleteMemo",

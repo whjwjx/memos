@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { DurationSchema, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import dayjs from "dayjs";
-import { CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon } from "lucide-react";
+import { AlertCircleIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon } from "lucide-react";
 import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
 import { useTodayDate, useWeekdayLabels } from "@/components/ActivityCalendar/hooks";
 import ActiveHoursSetting from "@/components/CalendarView/ActiveHoursSetting";
@@ -14,17 +14,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/contexts/AuthContext";
 import { useGeneralSetting } from "@/hooks/useInstanceQueries";
 import useMediaQuery from "@/hooks/useMediaQuery";
-import { useInfiniteMemos, useUpdateMemo } from "@/hooks/useMemoQueries";
+import {
+  useInfiniteMemos,
+  useMemoScheduleOccurrences,
+  useMemoScheduleStats,
+  useUpdateMemo,
+  useUpsertMemoScheduleOccurrence,
+} from "@/hooks/useMemoQueries";
 import { useUpdateUserGeneralSetting } from "@/hooks/useUserQueries";
 import i18n from "@/i18n";
 import { addMonths, formatMonth } from "@/lib/calendar-utils";
 import { cn } from "@/lib/utils";
-import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
+import { type Memo, MemoScheduleOccurrence_Status } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
-import { formatScheduleTooltip, getScheduleTimeRange, type ScheduledItem } from "@/utils/schedule";
+import { formatScheduleTooltip, getScheduleOccurrenceTimeRange, getScheduleTimeRange, type ScheduledItem } from "@/utils/schedule";
 
-// 只请求设置了排程时间的 memo。scheduled_ts 在 CEL 中是 Timestamp 类型，
-// 用 `> timestamp("1970-01-01T00:00:00Z")` 表达"已设置"（NULL 在 SQL 比较中会被排除）。
+// 兼容已有的一次性排程 memo。循环日程使用 occurrence 接口展开，这里作为旧数据源兜底，避免接口异常时日历整页空白。
 const SCHEDULED_MEMOS_FILTER = 'scheduled_ts > timestamp("1970-01-01T00:00:00Z")';
 // 有未完成任务但还没安排时间的 todo，供拖拽到日历上排期。
 const TODO_MEMOS_FILTER = "has_incomplete_tasks == true && scheduled_ts == null";
@@ -81,27 +86,86 @@ const CalendarPage = () => {
   const [weekStart, setWeekStart] = useState<dayjs.Dayjs>(() => getWeekStart(dayjs(), weekStartOffset));
   const [EditorComponent, setEditorComponent] = useState<ComponentType<MemoEditorProps>>();
   const [editMemo, setEditMemo] = useState<Memo | null>(null);
+  const statsRange = useMemo(() => {
+    const end = dayjs().add(1, "day").startOf("day");
+    return {
+      start: end.subtract(30, "day").toDate(),
+      end: end.toDate(),
+    };
+  }, []);
 
-  const { data, fetchNextPage, hasNextPage, isFetching } = useInfiniteMemos({ filter: SCHEDULED_MEMOS_FILTER });
-  // 排程 memo 数量通常有限，自动拉取剩余分页以确保完整。
-  useEffect(() => {
-    if (hasNextPage && !isFetching) {
-      void fetchNextPage();
+  const monthCells = useMemo(() => buildMonthMatrix(month, weekStartOffset), [month, weekStartOffset]);
+  const occurrenceRange = useMemo(() => {
+    if (view === "week") {
+      return {
+        start: weekStart.startOf("day").toDate(),
+        end: weekStart.add(7, "day").startOf("day").toDate(),
+      };
     }
-  }, [fetchNextPage, hasNextPage, isFetching]);
+    const firstCell = monthCells[0]?.date ?? dayjs(`${month}-01`);
+    const lastCell = monthCells[monthCells.length - 1]?.date ?? dayjs(`${month}-01`);
+    return {
+      start: firstCell.startOf("day").toDate(),
+      end: lastCell.add(1, "day").startOf("day").toDate(),
+    };
+  }, [month, monthCells, view, weekStart]);
 
-  const scheduledMemos = useMemo(() => (data?.pages.flatMap((page) => page.memos) ?? []).filter((memo) => memo.scheduledTime), [data]);
+  const {
+    data: scheduledData,
+    fetchNextPage: fetchScheduledPage,
+    hasNextPage: scheduledHasNextPage,
+    isFetching: scheduledIsFetching,
+    error: scheduledMemosError,
+  } = useInfiniteMemos({ filter: SCHEDULED_MEMOS_FILTER });
+  // 排程 memo 数量通常有限，自动拉取剩余分页，作为 occurrence 接口的兼容兜底。
+  useEffect(() => {
+    if (scheduledHasNextPage && !scheduledIsFetching) {
+      void fetchScheduledPage();
+    }
+  }, [fetchScheduledPage, scheduledHasNextPage, scheduledIsFetching]);
+  const scheduledMemos = useMemo(
+    () => (scheduledData?.pages.flatMap((page) => page.memos) ?? []).filter((memo) => memo.scheduledTime),
+    [scheduledData],
+  );
+
+  const { data: scheduleOccurrences = [], error: scheduleOccurrencesError } = useMemoScheduleOccurrences(
+    occurrenceRange.start,
+    occurrenceRange.end,
+  );
+  const { data: scheduleStats } = useMemoScheduleStats(editMemo?.name, statsRange.start, statsRange.end, {
+    enabled: !!editMemo?.scheduledTime,
+  });
 
   const scheduleItems = useMemo<ScheduledItem[]>(() => {
-    const items: ScheduledItem[] = [];
+    const occurrenceItems = scheduleOccurrences
+      .map((occurrence) => getScheduleOccurrenceTimeRange(occurrence))
+      .filter((item): item is ScheduledItem => !!item);
+    const seen = new Set(occurrenceItems.map((item) => `${item.memo.name}:${item.range.start.getTime()}`));
+
     for (const memo of scheduledMemos) {
       const range = getScheduleTimeRange(memo);
-      if (range) {
-        items.push({ memo, range });
+      if (!range || range.start < occurrenceRange.start || range.start >= occurrenceRange.end) {
+        continue;
       }
+
+      const key = `${memo.name}:${range.start.getTime()}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      occurrenceItems.push({
+        memo,
+        range,
+        occurrenceTime: range.start,
+        status: MemoScheduleOccurrence_Status.PENDING,
+        recurring: !!memo.scheduledRecurrence,
+      });
     }
-    return items;
-  }, [scheduledMemos]);
+
+    occurrenceItems.sort((a, b) => a.range.start.getTime() - b.range.start.getTime());
+    return occurrenceItems;
+  }, [occurrenceRange.end, occurrenceRange.start, scheduleOccurrences, scheduledMemos]);
+  const hasScheduleLoadError = !!scheduleOccurrencesError || !!scheduledMemosError;
 
   const {
     data: todoData,
@@ -119,6 +183,7 @@ const CalendarPage = () => {
   const todoMemos = useMemo(() => todoData?.pages.flatMap((page) => page.memos) ?? [], [todoData]);
 
   const { mutate: updateMemo } = useUpdateMemo();
+  const { mutate: upsertScheduleOccurrence } = useUpsertMemoScheduleOccurrence();
   const handleUpdateSchedule = useCallback(
     (memoName: string, patch: { scheduledTime: Date; scheduledDuration?: number }) => {
       const update: Partial<Memo> = { name: memoName, scheduledTime: timestampFromDate(patch.scheduledTime) };
@@ -130,6 +195,21 @@ const CalendarPage = () => {
       updateMemo({ update, updateMask });
     },
     [updateMemo],
+  );
+
+  const handleToggleOccurrence = useCallback(
+    (item: ScheduledItem) => {
+      if (!item.occurrenceTime) {
+        return;
+      }
+      upsertScheduleOccurrence({
+        memo: item.memo.name,
+        occurrenceTime: item.occurrenceTime,
+        status:
+          item.status === MemoScheduleOccurrence_Status.DONE ? MemoScheduleOccurrence_Status.PENDING : MemoScheduleOccurrence_Status.DONE,
+      });
+    },
+    [upsertScheduleOccurrence],
   );
 
   const openMemoEditor = useCallback((memo: Memo) => {
@@ -174,8 +254,6 @@ const CalendarPage = () => {
     }
     return map;
   }, [scheduleItems]);
-
-  const monthCells = useMemo(() => buildMonthMatrix(month, weekStartOffset), [month, weekStartOffset]);
 
   // useWeekdayLabels 固定从周日开始，按用户偏好的周起始日旋转表头以对齐网格。
   const rotatedWeekdayLabels = useMemo(
@@ -292,14 +370,44 @@ const CalendarPage = () => {
       </header>
 
       {editMemo && EditorComponent && (
-        <EditorComponent
-          autoFocus
-          className="mb-2"
-          cacheKey={`calendar-editor-${editMemo.name}`}
-          memo={editMemo}
-          onConfirm={() => setEditMemo(null)}
-          onCancel={() => setEditMemo(null)}
-        />
+        <div className="mb-2 flex flex-col gap-2">
+          {editMemo.scheduledTime && scheduleStats && (
+            <div className="grid gap-2 rounded-lg border bg-card p-3 text-sm sm:grid-cols-4">
+              <div>
+                <div className="text-xs text-muted-foreground">{t("memo.schedule.stats-completed")}</div>
+                <div className="font-semibold">
+                  {scheduleStats.completedCount}/{scheduleStats.expectedCount}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{t("memo.schedule.stats-current-streak")}</div>
+                <div className="font-semibold">{scheduleStats.currentStreak}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{t("memo.schedule.stats-longest-streak")}</div>
+                <div className="font-semibold">{scheduleStats.longestStreak}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{t("memo.schedule.stats-rate")}</div>
+                <div className="font-semibold">{Math.round(scheduleStats.completionRate * 100)}%</div>
+              </div>
+            </div>
+          )}
+          <EditorComponent
+            autoFocus
+            cacheKey={`calendar-editor-${editMemo.name}`}
+            memo={editMemo}
+            onConfirm={() => setEditMemo(null)}
+            onCancel={() => setEditMemo(null)}
+          />
+        </div>
+      )}
+
+      {hasScheduleLoadError && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertCircleIcon className="size-4 shrink-0" />
+          <span>{t("calendar.schedule-load-error")}</span>
+        </div>
       )}
 
       <div className="flex flex-col gap-4 md:flex-row">
@@ -343,9 +451,12 @@ const CalendarPage = () => {
                     </span>
                     {items.slice(0, MAX_BLOCKS_PER_CELL).map((item) => (
                       <span
-                        key={item.memo.name}
+                        key={`${item.memo.name}-${item.occurrenceTime?.toISOString() ?? item.range.start.toISOString()}`}
                         title={formatScheduleTooltip(item.range, i18n.language)}
-                        className="truncate rounded bg-primary/10 px-1 py-0.5 text-[10px] leading-3 text-primary"
+                        className={cn(
+                          "truncate rounded bg-primary/10 px-1 py-0.5 text-[10px] leading-3 text-primary",
+                          item.status === MemoScheduleOccurrence_Status.DONE && "text-muted-foreground line-through",
+                        )}
                       >
                         {formatBlockText(item)}
                       </span>
@@ -384,6 +495,7 @@ const CalendarPage = () => {
                 onUpdateSchedule={handleUpdateSchedule}
                 onDropTodo={(memoName, targetTime) => handleUpdateSchedule(memoName, { scheduledTime: targetTime })}
                 onOpenMemoEditor={openMemoEditor}
+                onToggleOccurrence={handleToggleOccurrence}
                 dayStartMin={dayStartMin}
                 dayEndMin={dayEndMin}
               />

@@ -62,6 +62,7 @@
     "no-time-todos": "无时间 todo",
     "no-todos": "暂无待办",
     "previous-month": "上个月",
+    "schedule-load-error": "日程加载异常，已尽量显示可用的一次性排程。",
     "week": "周"
   },
   "translation": {
@@ -364,7 +365,17 @@
     "schedule": {
       "clear": "清除日程",
       "duration": "时长",
+      "repeat": "重复",
+      "repeat-custom": "自定义日期",
+      "repeat-daily": "每天",
+      "repeat-none": "不重复",
+      "repeat-weekdays": "工作日",
+      "repeat-weekends": "周末",
       "set": "日程",
+      "stats-completed": "近 30 天完成",
+      "stats-current-streak": "当前连续",
+      "stats-longest-streak": "最长连续",
+      "stats-rate": "完成率",
       "time": "时间",
       "today": "今天",
       "tomorrow": "明天"

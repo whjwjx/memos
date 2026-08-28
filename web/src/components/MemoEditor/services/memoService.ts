@@ -60,6 +60,10 @@ function buildUpdateMask(
       ? create(DurationSchema, { seconds: BigInt(state.metadata.scheduledDuration) })
       : undefined;
   }
+  if (!isEqual(state.metadata.scheduledRecurrence, prevMemo.scheduledRecurrence)) {
+    mask.add("scheduled_recurrence");
+    patch.scheduledRecurrence = state.metadata.scheduledRecurrence;
+  }
 
   // Auto-update timestamp if content changed
   if (["content", "attachments", "relations", "location"].some((key) => mask.has(key))) {
@@ -124,6 +128,7 @@ export const memoService = {
       scheduledDuration: state.metadata.scheduledDuration
         ? create(DurationSchema, { seconds: BigInt(state.metadata.scheduledDuration) })
         : undefined,
+      scheduledRecurrence: state.metadata.scheduledRecurrence,
       createTime: state.timestamps.createTime ? timestampFromDate(state.timestamps.createTime) : undefined,
       updateTime: state.timestamps.updateTime ? timestampFromDate(state.timestamps.updateTime) : undefined,
     });
@@ -153,6 +158,7 @@ export const memoService = {
         location: memo.location,
         scheduledTime: memo.scheduledTime ? timestampDate(memo.scheduledTime) : undefined,
         scheduledDuration: memo.scheduledDuration ? Number(memo.scheduledDuration.seconds) : undefined,
+        scheduledRecurrence: memo.scheduledRecurrence,
       },
       timestamps: {
         createTime: memo.createTime ? timestampDate(memo.createTime) : undefined,

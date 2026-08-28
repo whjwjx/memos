@@ -51,8 +51,9 @@ type Memo struct {
 	Payload    *storepb.MemoPayload
 
 	// Schedule fields. Both are Unix epoch seconds and nullable; nil means unset.
-	ScheduledTime     *int64
-	ScheduledDuration *int64
+	ScheduledTime       *int64
+	ScheduledDuration   *int64
+	ScheduledRecurrence *MemoScheduleRecurrence
 
 	// Composed fields
 	ParentUID *string
@@ -70,10 +71,11 @@ type FindMemo struct {
 	CreatorID *int32
 
 	// Domain specific fields
-	VisibilityList  []Visibility
-	ExcludeContent  bool
-	ExcludeComments bool
-	Filters         []string
+	VisibilityList   []Visibility
+	ExcludeContent   bool
+	ExcludeComments  bool
+	HasScheduledTime *bool
+	Filters          []string
 
 	// Pagination
 	Limit  *int
@@ -108,10 +110,12 @@ type UpdateMemo struct {
 	// Schedule fields. ScheduledTime/ScheduledDuration are set when non-nil.
 	// ClearScheduledTime/ClearScheduledDuration force the column to NULL (clear
 	// the schedule) and take precedence over the corresponding value pointer.
-	ScheduledTime          *int64
-	ScheduledDuration      *int64
-	ClearScheduledTime     bool
-	ClearScheduledDuration bool
+	ScheduledTime            *int64
+	ScheduledDuration        *int64
+	ScheduledRecurrence      *MemoScheduleRecurrence
+	ClearScheduledTime       bool
+	ClearScheduledDuration   bool
+	ClearScheduledRecurrence bool
 }
 
 type DeleteMemo struct {
@@ -150,6 +154,9 @@ func (s *Store) UpdateMemo(ctx context.Context, update *UpdateMemo) error {
 }
 
 func (s *Store) DeleteMemo(ctx context.Context, delete *DeleteMemo) error {
+	if err := s.driver.DeleteMemoScheduleOccurrence(ctx, &DeleteMemoScheduleOccurrence{MemoID: &delete.ID}); err != nil {
+		return err
+	}
 	// Clean up memo_relation records where this memo is either the source or target.
 	if err := s.driver.DeleteMemoRelation(ctx, &DeleteMemoRelation{MemoID: &delete.ID}); err != nil {
 		return err

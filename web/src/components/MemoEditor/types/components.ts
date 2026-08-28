@@ -1,5 +1,5 @@
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
-import type { Location, Memo, Visibility } from "@/types/proto/api/v1/memo_service_pb";
+import type { Location, Memo, MemoScheduleRecurrence, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import type { AudioRecorderStatus } from "../hooks/useAudioRecorder";
 import type { LocalFile } from "./attachment";
 
@@ -103,7 +103,8 @@ export interface VisibilitySelectorProps {
 export interface ScheduleSelectorProps {
   value?: Date;
   duration?: number;
-  onChange: (scheduledTime?: Date, scheduledDuration?: number) => void;
+  recurrence?: MemoScheduleRecurrence;
+  onChange: (scheduledTime?: Date, scheduledDuration?: number, scheduledRecurrence?: MemoScheduleRecurrence) => void;
   onOpenChange?: (open: boolean) => void;
   /** Hide the trigger label on mobile to keep dense editor toolbars on one row. */
   mobileIconOnly?: boolean;

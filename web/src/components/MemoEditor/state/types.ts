@@ -1,5 +1,5 @@
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
-import type { Location, MemoRelation } from "@/types/proto/api/v1/memo_service_pb";
+import type { Location, MemoRelation, MemoScheduleRecurrence } from "@/types/proto/api/v1/memo_service_pb";
 import { Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import type { LocalFile } from "../types/attachment";
 
@@ -18,6 +18,8 @@ export interface EditorState {
     scheduledTime?: Date;
     /** Scheduled duration in seconds; undefined means a point event. */
     scheduledDuration?: number;
+    /** Recurrence rule for the scheduled memo. Undefined means it does not repeat. */
+    scheduledRecurrence?: MemoScheduleRecurrence;
   };
   ui: {
     isFocusMode: boolean;
@@ -63,6 +65,7 @@ const defaultState: EditorState = {
     location: undefined,
     scheduledTime: undefined,
     scheduledDuration: undefined,
+    scheduledRecurrence: undefined,
   },
   ui: {
     isFocusMode: false,

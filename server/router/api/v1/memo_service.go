@@ -154,6 +154,16 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 		}
 		create.ScheduledDuration = &scheduledDuration
 	}
+	if request.Memo.ScheduledRecurrence != nil {
+		if create.ScheduledTime == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "scheduled_time is required for scheduled_recurrence")
+		}
+		recurrence := convertScheduleRecurrenceToStore(request.Memo.ScheduledRecurrence)
+		if err := validateScheduleRecurrence(recurrence); err != nil {
+			return nil, err
+		}
+		create.ScheduledRecurrence = recurrence
+	}
 
 	preparedAttachments, err := s.prepareMemoAttachments(ctx, user, create, request.Memo.Attachments)
 	if err != nil {
@@ -619,6 +629,16 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 				}
 				update.ScheduledDuration = &scheduledDuration
 			}
+		} else if path == "scheduled_recurrence" {
+			if request.Memo.ScheduledRecurrence == nil {
+				update.ClearScheduledRecurrence = true
+			} else {
+				recurrence := convertScheduleRecurrenceToStore(request.Memo.ScheduledRecurrence)
+				if err := validateScheduleRecurrence(recurrence); err != nil {
+					return nil, err
+				}
+				update.ScheduledRecurrence = recurrence
+			}
 		} else if path == "location" {
 			if nextMemo.Payload == nil {
 				nextMemo.Payload = &storepb.MemoPayload{}
@@ -630,6 +650,12 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 		} else if path == "relations" {
 			relationsUpdated = true
 		}
+	}
+	if update.ClearScheduledTime {
+		update.ClearScheduledRecurrence = true
+	}
+	if update.ScheduledRecurrence != nil && update.ScheduledTime == nil && memo.ScheduledTime == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "scheduled_time is required for scheduled_recurrence")
 	}
 
 	var preparedAttachments *preparedMemoAttachments

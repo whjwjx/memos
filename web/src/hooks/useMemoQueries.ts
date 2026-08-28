@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
+import { FieldMaskSchema, timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   type InfiniteData,
   type QueryClient,
@@ -12,14 +12,28 @@ import {
 import { memoServiceClient } from "@/connect";
 import { userKeys } from "@/hooks/useUserQueries";
 import { DEFAULT_LIST_MEMOS_PAGE_SIZE } from "@/lib/constants";
-import type { ListMemosRequest, ListMemosResponse, Memo } from "@/types/proto/api/v1/memo_service_pb";
-import { ListMemoCommentsRequestSchema, ListMemosRequestSchema, MemoSchema } from "@/types/proto/api/v1/memo_service_pb";
+import type { ListMemosRequest, ListMemosResponse, Memo, MemoScheduleOccurrence } from "@/types/proto/api/v1/memo_service_pb";
+import {
+  GetMemoScheduleStatsRequestSchema,
+  ListMemoCommentsRequestSchema,
+  ListMemoScheduleOccurrencesRequestSchema,
+  ListMemosRequestSchema,
+  MemoScheduleOccurrence_Status,
+  MemoSchema,
+  UpsertMemoScheduleOccurrenceRequestSchema,
+} from "@/types/proto/api/v1/memo_service_pb";
 
 // Query keys factory for consistent cache management
 export const memoKeys = {
   all: ["memos"] as const,
   lists: () => [...memoKeys.all, "list"] as const,
   list: (filters: Partial<ListMemosRequest>) => [...memoKeys.lists(), filters] as const,
+  scheduleOccurrencesRoot: () => [...memoKeys.all, "scheduleOccurrences"] as const,
+  scheduleOccurrences: (startTime?: Date, endTime?: Date) =>
+    [...memoKeys.scheduleOccurrencesRoot(), startTime?.toISOString() ?? "", endTime?.toISOString() ?? ""] as const,
+  scheduleStatsRoot: () => [...memoKeys.all, "scheduleStats"] as const,
+  scheduleStats: (memo?: string, startTime?: Date, endTime?: Date) =>
+    [...memoKeys.scheduleStatsRoot(), memo ?? "", startTime?.toISOString() ?? "", endTime?.toISOString() ?? ""] as const,
   details: () => [...memoKeys.all, "detail"] as const,
   detail: (name: string) => [...memoKeys.details(), name] as const,
   comments: (name: string) => [...memoKeys.all, "comments", name] as const,
@@ -35,6 +49,7 @@ export const memoDetailQueryOptions = (name: string) =>
 
 type MemoPatch = Partial<Memo> & Pick<Memo, "name">;
 type MemoCollectionQueryData = ListMemosResponse | InfiniteData<ListMemosResponse>;
+type MemoScheduleOccurrenceQueryData = MemoScheduleOccurrence[];
 
 function isMemoListResponse(data: unknown): data is ListMemosResponse {
   return typeof data === "object" && data !== null && Array.isArray((data as { memos?: unknown }).memos);
@@ -123,6 +138,30 @@ function patchMemoInCollectionQueries(queryClient: QueryClient, update: MemoPatc
   queryClient.setQueriesData<MemoCollectionQueryData>({ queryKey: memoKeys.all }, (data) => patchMemoListQueryData(data, update));
 }
 
+function patchMemoInScheduleOccurrenceQueries(queryClient: QueryClient, update: MemoPatch) {
+  queryClient.setQueriesData<MemoScheduleOccurrenceQueryData>({ queryKey: memoKeys.scheduleOccurrencesRoot() }, (data) => {
+    if (!data) {
+      return data;
+    }
+
+    let changed = false;
+    const occurrences = data.map((occurrence) => {
+      if (occurrence.memo !== update.name || !occurrence.memoDetail) {
+        return occurrence;
+      }
+
+      changed = true;
+      return {
+        ...occurrence,
+        scheduledDuration: update.scheduledDuration ?? occurrence.scheduledDuration,
+        memoDetail: { ...occurrence.memoDetail, ...update },
+      };
+    });
+
+    return changed ? occurrences : data;
+  });
+}
+
 export function useMemos(request: Partial<ListMemosRequest> = {}) {
   return useQuery({
     queryKey: memoKeys.list(request),
@@ -150,6 +189,97 @@ export function useInfiniteMemos(request: Partial<ListMemosRequest> = {}, option
     staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 5,
     enabled: options?.enabled ?? true,
+  });
+}
+
+export function useMemoScheduleOccurrences(startTime?: Date, endTime?: Date, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: memoKeys.scheduleOccurrences(startTime, endTime),
+    queryFn: async () => {
+      const response = await memoServiceClient.listMemoScheduleOccurrences(
+        create(ListMemoScheduleOccurrencesRequestSchema, {
+          startTime: startTime ? timestampFromDate(startTime) : undefined,
+          endTime: endTime ? timestampFromDate(endTime) : undefined,
+        }),
+      );
+      return response.occurrences;
+    },
+    enabled: (options?.enabled ?? true) && !!startTime && !!endTime,
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useMemoScheduleStats(memo?: string, startTime?: Date, endTime?: Date, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: memoKeys.scheduleStats(memo, startTime, endTime),
+    queryFn: async () => {
+      const response = await memoServiceClient.getMemoScheduleStats(
+        create(GetMemoScheduleStatsRequestSchema, {
+          memo,
+          startTime: startTime ? timestampFromDate(startTime) : undefined,
+          endTime: endTime ? timestampFromDate(endTime) : undefined,
+        }),
+      );
+      return response;
+    },
+    enabled: (options?.enabled ?? true) && !!memo && !!startTime && !!endTime,
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useUpsertMemoScheduleOccurrence() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ memo, occurrenceTime, status }: { memo: string; occurrenceTime: Date; status: MemoScheduleOccurrence_Status }) => {
+      return memoServiceClient.upsertMemoScheduleOccurrence(
+        create(UpsertMemoScheduleOccurrenceRequestSchema, {
+          memo,
+          occurrenceTime: timestampFromDate(occurrenceTime),
+          status,
+        }),
+      );
+    },
+    onMutate: async ({ memo, occurrenceTime, status }) => {
+      await queryClient.cancelQueries({ queryKey: memoKeys.scheduleOccurrencesRoot() });
+      const previousQueries = queryClient.getQueriesData<MemoScheduleOccurrenceQueryData>({
+        queryKey: memoKeys.scheduleOccurrencesRoot(),
+      });
+      const targetTime = occurrenceTime.getTime();
+
+      queryClient.setQueriesData<MemoScheduleOccurrenceQueryData>({ queryKey: memoKeys.scheduleOccurrencesRoot() }, (data) => {
+        if (!data) {
+          return data;
+        }
+
+        let changed = false;
+        const next = data.map((occurrence) => {
+          if (occurrence.memo !== memo || !occurrence.occurrenceTime || timestampDate(occurrence.occurrenceTime).getTime() !== targetTime) {
+            return occurrence;
+          }
+
+          changed = true;
+          return {
+            ...occurrence,
+            status,
+            completedTime: status === MemoScheduleOccurrence_Status.DONE ? timestampFromDate(new Date()) : undefined,
+          };
+        });
+
+        return changed ? next : data;
+      });
+
+      return { previousQueries };
+    },
+    onError: (_err, _variables, context) => {
+      for (const [queryKey, data] of context?.previousQueries ?? []) {
+        queryClient.setQueryData(queryKey, data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleOccurrencesRoot() });
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleStatsRoot() });
+    },
   });
 }
 
@@ -195,6 +325,8 @@ export function useCreateMemo() {
     onSuccess: (newMemo) => {
       // Invalidate memo lists to refetch
       queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleOccurrencesRoot() });
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleStatsRoot() });
       // Add new memo to cache
       queryClient.setQueryData(memoKeys.detail(newMemo.name), newMemo);
       // Invalidate user stats
@@ -232,6 +364,7 @@ export function useUpdateMemo() {
         queryClient.setQueryData(memoKeys.detail(update.name), { ...previousMemo, ...memoPatch });
       }
       patchMemoInCollectionQueries(queryClient, memoPatch);
+      patchMemoInScheduleOccurrenceQueries(queryClient, memoPatch);
 
       return { previousMemo };
     },
@@ -240,6 +373,7 @@ export function useUpdateMemo() {
       if (context?.previousMemo && update.name) {
         queryClient.setQueryData(memoKeys.detail(update.name), context.previousMemo);
         patchMemoInCollectionQueries(queryClient, context.previousMemo);
+        patchMemoInScheduleOccurrenceQueries(queryClient, context.previousMemo);
       } else {
         queryClient.invalidateQueries({ queryKey: memoKeys.all });
       }
@@ -248,8 +382,11 @@ export function useUpdateMemo() {
       // Update cache with server response
       queryClient.setQueryData(memoKeys.detail(updatedMemo.name), updatedMemo);
       patchMemoInCollectionQueries(queryClient, updatedMemo);
+      patchMemoInScheduleOccurrenceQueries(queryClient, updatedMemo);
       // Invalidate lists to refresh
       queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleOccurrencesRoot() });
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleStatsRoot() });
       if (updatedMemo.parent) {
         queryClient.invalidateQueries({ queryKey: memoKeys.comments(updatedMemo.parent) });
       }
@@ -272,6 +409,8 @@ export function useDeleteMemo() {
       queryClient.removeQueries({ queryKey: memoKeys.detail(name) });
       // Invalidate lists
       queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleOccurrencesRoot() });
+      queryClient.invalidateQueries({ queryKey: memoKeys.scheduleStatsRoot() });
       // Invalidate user stats
       queryClient.invalidateQueries({ queryKey: userKeys.stats() });
     },

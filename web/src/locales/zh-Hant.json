@@ -54,6 +54,18 @@
     "banner-title": "Memos demo",
     "deploy-link": "部署您的 Memos"
   },
+  "calendar": {
+    "active-hours": "活躍時段",
+    "drag-to-schedule": "拖曳到日曆上以安排時間",
+    "month": "月",
+    "next-month": "下個月",
+    "no-schedules": "暫無排程",
+    "no-time-todos": "無時間 todo",
+    "no-todos": "暫無待辦",
+    "previous-month": "上個月",
+    "schedule-load-error": "日程載入異常，已盡量顯示可用的一次性排程。",
+    "week": "週"
+  },
   "attachment-details": {
     "actions": {
       "copied": "已複製座標",
@@ -437,6 +449,24 @@
       "protected-description": "已登入的使用者可見",
       "public": "公開",
       "public-description": "所有人皆可見"
+    },
+    "schedule": {
+      "clear": "清除日程",
+      "duration": "時長",
+      "repeat": "重複",
+      "repeat-custom": "自訂日期",
+      "repeat-daily": "每天",
+      "repeat-none": "不重複",
+      "repeat-weekdays": "工作日",
+      "repeat-weekends": "週末",
+      "set": "日程",
+      "stats-completed": "近 30 天完成",
+      "stats-current-streak": "目前連續",
+      "stats-longest-streak": "最長連續",
+      "stats-rate": "完成率",
+      "time": "時間",
+      "today": "今天",
+      "tomorrow": "明天"
     }
   },
   "message": {

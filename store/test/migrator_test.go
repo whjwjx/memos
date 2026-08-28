@@ -25,6 +25,7 @@ func TestFreshInstall(t *testing.T) {
 	// NewTestingStore creates a fresh database and runs Migrate()
 	// which applies LATEST.sql for uninitialized databases
 	ts := NewTestingStore(ctx, t)
+	defer ts.Close()
 
 	// Verify migration completed successfully
 	currentSchemaVersion, err := ts.GetCurrentSchemaVersion()
@@ -113,6 +114,64 @@ func TestMigrationMultipleReRuns(t *testing.T) {
 	finalVersion, err := ts.GetCurrentSchemaVersion()
 	require.NoError(t, err)
 	require.Equal(t, initialVersion, finalVersion, "version should remain unchanged after multiple re-runs")
+}
+
+func TestMigrationAddsMemoScheduleOccurrenceCompletedTs(t *testing.T) {
+	if getDriverFromEnv() != "sqlite" {
+		t.Skip("skipping focused migration fixture for non-sqlite driver")
+	}
+
+	ctx := context.Background()
+	dsn := fmt.Sprintf("%s/memos_schedule_occurrence_migration.db", t.TempDir())
+	db, err := sql.Open("sqlite", dsn)
+	require.NoError(t, err)
+
+	_, err = db.ExecContext(ctx, `
+		CREATE TABLE system_setting (
+			name TEXT NOT NULL,
+			value TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			UNIQUE(name)
+		);
+		CREATE TABLE memo (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uid TEXT NOT NULL UNIQUE,
+			scheduled_recurrence TEXT DEFAULT NULL
+		);
+		CREATE TABLE memo_schedule_occurrence (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			memo_id INTEGER NOT NULL,
+			occurrence_time BIGINT NOT NULL,
+			status TEXT NOT NULL CHECK (status IN ('DONE')),
+			created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			UNIQUE(memo_id, occurrence_time),
+			FOREIGN KEY (memo_id) REFERENCES memo(id) ON DELETE CASCADE
+		);
+		CREATE INDEX idx_memo_schedule_occurrence_memo_time ON memo_schedule_occurrence(memo_id, occurrence_time);
+	`)
+	require.NoError(t, err)
+	basicSettingBytes, err := protojson.Marshal(&storepb.InstanceBasicSetting{SchemaVersion: "0.36.1"})
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, "INSERT INTO system_setting (name, value, description) VALUES ('BASIC', ?, '')", string(basicSettingBytes))
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, "INSERT INTO memo (id, uid) VALUES (1, 'scheduled-migration-memo')")
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, "INSERT INTO memo_schedule_occurrence (memo_id, occurrence_time, status) VALUES (1, 1798425600, 'DONE')")
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	ts := NewTestingStoreWithDSN(ctx, t, "sqlite", dsn)
+	require.NoError(t, ts.Migrate(ctx))
+	defer ts.Close()
+
+	var completedTs int64
+	require.NoError(t, ts.GetDriver().GetDB().QueryRowContext(ctx, "SELECT completed_ts FROM memo_schedule_occurrence").Scan(&completedTs))
+	require.NotZero(t, completedTs)
+
+	setting, err := ts.GetInstanceBasicSetting(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "0.36.2", setting.SchemaVersion)
 }
 
 // TestMigrationStorageSetting verifies that the legacy singleton storage
