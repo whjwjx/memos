@@ -7,7 +7,6 @@ WORKDIR /usr/local/memos
 
 COPY memos-linux /usr/local/memos/memos
 RUN chmod +x /usr/local/memos/memos
-COPY dist /usr/local/memos/server/router/frontend/dist
 
 # memos 数据目录（运行时挂载卷）
 ENV MEMOS_DATA=/.memos
