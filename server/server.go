@@ -83,6 +83,7 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 	rss.NewRSSService(s.Profile, s.Store, apiV1Service.MarkdownService).RegisterRoutes(rootGroup)
 
 	// Register gRPC gateway as api v1 (includes SSE endpoint on CORS-enabled group).
+	apiV1Service.RegisterBackupRoutes(echoServer)
 	if err := apiV1Service.RegisterGateway(ctx, echoServer); err != nil {
 		return nil, errors.Wrap(err, "failed to register gRPC gateway")
 	}
