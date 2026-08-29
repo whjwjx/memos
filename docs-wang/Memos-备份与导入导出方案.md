@@ -330,11 +330,16 @@ Content-Type: multipart/form-data
 管理员全站导入：
 
 ```http
-POST /api/v1/admin/import
+POST /api/v1/import?scope=all
 Content-Type: multipart/form-data
 ```
 
-MVP 也可以先放在 instance namespace 下，但长期建议单独做 ImportExportService，避免和灾备 backup API 混淆。
+当前 MVP 采用统一入口：
+
+- `scope=mine` 是默认值，普通用户和管理员都可以使用。
+- `scope=all` 只允许管理员使用。
+- 导入接口使用 multipart 表单，文件字段名是 `file`。
+- 导出和导入都走结构化 zip，不直接读写数据库文件。
 
 ## 6. MVP 分阶段
 
@@ -353,7 +358,7 @@ MVP 也可以先放在 instance namespace 下，但长期建议单独做 ImportE
 目标：
 
 - 用户可导出自己的 memos。
-- 包含自己 memo 关联的本地附件。
+- 包含自己 memo 关联的附件内容。
 - 导出格式使用 `memos-export-v1.zip`。
 - 不直接导出数据库文件。
 
@@ -362,7 +367,8 @@ MVP 也可以先放在 instance namespace 下，但长期建议单独做 ImportE
 - memos
 - attachments
 - memo 与 attachment 绑定关系
-- 基础 relation/reaction 可后续补
+- memo relation
+- reaction
 
 ### 阶段 C：个人导入
 
@@ -374,6 +380,25 @@ MVP 也可以先放在 instance namespace 下，但长期建议单独做 ImportE
 - 返回导入报告。
 
 这是产品级导入/导出的核心闭环。
+
+当前 MVP 已按这个方向实现后端 API：
+
+```http
+GET /api/v1/export:download
+POST /api/v1/import
+```
+
+幂等规则：
+
+- memo UID 已存在时跳过，不重复创建。
+- attachment UID 已存在时跳过，不重复创建。
+- relation/reaction 使用现有 upsert 或导入前检查，重复导入不会制造重复数据。
+
+限制：
+
+- attachment 创建时间暂不保留，导入后会使用目标实例当前创建时间。
+- 导入附件会重新走目标实例当前存储配置，不复用源实例的本地绝对路径或 S3 对象引用。
+- `scope=mine` 导入时，所有 memo/attachment/reaction 都归属于当前登录用户。
 
 ### 阶段 D：管理员全站导出/导入
 
@@ -394,6 +419,12 @@ MVP 也可以先放在 instance namespace 下，但长期建议单独做 ImportE
 - instance settings 是否导入。
 
 建议这一阶段晚一点做，不要塞进第一版。
+
+当前 MVP 后端已预留 `scope=all`：
+
+- 管理员可以导出全站结构化 zip。
+- 管理员可以导入 `scope=all`，但只映射目标实例中已存在的 username。
+- 不自动创建用户，不处理 username/email 冲突；缺失用户的数据会跳过并出现在导入报告 warnings 中。
 
 ## 7. 不建议第一版处理的内容
 
