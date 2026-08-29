@@ -76,7 +76,7 @@ func (s *APIV1Service) exportBackup(c *echo.Context, authenticator *auth.Authent
 
 	databasePath, err := resolveBackupDBPath(s.Profile.DSN)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve database path").SetInternal(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve database path").Wrap(err)
 	}
 	db := driver.GetDB()
 	if db == nil {
@@ -85,7 +85,7 @@ func (s *APIV1Service) exportBackup(c *echo.Context, authenticator *auth.Authent
 
 	tmpDir, err := os.MkdirTemp("", "memos-backup-")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create temporary directory").SetInternal(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create temporary directory").Wrap(err)
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -95,12 +95,12 @@ func (s *APIV1Service) exportBackup(c *echo.Context, authenticator *auth.Authent
 
 	manifest, err := s.createBackupZip(ctx, db, zipFilePath, snapshotPath, databasePath)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create backup zip").SetInternal(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create backup zip").Wrap(err)
 	}
 
 	zipSize, err := getFileSize(zipFilePath)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read backup zip").SetInternal(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read backup zip").Wrap(err)
 	}
 
 	c.Response().Header().Set(echo.HeaderContentType, "application/zip")
@@ -120,11 +120,11 @@ func (s *APIV1Service) exportBackup(c *echo.Context, authenticator *auth.Authent
 
 	zipFile, err := os.Open(zipFilePath)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to open backup file").SetInternal(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to open backup file").Wrap(err)
 	}
 	defer zipFile.Close()
 	if _, err := io.Copy(c.Response(), zipFile); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to write backup file").SetInternal(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to write backup file").Wrap(err)
 	}
 	return nil
 }
@@ -239,25 +239,14 @@ func (s *APIV1Service) addLocalAttachmentsToZip(ctx context.Context, zipWriter *
 				continue
 			}
 
-			relativeReference := filepath.ToSlash(attachment.Reference)
-			if relativeReference == "" {
+			localPath, zipEntry, err := resolveLocalAttachmentBackupPath(s.Profile.Data, attachment.Reference)
+			if err != nil {
 				skippedCount++
-				addBackupReason(&skippedReasons, fmt.Sprintf("%s: empty attachment reference", attachment.UID), maxBackupAttachmentWarns)
-				continue
-			}
-			if strings.HasPrefix(relativeReference, "../") || strings.Contains(relativeReference, "/../") || strings.HasPrefix(relativeReference, "..\\") || strings.Contains(relativeReference, "\\../") {
-				skippedCount++
-				addBackupReason(&skippedReasons, fmt.Sprintf("%s: unsafe reference path", attachment.UID), maxBackupAttachmentWarns)
-				continue
-			}
-			if filepath.IsAbs(attachment.Reference) {
-				skippedCount++
-				addBackupReason(&skippedReasons, fmt.Sprintf("%s: absolute reference path", attachment.UID), maxBackupAttachmentWarns)
+				addBackupReason(&skippedReasons, fmt.Sprintf("%s: %v", attachment.UID, err), maxBackupAttachmentWarns)
 				continue
 			}
 
-			localPath := filepath.Join(s.Profile.Data, filepath.FromSlash(attachment.Reference))
-			if err := addFileToZip(zipWriter, path.Join("attachments", relativeReference), localPath); err != nil {
+			if err := addFileToZip(zipWriter, zipEntry, localPath); err != nil {
 				skippedCount++
 				addBackupReason(&skippedReasons, fmt.Sprintf("%s: %v", attachment.UID, err), maxBackupAttachmentWarns)
 				continue
@@ -272,6 +261,36 @@ func (s *APIV1Service) addLocalAttachmentsToZip(ctx context.Context, zipWriter *
 	}
 
 	return totalCount, localCount, skippedCount, skippedReasons
+}
+
+func resolveLocalAttachmentBackupPath(dataDir string, reference string) (string, string, error) {
+	if strings.TrimSpace(reference) == "" {
+		return "", "", errors.New("empty attachment reference")
+	}
+
+	dataDirAbs, err := filepath.Abs(dataDir)
+	if err != nil {
+		return "", "", errors.Wrap(err, "failed to resolve data directory")
+	}
+	referencePath := filepath.FromSlash(reference)
+	localPath := referencePath
+	if !filepath.IsAbs(localPath) {
+		localPath = filepath.Join(dataDirAbs, localPath)
+	}
+	localPath, err = filepath.Abs(filepath.Clean(localPath))
+	if err != nil {
+		return "", "", errors.Wrap(err, "failed to resolve attachment path")
+	}
+
+	relativePath, err := filepath.Rel(dataDirAbs, localPath)
+	if err != nil {
+		return "", "", errors.Wrap(err, "failed to resolve attachment relative path")
+	}
+	if relativePath == "." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) || relativePath == ".." || filepath.IsAbs(relativePath) {
+		return "", "", errors.New("attachment reference is outside data directory")
+	}
+
+	return localPath, path.Join("attachments", filepath.ToSlash(relativePath)), nil
 }
 
 func writeManifestToZip(zipWriter *zip.Writer, manifestData []byte) error {
