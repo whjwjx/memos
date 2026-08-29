@@ -12,6 +12,24 @@ Memos is an open-source, self-hosted note-taking app built for quick capture. It
 [![Discord](https://img.shields.io/badge/💬-Discord-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/tfPJa4UmAv)
 [![Docker Pulls](https://img.shields.io/docker/pulls/neosmemo/memos?style=flat-square&logo=docker)](https://hub.docker.com/r/neosmemo/memos)
 
+## Personal Fork
+
+This repository is my personal second-development fork of Memos. The goal is to keep the original lightweight memo experience while extending it into a daily-use personal knowledge and task system.
+
+Main customization directions:
+
+- AI-assisted organization: AI Tags, AI Comment, review workflow, saved translation records, and AI-readable translation history.
+- Task and workflow support: scheduled task features and personal memo-to-todo workflows.
+- Reading and interaction improvements: hidden-by-default comments, mobile save button improvements, swipe sidebar optimization, pinned memo navigation fixes, and long memo collapse / expand behavior.
+- Personal automation: a local backup MVP is in progress, and a personal memos skill supports editing, pinned memo search, and batch processing.
+- Private deployment: this fork is maintained on a `dev`-first workflow and deployed through a personal VPS with Docker and Nginx.
+
+Personal documentation:
+
+- `docs-wang/CHANGELOG.md` — Personal fork changes and roadmap.
+- `docs-wang/memos-deploy-sop.md` — Private deployment SOP.
+- `docs-wang/Memos-备份与导入导出方案.md` — Backup, restore, import, and export notes.
+
 <img src="https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/demo.png" alt="Memos Demo Screenshot" height="512" />
 
 ## Features
