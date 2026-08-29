@@ -1,4 +1,5 @@
 import {
+  ArchiveIcon,
   BarChart3Icon,
   CogIcon,
   DatabaseIcon,
@@ -18,6 +19,7 @@ import {
 import { type ComponentType } from "react";
 import AccessTokenSection from "@/components/Settings/AccessTokenSection";
 import AISection from "@/components/Settings/AISection";
+import DataSection from "@/components/Settings/DataSection";
 import InstanceSection from "@/components/Settings/InstanceSection";
 import LogSection from "@/components/Settings/LogSection";
 import MemberSection from "@/components/Settings/MemberSection";
@@ -35,6 +37,7 @@ import { InstanceSetting_Key } from "@/types/proto/api/v1/instance_service_pb";
 export type SettingSectionKey =
   | "my-account"
   | "access-token"
+  | "data"
   | "preference"
   | "webhook"
   | "member"
@@ -73,6 +76,13 @@ export const SETTINGS_SECTIONS: SettingSectionDefinition[] = [
     labelKey: "setting.access-token.label",
     icon: KeyRoundIcon,
     component: AccessTokenSection,
+  },
+  {
+    key: "data",
+    scope: "basic",
+    labelKey: "setting.data.label",
+    icon: ArchiveIcon,
+    component: DataSection,
   },
   {
     key: "preference",

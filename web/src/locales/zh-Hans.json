@@ -528,6 +528,23 @@
     "go-to-home": "回到首页"
   },
   "setting": {
+    "data": {
+      "admin-data": "全站数据",
+      "admin-data-description": "导出或导入所有用户的 memo。导入时只映射当前实例已存在的用户名。",
+      "description": "将 Memos 数据导出为结构化 zip，或导入之前的导出包；重复 memo 和附件会自动跳过。",
+      "export-all-data": "导出全部数据",
+      "export-my-data": "导出我的数据",
+      "export-success": "已开始导出",
+      "exporting": "导出中...",
+      "import-all-data": "导入全部数据",
+      "import-my-data": "导入我的数据",
+      "import-success": "导入完成：新增 {{created}}，跳过 {{skipped}}",
+      "import-warning": "导入完成，但有 {{count}} 条提醒。",
+      "importing": "导入中...",
+      "label": "数据",
+      "my-data": "我的数据",
+      "my-data-description": "导出或导入当前账号的 memo 和附件。"
+    },
     "member": {
       "active": "启用中",
       "admin": "管理员",

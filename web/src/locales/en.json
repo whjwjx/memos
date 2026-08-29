@@ -603,6 +603,23 @@
     "go-to-home": "Go to Home"
   },
   "setting": {
+    "data": {
+      "admin-data": "Admin data",
+      "admin-data-description": "Export or import all users' memos. Import maps data only to usernames that already exist on this instance.",
+      "description": "Export structured Memos data as a zip, or import a previous export without creating duplicate memo and attachment records.",
+      "export-all-data": "Export all data",
+      "export-my-data": "Export my data",
+      "export-success": "Export started",
+      "exporting": "Exporting...",
+      "import-all-data": "Import all data",
+      "import-my-data": "Import my data",
+      "import-success": "Import finished: {{created}} created, {{skipped}} skipped",
+      "import-warning": "Import completed with {{count}} warnings.",
+      "importing": "Importing...",
+      "label": "Data",
+      "my-data": "My data",
+      "my-data-description": "Export or import memos and attachments for the current account."
+    },
     "access-token": {
       "access-token-copied-to-clipboard": "Access token copied to clipboard",
       "access-token-deleted": "Access token `{{description}}` deleted",
