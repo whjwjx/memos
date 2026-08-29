@@ -269,3 +269,24 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 镜像：`memos-ai:local`（哈希 `eb3d7124`），容器 recreate 时间 `2026-08-27T23:41:16Z`（北京时间 8-28 07:41）。
 - 校验：容器内 / 公网 / 构建输出三方前端资产均为 `index-C90aBcPR.js`；API `/api/v1/memos?limit=1` 正常；日志无异常。
 - **构建踩坑修复**：本次 `docker build` 首报 `/dist not found`，根因是 8.3 清理删了服务器 `deploy/dist`，而 `Dockerfile.runtime` 还留 `COPY dist` 冗余行（SOP 1 已注明前端已 embed，该 COPY 无效）。已**从 `deploy/Dockerfile.runtime` 删除该行**（本地 + 服务器同步），根治后再构建成功。今后清理 `dist` 不再影响部署，该 Dockerfile 改动需提交进仓库。
+
+### 8.5 部署记录（2026-08-28 第二次）
+
+> 完整重新部署：纳入 pinned tags / review polish（`fa8e15e7`）、recurring schedule（`e4622ced` merge codex/recurring-schedule-mvp）。Dockerfile 冗余 `COPY dist` 已在 8.4 修复，本次构建一次成功。
+
+- 代码：`dev` HEAD = `fa8e15e7`（merge pinned tags review polish，含 `e4622ced` recurring schedule）。
+- 构建：`pnpm release`（资产 `index-xHeTUHvp.js`，5118 modules）→ `go build`（linux/amd64，102MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260828b/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `d62f3508`），容器 recreate 时间 `2026-08-28T11:52:50Z`（北京时间 8-28 19:52）。
+- 校验：容器内 / 公网 / 构建输出三方前端资产均为 `index-xHeTUHvp.js`；API `/api/v1/memos?limit=1` 正常；日志无异常。
+
+### 8.6 部署记录（2026-08-29）
+
+> 完整重新部署：纳入 structured import/export（`58f7376a` merge）、backup export mvp（`89a54d8d` merge）、personal fork notes（`01abe23c` docs）。
+
+- 代码：`dev` HEAD = `58f7376a`（merge structured import export，含 `89a54d8d` backup export、`01abe23c` fork notes）。
+- 构建：`pnpm release`（资产 `index-tZGYqm1N.js`，5120 modules）→ `go build`（linux/amd64，102MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260829/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `3390505a`），容器 recreate 时间 `2026-08-29T15:14:02Z`（北京时间 8-29 23:14）。
+- 校验：容器内 / 公网 / 构建输出三方前端资产均为 `index-tZGYqm1N.js`；API `/api/v1/memos?limit=1` 正常；日志无异常。
+- 备注：本次 C 盘 52GB 充足，无需 `go clean -cache`；Dockerfile 已无 `COPY dist`，构建一次成功。
