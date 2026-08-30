@@ -85,8 +85,36 @@ function isCombiningMark(value: string): boolean {
   return isInRanges(value.codePointAt(0) ?? 0, COMBINING_MARK_RANGES);
 }
 
+const TAG_PUNCTUATION = new Set([
+  "-",
+  "+",
+  "&",
+  ".",
+  "_",
+  ":",
+  ",",
+  "!",
+  "?",
+  "·",
+  "×",
+  "‘",
+  "’",
+  "“",
+  "”",
+  "（",
+  "）",
+  "《",
+  "》",
+  "、",
+  "。",
+  "，",
+  "！",
+  "？",
+  "：",
+]);
+
 function isExtensionUnit(value: string): boolean {
-  return value === "-" || value === "+" || value === "&";
+  return TAG_PUNCTUATION.has(value);
 }
 
 function isApostropheJoiner(value: string): boolean {

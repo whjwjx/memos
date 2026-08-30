@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	storepb "github.com/usememos/memos/proto/gen/store"
+	"github.com/usememos/memos/store"
 )
 
 func TestParseImportExportScope(t *testing.T) {
@@ -155,6 +156,43 @@ func TestSanitizeAttachmentPayloadDropsS3Object(t *testing.T) {
 	require.Equal(t, "motion-group", sanitized.GetMotionMedia().GetGroupId())
 	require.Equal(t, int32(100), sanitized.GetMediaMetadata().GetWidth())
 	require.Equal(t, int32(200), sanitized.GetMediaMetadata().GetHeight())
+}
+
+func TestImportUIDMapperScopesMineByUser(t *testing.T) {
+	t.Parallel()
+
+	alice := &store.User{ID: 1}
+	bob := &store.User{ID: 2}
+
+	aliceMapper := newImportUIDMapper(alice, importExportScopeMine)
+	bobMapper := newImportUIDMapper(bob, importExportScopeMine)
+	allMapper := newImportUIDMapper(alice, importExportScopeAll)
+
+	require.Equal(t, aliceMapper.memoUID("memo-source"), aliceMapper.memoUID("memo-source"))
+	require.Equal(t, aliceMapper.attachmentUID("att-source"), aliceMapper.attachmentUID("att-source"))
+	require.NotEqual(t, aliceMapper.memoUID("memo-source"), bobMapper.memoUID("memo-source"))
+	require.NotEqual(t, aliceMapper.attachmentUID("att-source"), bobMapper.attachmentUID("att-source"))
+	require.Equal(t, "memo-source", allMapper.memoUID("memo-source"))
+	require.Equal(t, "att-source", allMapper.attachmentUID("att-source"))
+}
+
+func TestRewriteImportedAttachmentLinks(t *testing.T) {
+	t.Parallel()
+
+	content := `![image](/file/attachments/old-att/image.png)
+<img src="/file/attachments/second-att">
+/file/attachments/missing-att
+https://example.com/file/attachments/old-att`
+
+	got := rewriteImportedAttachmentLinks(content, map[string]string{
+		"old-att":    "att-new",
+		"second-att": "att-second-new",
+	})
+
+	require.Contains(t, got, "![image](/file/attachments/att-new/image.png)")
+	require.Contains(t, got, `<img src="/file/attachments/att-second-new">`)
+	require.Contains(t, got, "/file/attachments/missing-att")
+	require.Contains(t, got, "https://example.com/file/attachments/old-att")
 }
 
 func TestImportExportManifestJSON(t *testing.T) {

@@ -613,6 +613,7 @@
       "export-my-data": "Export my data",
       "export-success": "Export started",
       "exporting": "Exporting...",
+      "flomo-package-title": "flomo data package",
       "import-all-data": "Import all data",
       "import-all-memos-package": "Import all Memos data package",
       "import-flomo-package": "Import flomo data package",
@@ -625,6 +626,7 @@
       "import-warning": "Import completed with {{count}} warnings.",
       "importing": "Importing...",
       "label": "Data",
+      "memos-package-title": "Memos data package",
       "my-data": "My data",
       "my-data-description": "Export or import memos and attachments for the current account."
     },

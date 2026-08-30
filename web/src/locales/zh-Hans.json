@@ -538,6 +538,7 @@
       "export-my-data": "导出我的数据",
       "export-success": "已开始导出",
       "exporting": "导出中...",
+      "flomo-package-title": "flomo 数据包",
       "import-all-data": "导入全部数据",
       "import-all-memos-package": "导入全部 Memos 数据包",
       "import-flomo-package": "导入 flomo 数据包",
@@ -550,6 +551,7 @@
       "import-warning": "导入完成，但有 {{count}} 条提醒。",
       "importing": "导入中...",
       "label": "数据",
+      "memos-package-title": "Memos 数据包",
       "my-data": "我的数据",
       "my-data-description": "导出或导入当前账号的 memo 和附件。"
     },

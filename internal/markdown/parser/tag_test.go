@@ -56,7 +56,7 @@ func TestFindTagMatches(t *testing.T) {
 		{
 			name:        "tag followed by punctuation",
 			input:       "#tag.",
-			expectedTag: "tag",
+			expectedTag: "tag.",
 			shouldParse: true,
 		},
 		{
@@ -122,7 +122,7 @@ func TestFindTagMatches(t *testing.T) {
 		{
 			name:        "hierarchical tag followed by punctuation",
 			input:       "#project/2024.",
-			expectedTag: "project/2024",
+			expectedTag: "project/2024.",
 			shouldParse: true,
 		},
 		{
@@ -146,7 +146,19 @@ func TestFindTagMatches(t *testing.T) {
 		{
 			name:        "Chinese tag followed by punctuation",
 			input:       "#测试。",
-			expectedTag: "测试",
+			expectedTag: "测试。",
+			shouldParse: true,
+		},
+		{
+			name:        "flomo style decimal section tag",
+			input:       "#Books/笔记的方法/2.记录篇/2.标签分类 ",
+			expectedTag: "Books/笔记的方法/2.记录篇/2.标签分类",
+			shouldParse: true,
+		},
+		{
+			name:        "flomo style quoted multiplication tag",
+			input:       "#Books/九宫格写作法/01用“九宫格×自问自答”变身写作达人 ",
+			expectedTag: "Books/九宫格写作法/01用“九宫格×自问自答”变身写作达人",
 			shouldParse: true,
 		},
 		{
@@ -230,7 +242,7 @@ func TestFindTagMatchesMemosTagV1(t *testing.T) {
 		{name: "apostrophe cannot start", input: "#'tag", shouldParse: false},
 		{name: "apostrophe cannot end", input: "#users'", expectedTag: "users", expectedSource: "#users", expectedRest: "'", shouldParse: true},
 		{name: "apostrophe cannot repeat", input: "#rock''roll", expectedTag: "rock", expectedSource: "#rock", expectedRest: "''roll", shouldParse: true},
-		{name: "left curly quote terminates", input: "#O‘Brien", expectedTag: "O", expectedSource: "#O", expectedRest: "‘Brien", shouldParse: true},
+		{name: "left curly quote continues", input: "#O‘Brien", expectedTag: "O‘Brien", expectedSource: "#O‘Brien", shouldParse: true},
 		{name: "apostrophe does not adjoin extension", input: "#foo-'bar", expectedTag: "foo-", expectedSource: "#foo-", expectedRest: "'bar", shouldParse: true},
 		{name: "apostrophe does not adjoin fully qualified emoji", input: "#foo'1️⃣", expectedTag: "foo", expectedSource: "#foo", expectedRest: "'1️⃣", shouldParse: true},
 		{name: "apostrophe does not join across ignored code point", input: "#A\u200d'B", expectedTag: "A", expectedSource: "#A\u200d", expectedRest: "'B", shouldParse: true},

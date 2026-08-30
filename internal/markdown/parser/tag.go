@@ -52,12 +52,25 @@ func isCombiningMark(r rune) bool {
 	return containsCodePoint(unicode17CombiningMarks[:], r)
 }
 
+func isTagPunctuation(r rune) bool {
+	switch r {
+	case '-', '+', '&', '.', '_', ':', ',', '!', '?',
+		'\u00b7', '\u00d7',
+		'\u2018', '\u2019', '\u201c', '\u201d',
+		'\uff08', '\uff09', '\u300a', '\u300b', '\u3001', '\u3002',
+		'\uff0c', '\uff01', '\uff1f', '\uff1a':
+		return true
+	default:
+		return false
+	}
+}
+
 func isSegmentStarter(r rune) bool {
-	return r == '-' || r == '+' || r == '&' || isXIDContinue(r) && !isCombiningMark(r) && !isDefaultIgnorable(r)
+	return isTagPunctuation(r) || isXIDContinue(r) && !isCombiningMark(r) && !isDefaultIgnorable(r)
 }
 
 func isSegmentContinuation(r rune) bool {
-	return r == '-' || r == '+' || r == '&' || isXIDContinue(r) && !isDefaultIgnorable(r)
+	return isTagPunctuation(r) || isXIDContinue(r) && !isDefaultIgnorable(r)
 }
 
 func isApostropheJoiner(r rune) bool {

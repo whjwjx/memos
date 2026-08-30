@@ -547,7 +547,7 @@ func TestExtractTags(t *testing.T) {
 			name:     "tags at end of sentence",
 			content:  "This is important #urgent.",
 			withExt:  true,
-			expected: []string{"urgent"},
+			expected: []string{"urgent."},
 		},
 		{
 			name:     "headings not tags",
@@ -607,7 +607,7 @@ func TestExtractTags(t *testing.T) {
 			name:     "Chinese tag followed by punctuation",
 			content:  "Text #测试。 More text",
 			withExt:  true,
-			expected: []string{"测试"},
+			expected: []string{"测试。"},
 		},
 		{
 			name:     "mixed Chinese and ASCII tag",
@@ -674,14 +674,14 @@ func TestExtractTagsMemosTagV1(t *testing.T) {
 		{
 			name:     "apostrophe boundaries",
 			content:  "'#tag' #users' #'missing #rock''roll #O‘Brien #A\u200d'B",
-			expected: []string{"tag", "users", "rock", "O", "A"},
+			expected: []string{"tag", "users", "rock", "O‘Brien", "A"},
 		},
 		{name: "ignored spellings deduplicate", content: "#AB #A\u200dB #\u0301AB", expected: []string{"AB"}},
 		{name: "hierarchy expansion", content: "#book/fiction/history", expected: []string{"book", "book/fiction", "book/fiction/history"}},
 		{name: "hierarchy exact dedupe", content: "#book/fiction #book", expected: []string{"book", "book/fiction"}},
 		{name: "literal ampersand", content: "#R&D", expected: []string{"R&D"}},
 		{name: "named character reference boundary", content: "#R&amp;D", expected: []string{"R"}},
-		{name: "character reference requires a real opener", content: "~#a!&&amp;)*", expected: []string{"a"}},
+		{name: "character reference requires a real opener", content: "~#a!&&amp;)*", expected: []string{"a!&"}},
 		{name: "unknown character reference stays literal", content: "#R&bogus;D #Q&amp;&bogus;D", expected: []string{"R&bogus", "Q"}},
 		{name: "numeric character reference introducer", content: "&#35;tag &#x23;other", expected: []string{}},
 		{name: "named character reference introducer", content: "&num;tag", expected: []string{}},
@@ -756,7 +756,7 @@ func TestExtractTagsMemosTagV1(t *testing.T) {
 			content:  "foo#mail@example.com foo!#second@example.com <foo#hidden@example.com> foo@example.com/#after",
 			expected: []string{"after"},
 		},
-		{name: "invalid GFM email local part", content: "#foo!bar@example.com", expected: []string{"foo"}},
+		{name: "invalid GFM email local part", content: "#foo!bar@example.com", expected: []string{"foo!"}},
 		{name: "email after tag hierarchy separator", content: "#foo/bar@example.com", expected: []string{"foo"}},
 		{name: "GFM email after Unicode tag", content: "#中mail@example.com", expected: []string{"中"}},
 		{name: "email after padded list tag", content: "-\t#foo/bar@example.com", expected: []string{"foo"}},
@@ -1031,6 +1031,15 @@ func TestRenameTagReplacesEveryExactSourceSpan(t *testing.T) {
 	result, err := svc.RenameTag([]byte(content), "old", "new")
 	require.NoError(t, err)
 	assert.Equal(t, "#new #new #new#new [#old](url) https://example.com/#old #Old", result)
+}
+
+func TestRenameTagRewritesTagSubtree(t *testing.T) {
+	svc := NewService(WithTagExtension())
+
+	result, err := svc.RenameTag([]byte("#life #life/1/2 #lifestyle #life-logs"), "life", "work")
+	require.NoError(t, err)
+
+	assert.Equal(t, "#work #work/1/2 #lifestyle #life-logs", result)
 }
 
 func TestUniquePreserveCase(t *testing.T) {

@@ -1,14 +1,20 @@
 import { create } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
-import { ArrowUpToLineIcon, HashIcon, ListIcon, ListTreeIcon } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { HashIcon, ListIcon, ListTreeIcon } from "lucide-react";
 import { forwardRef, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { userServiceClient } from "@/connect";
 import { useOptionalAuth } from "@/contexts/AuthContext";
 import { replaceFiltersByFactor, stringifyFilters, useMemoFilterContext } from "@/contexts/MemoFilterContext";
+import { renameTag } from "@/helpers/tag";
 import { useLocalStorage, useOverflowTitle } from "@/hooks";
+import { memoKeys } from "@/hooks/useMemoQueries";
+import { userKeys } from "@/hooks/useUserQueries";
 import { handleError } from "@/lib/error";
 import { buildUserSettingName } from "@/lib/resource-names";
 import { cn } from "@/lib/utils";
@@ -32,6 +38,7 @@ import SidebarSection, {
   SIDEBAR_SECTION_ACTION_BUTTON_CLASSES,
   SIDEBAR_SECTION_ACTION_ICON_CLASSES,
 } from "./SidebarSection";
+import TagActionMenu from "./TagActionMenu";
 
 interface Props {
   tagCount: Record<string, number>;
@@ -66,12 +73,11 @@ interface FlatTagRowProps {
   pinDisabled?: boolean;
   onClick: () => void;
   onTogglePin?: () => void;
+  onRename?: () => void;
 }
 
-const FlatTagRow = ({ tag, amount, active, pinned, pinDisabled, onClick, onTogglePin }: FlatTagRowProps) => {
-  const t = useTranslate();
+const FlatTagRow = ({ tag, amount, active, pinned, pinDisabled, onClick, onTogglePin, onRename }: FlatTagRowProps) => {
   const { ref, title } = useOverflowTitle<HTMLSpanElement>(`#${tag}`);
-  const pinLabel = `${t(pinned ? "common.unpin" : "common.pin")} #${tag}`;
 
   return (
     <div className={cn(SIDEBAR_ROW_BOX_CLASSES, "group/tag", sidebarRowStateClasses(active))}>
@@ -86,23 +92,7 @@ const FlatTagRow = ({ tag, amount, active, pinned, pinDisabled, onClick, onToggl
         <TagPath ref={ref} tag={tag} />
         <span className={SIDEBAR_ROW_COUNT_CLASSES}>{amount}</span>
       </button>
-      {onTogglePin && (
-        <button
-          type="button"
-          aria-label={pinLabel}
-          title={pinLabel}
-          disabled={pinDisabled}
-          className={cn(
-            "-mr-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-[background-color,color,opacity,scale] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-40",
-            SIDEBAR_ROW_FOCUS_CLASSES,
-            "scale-95 md:opacity-0 md:group-hover/tag:scale-100 md:group-hover/tag:opacity-100",
-            pinned && "text-primary hover:text-primary",
-          )}
-          onClick={onTogglePin}
-        >
-          <ArrowUpToLineIcon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
-        </button>
-      )}
+      <TagActionMenu tag={tag} pinned={pinned} pinDisabled={pinDisabled} onTogglePin={onTogglePin} onRename={onRename} />
     </div>
   );
 };
@@ -110,6 +100,7 @@ const FlatTagRow = ({ tag, amount, active, pinned, pinDisabled, onClick, onToggl
 const TagsSection = ({ tagCount, onSelect, navigationTarget, scope }: Props) => {
   const t = useTranslate();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const authContext = useOptionalAuth();
   const currentUser = authContext?.currentUser;
   const userTagsSetting = authContext?.userTagsSetting;
@@ -117,6 +108,9 @@ const TagsSection = ({ tagCount, onSelect, navigationTarget, scope }: Props) => 
   const { filters, setFilters, getFiltersByFactor, addFilter, removeFilter } = useMemoFilterContext();
   const [treeMode, setTreeMode] = useLocalStorage<boolean>("tag-view-as-tree", false);
   const [pinningTag, setPinningTag] = useState<string>();
+  const [renameTarget, setRenameTarget] = useState<string>();
+  const [renameValue, setRenameValue] = useState("");
+  const [renamingTag, setRenamingTag] = useState<string>();
   const activeTags = new Set(getFiltersByFactor("tagSearch").map((filter) => filter.value));
   const activeTag = activeTags.values().next().value as string | undefined;
   const tags = useMemo(() => Object.entries(tagCount).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])), [tagCount]);
@@ -125,7 +119,6 @@ const TagsSection = ({ tagCount, onSelect, navigationTarget, scope }: Props) => 
     return new Set(Object.keys(tagCount).filter((tag) => settingTags[tag]?.pinned));
   }, [tagCount, userTagsSetting?.tags]);
   const pinnedTags = useMemo(() => tags.filter(([tag]) => pinnedTagSet.has(tag)), [pinnedTagSet, tags]);
-  const regularTags = useMemo(() => tags.filter(([tag]) => !pinnedTagSet.has(tag)), [pinnedTagSet, tags]);
 
   if (tags.length === 0) {
     return null;
@@ -189,6 +182,52 @@ const TagsSection = ({ tagCount, onSelect, navigationTarget, scope }: Props) => 
     }
   };
 
+  const handleStartRename = (tag: string) => {
+    setRenameTarget(tag);
+    setRenameValue(tag);
+  };
+
+  const handleRenameOpenChange = (open: boolean) => {
+    if (open || renamingTag) {
+      return;
+    }
+    setRenameTarget(undefined);
+    setRenameValue("");
+  };
+
+  const handleRenameTag = async () => {
+    if (!renameTarget || renamingTag) {
+      return;
+    }
+
+    const nextTag = renameValue.trim().replace(/^#/, "");
+    if (!nextTag || /\s/.test(nextTag) || nextTag.includes("#")) {
+      toast.error(t("tag.rename-error-empty"));
+      return;
+    }
+    if (nextTag === renameTarget) {
+      toast.error(t("tag.rename-error-repeat"));
+      return;
+    }
+
+    setRenamingTag(renameTarget);
+    try {
+      const result = await renameTag(renameTarget, nextTag);
+      await Promise.all([
+        refetchSettings?.(),
+        queryClient.invalidateQueries({ queryKey: memoKeys.all }),
+        queryClient.invalidateQueries({ queryKey: userKeys.stats() }),
+      ]);
+      toast.success(`${t("tag.rename-success")} (${result.updatedMemos})`);
+      setRenameTarget(undefined);
+      setRenameValue("");
+    } catch (error: unknown) {
+      handleError(error, toast.error, { context: "Rename tag" });
+    } finally {
+      setRenamingTag(undefined);
+    }
+  };
+
   return (
     <>
       {pinnedTags.length > 0 && (
@@ -203,12 +242,13 @@ const TagsSection = ({ tagCount, onSelect, navigationTarget, scope }: Props) => 
               pinDisabled={pinningTag === tag}
               onClick={() => handleTagClick(tag)}
               onTogglePin={currentUser ? () => handleTogglePin(tag) : undefined}
+              onRename={currentUser ? () => handleStartRename(tag) : undefined}
             />
           ))}
         </SidebarSection>
       )}
 
-      {regularTags.length > 0 && (
+      {tags.length > 0 && (
         <SidebarSection
           label={t("common.tags")}
           action={
@@ -239,31 +279,71 @@ const TagsSection = ({ tagCount, onSelect, navigationTarget, scope }: Props) => 
           {treeMode ? (
             <TagTree
               key={scope}
-              tagAmounts={regularTags}
+              tagAmounts={tags}
               activeTag={activeTag}
               scope={scope}
               onTagClick={handleTagClick}
               onTogglePin={currentUser ? handleTogglePin : undefined}
+              onRenameTag={currentUser ? handleStartRename : undefined}
+              pinnedTags={pinnedTagSet}
               pinningTag={pinningTag}
             />
           ) : (
             <>
-              {regularTags.map(([tag, amount]) => (
+              {tags.map(([tag, amount]) => (
                 <FlatTagRow
                   key={tag}
                   tag={tag}
                   amount={amount}
                   active={activeTags.has(tag)}
-                  pinned={false}
+                  pinned={pinnedTagSet.has(tag)}
                   pinDisabled={pinningTag === tag}
                   onClick={() => handleTagClick(tag)}
                   onTogglePin={currentUser ? () => handleTogglePin(tag) : undefined}
+                  onRename={currentUser ? () => handleStartRename(tag) : undefined}
                 />
               ))}
             </>
           )}
         </SidebarSection>
       )}
+      <Dialog open={!!renameTarget} onOpenChange={handleRenameOpenChange}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>{t("tag.rename-tag")}</DialogTitle>
+            <DialogDescription>{t("tag.rename-tip")}</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium text-foreground">{t("tag.old-name")}</span>
+              <Input value={renameTarget ? `#${renameTarget}` : ""} readOnly />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium text-foreground">{t("tag.new-name")}</span>
+              <Input
+                autoFocus
+                value={renameValue}
+                disabled={!!renamingTag}
+                onChange={(event) => setRenameValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleRenameTag();
+                  }
+                }}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" disabled={!!renamingTag} onClick={() => handleRenameOpenChange(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button disabled={!!renamingTag} onClick={handleRenameTag}>
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
