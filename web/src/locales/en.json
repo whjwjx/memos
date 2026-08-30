@@ -6,6 +6,7 @@
     "build": "Build",
     "commit": "Commit",
     "demo": "Demo",
+    "default-tagline": "Recording, meaning emerges.",
     "description": "A privacy-first, lightweight note-taking service. Easily capture and share your great thoughts.",
     "distribution": "Distribution",
     "documents": "Documents",

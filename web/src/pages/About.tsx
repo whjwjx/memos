@@ -8,7 +8,6 @@ const GITHUB_COMMIT_URL_PREFIX = "https://github.com/usememos/memos/commit/";
 const GITHUB_RELEASE_URL_PREFIX = "https://github.com/usememos/memos/releases/tag/v";
 
 const DEFAULT_TITLE = "Memos";
-const DEFAULT_TAGLINE = "Capture first. Keep it yours.";
 const DEFAULT_LOGO = "/logo.webp";
 
 const isCommitSha = (commit: string) => /^[0-9a-f]{7,40}$/i.test(commit);
@@ -36,7 +35,7 @@ const About = () => {
 
   const customProfile = generalSetting.customProfile;
   const instanceTitle = customProfile?.title || DEFAULT_TITLE;
-  const instanceTagline = customProfile?.description || DEFAULT_TAGLINE;
+  const instanceTagline = customProfile?.description || t("about.default-tagline");
   const instanceLogo = customProfile?.logoUrl || DEFAULT_LOGO;
   const isCustomBranded = instanceTitle !== DEFAULT_TITLE;
 

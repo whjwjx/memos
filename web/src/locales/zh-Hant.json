@@ -6,6 +6,7 @@
     "build": "建置資訊",
     "commit": "提交",
     "demo": "示範",
+    "default-tagline": "持續記錄，意義自然復現",
     "description": "以隱私為核心的輕量化筆記服務，輕鬆記錄並分享您的好點子。",
     "distribution": "發行版本",
     "documents": "文件",

@@ -22,6 +22,7 @@ vi.mock("@/utils/i18n", () => ({
     (
       ({
         "common.version": "Version",
+        "about.default-tagline": "Recording, meaning emerges.",
         "about.powered-by": "Powered by Memos",
       }) as Record<string, string>
     )[key] ?? key,
@@ -49,7 +50,7 @@ describe("<About>", () => {
     renderAbout();
 
     expect(screen.getByRole("heading", { name: "Memos" })).toBeInTheDocument();
-    expect(screen.getByText(/Capture first/i)).toBeInTheDocument();
+    expect(screen.getByText("Recording, meaning emerges.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "v0.25.0" })).toHaveAttribute("href", "https://github.com/usememos/memos/releases/tag/v0.25.0");
     expect(screen.getByRole("link", { name: "0123456" })).toHaveAttribute(
       "href",

@@ -6,6 +6,7 @@
     "build": "构建信息",
     "commit": "提交",
     "demo": "演示",
+    "default-tagline": "持续记录，意义自然复现",
     "description": "Memos 是一个隐私优先、轻量级的笔记解决方案，可以轻松捕捉和分享您的想法。",
     "distribution": "发行版本",
     "documents": "文档",
