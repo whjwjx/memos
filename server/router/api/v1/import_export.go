@@ -36,6 +36,14 @@ const (
 	maxImportExportWarnings = 30
 )
 
+type importSource string
+
+const (
+	importSourceAuto  importSource = ""
+	importSourceMemos importSource = "memos"
+	importSourceFlomo importSource = "flomo"
+)
+
 type importExportScope string
 
 const (
@@ -128,6 +136,7 @@ type importExportReactionRecord struct {
 }
 
 type importExportResult struct {
+	Source             string   `json:"source,omitempty"`
 	Scope              string   `json:"scope"`
 	CreatedMemos       int      `json:"createdMemos"`
 	SkippedMemos       int      `json:"skippedMemos"`
@@ -149,6 +158,18 @@ func (s *APIV1Service) RegisterImportExportRoutes(echoServer *echo.Echo) {
 	})
 	apiGroup.POST("/import", func(c *echo.Context) error {
 		return s.importStructuredData(c, authenticator)
+	})
+	apiGroup.POST("/import/uploads", func(c *echo.Context) error {
+		return s.createImportUpload(c, authenticator)
+	})
+	apiGroup.PUT("/import/uploads/:uploadId/chunks/:index", func(c *echo.Context) error {
+		return s.uploadImportChunk(c, authenticator)
+	})
+	apiGroup.POST("/import/uploads/:uploadId/complete", func(c *echo.Context) error {
+		return s.completeImportUpload(c, authenticator)
+	})
+	apiGroup.DELETE("/import/uploads/:uploadId", func(c *echo.Context) error {
+		return s.cancelImportUpload(c, authenticator)
 	})
 }
 
@@ -218,6 +239,10 @@ func (s *APIV1Service) importStructuredData(c *echo.Context, authenticator *auth
 	if fileHeader.Size > MaxAPIRequestBytes {
 		return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "import file is too large")
 	}
+	source, err := parseImportSource(c.QueryParam("source"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
 
 	upload, err := fileHeader.Open()
 	if err != nil {
@@ -239,11 +264,21 @@ func (s *APIV1Service) importStructuredData(c *echo.Context, authenticator *auth
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to close import file").Wrap(err)
 	}
 
-	result, err := s.importStructuredZip(ctx, user, scope, tmpFilePath)
+	result, err := s.importZip(ctx, user, scope, tmpFilePath, source)
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, result)
+}
+
+func parseImportSource(raw string) (importSource, error) {
+	source := importSource(strings.TrimSpace(strings.ToLower(raw)))
+	switch source {
+	case importSourceAuto, importSourceMemos, importSourceFlomo:
+		return source, nil
+	default:
+		return "", errors.Errorf("unsupported import source %q", raw)
+	}
 }
 
 func (s *APIV1Service) authenticateImportExportRequest(ctx context.Context, c *echo.Context, authenticator *auth.Authenticator) (*store.User, importExportScope, error) {
@@ -276,6 +311,34 @@ func parseImportExportScope(raw string) (importExportScope, error) {
 	default:
 		return "", errors.Errorf("unsupported scope %q", raw)
 	}
+}
+
+func (s *APIV1Service) importZip(ctx context.Context, user *store.User, scope importExportScope, zipFilePath string, source importSource) (*importExportResult, error) {
+	zipReader, err := zip.OpenReader(zipFilePath)
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid import zip").Wrap(err)
+	}
+	defer zipReader.Close()
+
+	if findZipEntry(&zipReader.Reader, "manifest.json") != nil {
+		if source == importSourceFlomo {
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "selected flomo import but uploaded a Memos data package")
+		}
+		return s.importStructuredZip(ctx, user, scope, zipFilePath)
+	}
+
+	flomoHTML := findFlomoHTMLZipEntry(&zipReader.Reader)
+	if flomoHTML != nil {
+		if source == importSourceMemos {
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "selected Memos import but uploaded a flomo data package")
+		}
+		if scope != importExportScopeMine {
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "flomo import only supports scope=mine")
+		}
+		return s.importFlomoZip(ctx, user, scope, zipFilePath, flomoHTML.Name)
+	}
+
+	return nil, echo.NewHTTPError(http.StatusBadRequest, "unsupported import format")
 }
 
 func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *store.User, scope importExportScope, zipFilePath string) (*importExportManifest, error) {
@@ -719,7 +782,7 @@ func (s *APIV1Service) importStructuredZip(ctx context.Context, user *store.User
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "unsupported import format")
 	}
 
-	result := &importExportResult{Scope: string(scope)}
+	result := &importExportResult{Source: string(importSourceMemos), Scope: string(scope)}
 	zipEntries := zipEntriesByName(&zipReader.Reader)
 	userIDs, err := s.resolveImportUsers(ctx, user, scope)
 	if err != nil {
@@ -770,6 +833,16 @@ func (s *APIV1Service) importMemosFromZip(
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid memos.jsonl").Wrap(err)
 	}
+	return s.importMemosFromRecords(ctx, records, userIDs, scope, result)
+}
+
+func (s *APIV1Service) importMemosFromRecords(
+	ctx context.Context,
+	records []importExportMemoRecord,
+	userIDs map[string]int32,
+	scope importExportScope,
+	result *importExportResult,
+) (map[string]int32, error) {
 	memoIDsByUID := make(map[string]int32, len(records))
 	for _, record := range records {
 		creatorID, ok := importCreatorID(userIDs, record.CreatorUsername, scope)
@@ -853,7 +926,46 @@ func (s *APIV1Service) importAttachmentsFromZip(
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid attachments.jsonl").Wrap(err)
 	}
+	inputs := make([]importAttachmentInput, 0, len(records))
 	for _, record := range records {
+		if err := validateImportAttachmentContentPath(record.ContentPath); err != nil {
+			result.SkippedAttachments++
+			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: %v", record.UID, err))
+			continue
+		}
+		zipEntry := zipEntries[record.ContentPath]
+		if zipEntry == nil {
+			result.SkippedAttachments++
+			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment content missing", record.UID))
+			continue
+		}
+		blob, err := readZipEntry(zipEntry)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "failed to read attachment content").Wrap(err)
+		}
+		inputs = append(inputs, importAttachmentInput{
+			Record: record,
+			Blob:   blob,
+		})
+	}
+	return s.importAttachmentsFromRecords(ctx, inputs, userIDs, scope, memoIDsByUID, result)
+}
+
+type importAttachmentInput struct {
+	Record importExportAttachmentRecord
+	Blob   []byte
+}
+
+func (s *APIV1Service) importAttachmentsFromRecords(
+	ctx context.Context,
+	inputs []importAttachmentInput,
+	userIDs map[string]int32,
+	scope importExportScope,
+	memoIDsByUID map[string]int32,
+	result *importExportResult,
+) error {
+	for _, input := range inputs {
+		record := input.Record
 		creatorID, ok := importCreatorID(userIDs, record.CreatorUsername, scope)
 		if !ok {
 			result.SkippedAttachments++
@@ -878,21 +990,7 @@ func (s *APIV1Service) importAttachmentsFromZip(
 			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: invalid filename", record.UID))
 			continue
 		}
-		if err := validateImportAttachmentContentPath(record.ContentPath); err != nil {
-			result.SkippedAttachments++
-			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: %v", record.UID, err))
-			continue
-		}
-		zipEntry := zipEntries[record.ContentPath]
-		if zipEntry == nil {
-			result.SkippedAttachments++
-			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment content missing", record.UID))
-			continue
-		}
-		blob, err := readZipEntry(zipEntry)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "failed to read attachment content").Wrap(err)
-		}
+		blob := input.Blob
 		if record.Sha256 != "" {
 			sum := sha256.Sum256(blob)
 			if !strings.EqualFold(record.Sha256, hex.EncodeToString(sum[:])) {
