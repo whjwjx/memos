@@ -399,6 +399,7 @@ POST /api/v1/import
 - attachment 创建时间暂不保留，导入后会使用目标实例当前创建时间。
 - 导入附件会重新走目标实例当前存储配置，不复用源实例的本地绝对路径或 S3 对象引用。
 - `scope=mine` 导入时，所有 memo/attachment/reaction 都归属于当前登录用户。
+- `scope=mine` 导入时，memo UID 和 attachment UID 按当前登录用户做稳定映射，避免不同用户导入同一数据包时被全站 UID 去重误跳过；同一用户重复导入仍会幂等跳过。
 
 ### 阶段 D：管理员全站导出/导入
 
