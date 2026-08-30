@@ -52,6 +52,54 @@ func TestParseImportExportScope(t *testing.T) {
 	}
 }
 
+func TestParseImportSource(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		raw     string
+		want    importSource
+		wantErr bool
+	}{
+		{
+			name: "defaults to auto",
+			want: importSourceAuto,
+		},
+		{
+			name: "memos",
+			raw:  "memos",
+			want: importSourceMemos,
+		},
+		{
+			name: "flomo",
+			raw:  "flomo",
+			want: importSourceFlomo,
+		},
+		{
+			name: "trim and lowercase",
+			raw:  " Flomo ",
+			want: importSourceFlomo,
+		},
+		{
+			name:    "invalid",
+			raw:     "notion",
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := parseImportSource(test.raw)
+			if test.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
 func TestValidateImportAttachmentContentPath(t *testing.T) {
 	t.Parallel()
 
