@@ -290,3 +290,16 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 镜像：`memos-ai:local`（哈希 `3390505a`），容器 recreate 时间 `2026-08-29T15:14:02Z`（北京时间 8-29 23:14）。
 - 校验：容器内 / 公网 / 构建输出三方前端资产均为 `index-tZGYqm1N.js`；API `/api/v1/memos?limit=1` 正常；日志无异常。
 - 备注：本次 C 盘 52GB 充足，无需 `go clean -cache`；Dockerfile 已无 `COPY dist`，构建一次成功。
+
+### 8.7 部署记录（2026-08-30，含词典功能首次部署）
+
+> 完整重新部署：纳入 translation dictionary lookup（`bc39d9e3` merge `c46bff99`、speech playback `1ad47925`）。**首次启用英汉词典功能**，需额外上传独立 SQLite 词典文件 `ecdict.db`（不进镜像、不进主库，走数据卷挂载）。
+
+- 代码：`dev` HEAD = `3287e021`（chore about default tagline，含 `c46bff99` translation dictionary lookup）。
+- 构建：`pnpm release`（资产 `index-ByUaSSQ5.js`，5124 modules）→ `go build`（linux/amd64，102MB）→ scp 上传 `memos-linux`。
+- **新增首次步骤 — 词典文件**：本地 `C:\ProgramData\memos\dictionaries\ecdict.db`（180MB，跨平台 SQLite，770611 条）scp 传到服务器 `~/ecdict.db`，再 `sudo mkdir -p /root/.memos/dictionaries && sudo mv ~/ecdict.db /root/.memos/dictionaries/ecdict.db && sudo chmod 644`。对应容器内 `/var/opt/memos/dictionaries/ecdict.db`（compose 已挂载 `/root/.memos:/var/opt/memos`）。
+- 备份：`/home/deployer/backups/memos_data_20260830/`（memos_prod.db + -shm + -wal，未备 dictionaries/，静态可再生成）。
+- 镜像：`memos-ai:local`（哈希 `0e7c1ff1`），容器 recreate 时间 `2026-08-30T11:15:20Z`（北京时间 8-30 19:15）。
+- 校验：容器内 / 公网 / 构建输出三方前端资产均为 `index-ByUaSSQ5.js`；API 正常；日志无异常。
+- **词典专项验证**：容器内 `ls /var/opt/memos/dictionaries/ecdict.db` 可见，文件头 `SQLite format 3`，`stardict` 表，`right` 词条数据完整；未登录调 `GET /api/v1/dictionary/entries/right` 返回 `authentication required`（设计预期，登录后可用）。浏览器强刷后 Translation 页输入单词显示词典信息、输入句子不触发 —— **功能生效确认**。
+- 备注：词典接口要求登录（JWT，token 不存库），服务端无法直连测，需浏览器验证；词典文件缺失时接口返回 `configured:false` 降级，不影响其他功能。后续重部署因文件在数据卷不丢；更新词典版本才需重传。
