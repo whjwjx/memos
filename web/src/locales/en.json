@@ -147,6 +147,8 @@
     "input-placeholder": "Enter text to translate",
     "input-required": "Enter text to translate.",
     "language-pair": "{{source}} to {{target}}",
+    "listen-result": "Listen to translation",
+    "listen-source": "Listen to source",
     "loading": "Loading...",
     "result-empty": "The translation will appear here.",
     "result-placeholder": "Result",
@@ -154,6 +156,8 @@
     "save-to-memo": "Save to memo",
     "saved-to-memo": "Saved to memo",
     "show-history": "Show history",
+    "speech-unsupported": "Speech playback is not supported in this browser.",
+    "stop-speaking": "Stop speaking",
     "title": "Translation",
     "too-long": "Use {{count}} characters or fewer.",
     "translate": "Translate"

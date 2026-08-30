@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { ArrowRightLeftIcon, CheckIcon, ClockIcon, CopyIcon, FilePlus2Icon, LoaderCircleIcon, Trash2Icon } from "lucide-react";
+import { ArrowRightLeftIcon, CheckIcon, ClockIcon, CopyIcon, FilePlus2Icon, LoaderCircleIcon, Trash2Icon, Volume2Icon } from "lucide-react";
 import { type KeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { memoServiceClient } from "@/connect";
 import { useInstance } from "@/contexts/InstanceContext";
 import { useCreateMemo } from "@/hooks/useMemoQueries";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import {
   useClearTranslationHistories,
   useDeleteTranslationHistory,
@@ -23,6 +24,7 @@ import { ListMemosRequestSchema, MemoSchema, Visibility } from "@/types/proto/ap
 import { useTranslate } from "@/utils/i18n";
 
 const directionOptions = [TranslationDirection.AUTO, TranslationDirection.EN_TO_ZH, TranslationDirection.ZH_TO_EN] as const;
+const cjkPattern = /[\u3400-\u9fff]/;
 
 const getDirectionFromHistory = (history: TranslationHistory): TranslationDirection => {
   if (history.sourceLanguage === "en" && history.targetLanguage.startsWith("zh")) return TranslationDirection.EN_TO_ZH;
@@ -91,6 +93,17 @@ const hasSavedTranslationHistoryMemo = async (history: TranslationHistory): Prom
   return response.memos.length > 0;
 };
 
+const getSpeechLanguageFromCode = (language: string): string | undefined => {
+  const normalized = language.trim().toLowerCase();
+  if (normalized === "en" || normalized.startsWith("en-")) return "en-US";
+  if (normalized === "zh" || normalized.startsWith("zh-")) return "zh-CN";
+  return undefined;
+};
+
+const inferSpeechLanguageFromText = (text: string): string => {
+  return cjkPattern.test(text) ? "zh-CN" : "en-US";
+};
+
 const TranslatePage = () => {
   const t = useTranslate();
   const { aiSetting, fetchSetting } = useInstance();
@@ -119,6 +132,7 @@ const TranslatePage = () => {
   const createMemo = useCreateMemo();
   const deleteHistory = useDeleteTranslationHistory();
   const clearHistories = useClearTranslationHistories();
+  const speech = useSpeechSynthesis();
 
   useEffect(() => {
     setLoadingSetting(true);
@@ -204,6 +218,29 @@ const TranslatePage = () => {
 
   const handleTranslate = () => {
     void performTranslate(sourceText, direction);
+  };
+
+  const getSourceSpeechLanguage = () => {
+    const reportedLanguage = getSpeechLanguageFromCode(sourceLanguage);
+    if (reportedLanguage) return reportedLanguage;
+    if (direction === TranslationDirection.EN_TO_ZH) return "en-US";
+    if (direction === TranslationDirection.ZH_TO_EN) return "zh-CN";
+    return inferSpeechLanguageFromText(sourceText);
+  };
+
+  const getTargetSpeechLanguage = () => {
+    const reportedLanguage = getSpeechLanguageFromCode(targetLanguage);
+    if (reportedLanguage) return reportedLanguage;
+    if (direction === TranslationDirection.EN_TO_ZH) return "zh-CN";
+    if (direction === TranslationDirection.ZH_TO_EN) return "en-US";
+    return inferSpeechLanguageFromText(translatedText);
+  };
+
+  const handleSpeechToggle = (key: "source" | "target", text: string, lang: string) => {
+    if (!text.trim()) return;
+    if (!speech.toggle({ key, text, lang })) {
+      toast.error(t("translation.speech-unsupported"));
+    }
   };
 
   const updateSourcePaneWidth = useCallback((clientX: number) => {
@@ -371,7 +408,20 @@ const TranslatePage = () => {
                   disabled={!enabled || loadingSetting}
                 />
                 <div className="flex items-center justify-between gap-3 px-7 py-3 text-xs text-muted-foreground">
-                  <span className={cn(overLimit && "text-destructive")}>{t("translation.count", { count, max: maxTextLength })}</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={speech.speakingKey === "source" ? "secondary" : "ghost"}
+                      size="icon-sm"
+                      disabled={!sourceText.trim() || !speech.isSupported}
+                      aria-label={t(speech.speakingKey === "source" ? "translation.stop-speaking" : "translation.listen-source")}
+                      title={t(speech.speakingKey === "source" ? "translation.stop-speaking" : "translation.listen-source")}
+                      onClick={() => handleSpeechToggle("source", sourceText, getSourceSpeechLanguage())}
+                      className="transition-[background-color,color,transform] active:scale-95"
+                    >
+                      <Volume2Icon className="size-4" strokeWidth={1.8} />
+                    </Button>
+                    <span className={cn(overLimit && "text-destructive")}>{t("translation.count", { count, max: maxTextLength })}</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon-sm" onClick={() => setSourceText("")} disabled={!sourceText}>
                       <Trash2Icon className="size-4" strokeWidth={1.8} />
@@ -431,6 +481,19 @@ const TranslatePage = () => {
                           : t("translation.disabled-description")}
                     </span>
                   )}
+                </div>
+                <div className="flex items-center justify-between gap-3 px-7 py-3 text-xs text-muted-foreground">
+                  <Button
+                    variant={speech.speakingKey === "target" ? "secondary" : "ghost"}
+                    size="icon-sm"
+                    disabled={!translatedText.trim() || !speech.isSupported}
+                    aria-label={t(speech.speakingKey === "target" ? "translation.stop-speaking" : "translation.listen-result")}
+                    title={t(speech.speakingKey === "target" ? "translation.stop-speaking" : "translation.listen-result")}
+                    onClick={() => handleSpeechToggle("target", translatedText, getTargetSpeechLanguage())}
+                    className="transition-[background-color,color,transform] active:scale-95"
+                  >
+                    <Volume2Icon className="size-4" strokeWidth={1.8} />
+                  </Button>
                 </div>
               </section>
             </div>
