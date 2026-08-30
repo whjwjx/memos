@@ -82,11 +82,20 @@ func (s *APIV1Service) importFlomoZip(
 		"":            user.ID,
 		user.Username: user.ID,
 	}
-	memoIDsByUID, err := s.importMemosFromRecords(ctx, data.Memos, userIDs, scope, result)
+	uidMapper := newImportUIDMapper(user, scope)
+	attachmentRecords := make([]importExportAttachmentRecord, 0, len(data.Attachments))
+	for _, input := range data.Attachments {
+		attachmentRecords = append(attachmentRecords, input.Record)
+	}
+	attachmentUIDMap, err := s.buildImportAttachmentUIDMap(ctx, attachmentRecords, userIDs, scope, uidMapper)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.importAttachmentsFromRecords(ctx, data.Attachments, userIDs, scope, memoIDsByUID, result); err != nil {
+	memoIDsByUID, err := s.importMemosFromRecords(ctx, data.Memos, userIDs, scope, uidMapper, attachmentUIDMap, result)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.importAttachmentsFromRecords(ctx, data.Attachments, userIDs, scope, uidMapper, memoIDsByUID, result); err != nil {
 		return nil, err
 	}
 	return result, nil

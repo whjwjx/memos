@@ -788,11 +788,24 @@ func (s *APIV1Service) importStructuredZip(ctx context.Context, user *store.User
 	if err != nil {
 		return nil, err
 	}
-	memoIDsByUID, err := s.importMemosFromZip(ctx, &zipReader.Reader, userIDs, scope, result)
+	uidMapper := newImportUIDMapper(user, scope)
+	memoRecords, err := readJSONLFromZip[importExportMemoRecord](&zipReader.Reader, "memos.jsonl")
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid memos.jsonl").Wrap(err)
+	}
+	attachmentRecords, err := readJSONLFromZip[importExportAttachmentRecord](&zipReader.Reader, "attachments.jsonl")
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid attachments.jsonl").Wrap(err)
+	}
+	attachmentUIDMap, err := s.buildImportAttachmentUIDMap(ctx, attachmentRecords, userIDs, scope, uidMapper)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.importAttachmentsFromZip(ctx, &zipReader.Reader, zipEntries, userIDs, scope, memoIDsByUID, result); err != nil {
+	memoIDsByUID, err := s.importMemosFromRecords(ctx, memoRecords, userIDs, scope, uidMapper, attachmentUIDMap, result)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.importAttachmentsFromZip(ctx, zipEntries, attachmentRecords, userIDs, scope, uidMapper, memoIDsByUID, result); err != nil {
 		return nil, err
 	}
 	if err := s.importRelationsFromZip(ctx, &zipReader.Reader, memoIDsByUID, result); err != nil {
@@ -802,6 +815,123 @@ func (s *APIV1Service) importStructuredZip(ctx context.Context, user *store.User
 		return nil, err
 	}
 	return result, nil
+}
+
+type importUIDMapper struct {
+	scope importExportScope
+	user  *store.User
+}
+
+func newImportUIDMapper(user *store.User, scope importExportScope) *importUIDMapper {
+	return &importUIDMapper{
+		scope: scope,
+		user:  user,
+	}
+}
+
+func (m *importUIDMapper) memoUID(originalUID string) string {
+	if m == nil || m.scope == importExportScopeAll {
+		return originalUID
+	}
+	return stableImportUID("memo", importOwnerUIDScope(m.user), originalUID)
+}
+
+func (m *importUIDMapper) attachmentUID(originalUID string) string {
+	if m == nil || m.scope == importExportScopeAll {
+		return originalUID
+	}
+	return stableImportUID("att", importOwnerUIDScope(m.user), originalUID)
+}
+
+func importOwnerUIDScope(user *store.User) string {
+	if user == nil {
+		return ""
+	}
+	return fmt.Sprintf("user:%d", user.ID)
+}
+
+func (s *APIV1Service) resolveImportMemoUID(
+	ctx context.Context,
+	originalUID string,
+	creatorID int32,
+	scope importExportScope,
+	uidMapper *importUIDMapper,
+) (string, *store.Memo, error) {
+	targetUID := originalUID
+	if uidMapper != nil {
+		targetUID = uidMapper.memoUID(originalUID)
+	}
+	if scope == importExportScopeAll || targetUID == originalUID {
+		existing, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &originalUID})
+		return targetUID, existing, err
+	}
+
+	existingOriginal, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &originalUID})
+	if err != nil {
+		return "", nil, err
+	}
+	if existingOriginal != nil && existingOriginal.CreatorID == creatorID {
+		return originalUID, existingOriginal, nil
+	}
+
+	existingTarget, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &targetUID})
+	if err != nil {
+		return "", nil, err
+	}
+	return targetUID, existingTarget, nil
+}
+
+func (s *APIV1Service) resolveImportAttachmentUID(
+	ctx context.Context,
+	originalUID string,
+	creatorID int32,
+	scope importExportScope,
+	uidMapper *importUIDMapper,
+) (string, *store.Attachment, error) {
+	targetUID := originalUID
+	if uidMapper != nil {
+		targetUID = uidMapper.attachmentUID(originalUID)
+	}
+	if scope == importExportScopeAll || targetUID == originalUID {
+		existing, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &originalUID})
+		return targetUID, existing, err
+	}
+
+	existingOriginal, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &originalUID})
+	if err != nil {
+		return "", nil, err
+	}
+	if existingOriginal != nil && existingOriginal.CreatorID == creatorID {
+		return originalUID, existingOriginal, nil
+	}
+
+	existingTarget, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &targetUID})
+	if err != nil {
+		return "", nil, err
+	}
+	return targetUID, existingTarget, nil
+}
+
+func (s *APIV1Service) buildImportAttachmentUIDMap(
+	ctx context.Context,
+	records []importExportAttachmentRecord,
+	userIDs map[string]int32,
+	scope importExportScope,
+	uidMapper *importUIDMapper,
+) (map[string]string, error) {
+	uidMap := make(map[string]string, len(records))
+	for _, record := range records {
+		creatorID, ok := importCreatorID(userIDs, record.CreatorUsername, scope)
+		if !ok {
+			continue
+		}
+		targetUID, _, err := s.resolveImportAttachmentUID(ctx, record.UID, creatorID, scope, uidMapper)
+		if err != nil {
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to get attachment").Wrap(err)
+		}
+		uidMap[record.UID] = targetUID
+	}
+	return uidMap, nil
 }
 
 func (s *APIV1Service) resolveImportUsers(ctx context.Context, user *store.User, scope importExportScope) (map[string]int32, error) {
@@ -822,25 +952,13 @@ func (s *APIV1Service) resolveImportUsers(ctx context.Context, user *store.User,
 	return userIDs, nil
 }
 
-func (s *APIV1Service) importMemosFromZip(
-	ctx context.Context,
-	zipReader *zip.Reader,
-	userIDs map[string]int32,
-	scope importExportScope,
-	result *importExportResult,
-) (map[string]int32, error) {
-	records, err := readJSONLFromZip[importExportMemoRecord](zipReader, "memos.jsonl")
-	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid memos.jsonl").Wrap(err)
-	}
-	return s.importMemosFromRecords(ctx, records, userIDs, scope, result)
-}
-
 func (s *APIV1Service) importMemosFromRecords(
 	ctx context.Context,
 	records []importExportMemoRecord,
 	userIDs map[string]int32,
 	scope importExportScope,
+	uidMapper *importUIDMapper,
+	attachmentUIDMap map[string]string,
 	result *importExportResult,
 ) (map[string]int32, error) {
 	memoIDsByUID := make(map[string]int32, len(records))
@@ -851,14 +969,14 @@ func (s *APIV1Service) importMemosFromRecords(
 			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: creator %q not found", record.UID, record.CreatorUsername))
 			continue
 		}
-		existing, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &record.UID})
+		targetUID, existing, err := s.resolveImportMemoUID(ctx, record.UID, creatorID, scope, uidMapper)
 		if err != nil {
 			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to get memo").Wrap(err)
 		}
 		if existing != nil {
 			if scope == importExportScopeMine && existing.CreatorID != creatorID {
 				result.SkippedMemos++
-				addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: memo UID already belongs to another user", record.UID))
+				addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: memo UID already belongs to another user", targetUID))
 				continue
 			}
 			memoIDsByUID[record.UID] = existing.ID
@@ -870,19 +988,20 @@ func (s *APIV1Service) importMemosFromRecords(
 		if err != nil {
 			return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid memo payload").Wrap(err)
 		}
+		content := rewriteImportedAttachmentLinks(record.Content, attachmentUIDMap)
 		create := &store.Memo{
-			UID:                 record.UID,
+			UID:                 targetUID,
 			CreatorID:           creatorID,
 			CreatedTs:           record.CreatedTs,
 			UpdatedTs:           record.UpdatedTs,
-			Content:             record.Content,
+			Content:             content,
 			Visibility:          importVisibility(record.Visibility),
 			Payload:             payload,
 			ScheduledTime:       record.ScheduledTime,
 			ScheduledDuration:   record.ScheduledDuration,
 			ScheduledRecurrence: record.ScheduledRecurrence,
 		}
-		if create.Payload == nil {
+		if create.Payload == nil || content != record.Content {
 			if err := memopayload.RebuildMemoPayload(ctx, create, s.MarkdownService); err != nil {
 				return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to rebuild memo payload").Wrap(err)
 			}
@@ -913,19 +1032,76 @@ func (s *APIV1Service) importMemosFromRecords(
 	return memoIDsByUID, nil
 }
 
+func rewriteImportedAttachmentLinks(content string, attachmentUIDMap map[string]string) string {
+	if len(attachmentUIDMap) == 0 || !strings.Contains(content, "/file/attachments/") {
+		return content
+	}
+
+	const prefix = "/file/attachments/"
+	var builder strings.Builder
+	builder.Grow(len(content))
+	cursor := 0
+	for {
+		index := strings.Index(content[cursor:], prefix)
+		if index < 0 {
+			builder.WriteString(content[cursor:])
+			break
+		}
+		index += cursor
+		if !isImportAttachmentPrefixBoundary(content, index) {
+			builder.WriteString(content[cursor : index+len(prefix)])
+			cursor = index + len(prefix)
+			continue
+		}
+		uidStart := index + len(prefix)
+		uidEnd := uidStart
+		for uidEnd < len(content) && isImportUIDByte(content[uidEnd]) {
+			uidEnd++
+		}
+		if uidEnd == uidStart {
+			builder.WriteString(content[cursor:uidEnd])
+			cursor = uidEnd
+			continue
+		}
+
+		uid := content[uidStart:uidEnd]
+		targetUID := attachmentUIDMap[uid]
+		if targetUID == "" {
+			targetUID = uid
+		}
+		builder.WriteString(content[cursor:uidStart])
+		builder.WriteString(targetUID)
+		cursor = uidEnd
+	}
+	return builder.String()
+}
+
+func isImportUIDByte(value byte) bool {
+	return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9' || value == '-'
+}
+
+func isImportAttachmentPrefixBoundary(content string, index int) bool {
+	if index == 0 {
+		return true
+	}
+	switch content[index-1] {
+	case ' ', '\t', '\r', '\n', '(', '[', '"', '\'', '<', '=':
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *APIV1Service) importAttachmentsFromZip(
 	ctx context.Context,
-	zipReader *zip.Reader,
 	zipEntries map[string]*zip.File,
+	records []importExportAttachmentRecord,
 	userIDs map[string]int32,
 	scope importExportScope,
+	uidMapper *importUIDMapper,
 	memoIDsByUID map[string]int32,
 	result *importExportResult,
 ) error {
-	records, err := readJSONLFromZip[importExportAttachmentRecord](zipReader, "attachments.jsonl")
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid attachments.jsonl").Wrap(err)
-	}
 	inputs := make([]importAttachmentInput, 0, len(records))
 	for _, record := range records {
 		if err := validateImportAttachmentContentPath(record.ContentPath); err != nil {
@@ -948,7 +1124,7 @@ func (s *APIV1Service) importAttachmentsFromZip(
 			Blob:   blob,
 		})
 	}
-	return s.importAttachmentsFromRecords(ctx, inputs, userIDs, scope, memoIDsByUID, result)
+	return s.importAttachmentsFromRecords(ctx, inputs, userIDs, scope, uidMapper, memoIDsByUID, result)
 }
 
 type importAttachmentInput struct {
@@ -961,6 +1137,7 @@ func (s *APIV1Service) importAttachmentsFromRecords(
 	inputs []importAttachmentInput,
 	userIDs map[string]int32,
 	scope importExportScope,
+	uidMapper *importUIDMapper,
 	memoIDsByUID map[string]int32,
 	result *importExportResult,
 ) error {
@@ -972,14 +1149,14 @@ func (s *APIV1Service) importAttachmentsFromRecords(
 			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment creator %q not found", record.UID, record.CreatorUsername))
 			continue
 		}
-		existing, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &record.UID})
+		targetUID, existing, err := s.resolveImportAttachmentUID(ctx, record.UID, creatorID, scope, uidMapper)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get attachment").Wrap(err)
 		}
 		if existing != nil {
 			if scope == importExportScopeMine && existing.CreatorID != creatorID {
 				result.SkippedAttachments++
-				addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment UID already belongs to another user", record.UID))
+				addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment UID already belongs to another user", targetUID))
 				continue
 			}
 			result.SkippedAttachments++
@@ -1010,7 +1187,7 @@ func (s *APIV1Service) importAttachmentsFromRecords(
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid attachment payload").Wrap(err)
 		}
 		create := &store.Attachment{
-			UID:       record.UID,
+			UID:       targetUID,
 			CreatorID: creatorID,
 			Filename:  record.Filename,
 			Type:      attachmentType,

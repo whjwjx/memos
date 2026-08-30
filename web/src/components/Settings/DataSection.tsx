@@ -17,6 +17,7 @@ import { User_Role } from "@/types/proto/api/v1/user_service_pb";
 import type { Translations } from "@/utils/i18n";
 import { useTranslate } from "@/utils/i18n";
 import SettingGroup from "./SettingGroup";
+import { SettingList, SettingListItem } from "./SettingList";
 import SettingSection from "./SettingSection";
 
 const formatImportResult = (result: ImportExportResult) => {
@@ -102,57 +103,83 @@ const DataSection = () => {
       <input ref={fileInputRef} type="file" accept=".zip,application/zip" className="hidden" onChange={handleImportFileChange} />
 
       <SettingGroup title={t("setting.data.my-data")} description={t("setting.data.my-data-description")}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" disabled={!!exportingScope || !!importingScope} onClick={() => handleExport("mine")}>
-            <DownloadIcon className="mr-1.5 h-4 w-4" />
-            {exportingScope === "mine" ? t("setting.data.exporting") : t("setting.data.export-memos-package")}
-          </Button>
-        </div>
-        <div className="mt-3 flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <SettingList>
+          <SettingListItem
+            label={t("setting.data.memos-package-title")}
+            description={t("setting.data.import-memos-package-description")}
+            controlClassName="flex-wrap gap-2"
+          >
             <Button
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
+              disabled={!!exportingScope || !!importingScope}
+              onClick={() => handleExport("mine")}
+            >
+              <DownloadIcon className="h-4 w-4" />
+              {exportingScope === "mine" ? t("setting.data.exporting") : t("setting.data.export-memos-package")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
               disabled={!!exportingScope || !!importingScope}
               onClick={() => openImportFilePicker("mine", "memos")}
             >
-              <UploadIcon className="mr-1.5 h-4 w-4" />
+              <UploadIcon className="h-4 w-4" />
               {getImportButtonText("mine", "memos", "setting.data.import-memos-package")}
             </Button>
-            <span className="text-muted-foreground text-sm">{t("setting.data.import-memos-package-description")}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+          </SettingListItem>
+
+          <SettingListItem
+            label={t("setting.data.flomo-package-title")}
+            description={t("setting.data.import-flomo-package-description")}
+            controlClassName="flex-wrap gap-2"
+          >
             <Button
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
               disabled={!!exportingScope || !!importingScope}
               onClick={() => openImportFilePicker("mine", "flomo")}
             >
-              <UploadIcon className="mr-1.5 h-4 w-4" />
+              <UploadIcon className="h-4 w-4" />
               {getImportButtonText("mine", "flomo", "setting.data.import-flomo-package")}
             </Button>
-            <span className="text-muted-foreground text-sm">{t("setting.data.import-flomo-package-description")}</span>
-          </div>
-        </div>
+          </SettingListItem>
+        </SettingList>
       </SettingGroup>
 
       {isAdmin && (
         <SettingGroup showSeparator title={t("setting.data.admin-data")} description={t("setting.data.admin-data-description")}>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" disabled={!!exportingScope || !!importingScope} onClick={() => handleExport("all")}>
-              <DownloadIcon className="mr-1.5 h-4 w-4" />
-              {exportingScope === "all" ? t("setting.data.exporting") : t("setting.data.export-all-memos-package")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!!exportingScope || !!importingScope}
-              onClick={() => openImportFilePicker("all", "memos")}
+          <SettingList>
+            <SettingListItem
+              label={t("setting.data.memos-package-title")}
+              description={t("setting.data.admin-data-description")}
+              controlClassName="flex-wrap gap-2"
             >
-              <UploadIcon className="mr-1.5 h-4 w-4" />
-              {getImportButtonText("all", "memos", "setting.data.import-all-memos-package")}
-            </Button>
-          </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={!!exportingScope || !!importingScope}
+                onClick={() => handleExport("all")}
+              >
+                <DownloadIcon className="h-4 w-4" />
+                {exportingScope === "all" ? t("setting.data.exporting") : t("setting.data.export-all-memos-package")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={!!exportingScope || !!importingScope}
+                onClick={() => openImportFilePicker("all", "memos")}
+              >
+                <UploadIcon className="h-4 w-4" />
+                {getImportButtonText("all", "memos", "setting.data.import-all-memos-package")}
+              </Button>
+            </SettingListItem>
+          </SettingList>
         </SettingGroup>
       )}
     </SettingSection>

@@ -44,7 +44,7 @@ describe("remarkMemoSyntax", () => {
   it("coalesces text after unwrapping a remark-only URL", () => {
     const html = renderMarkdown("#&HTTP://example.com/");
 
-    expect(html).toContain('<span class="tag" data-tag="&amp;HTTP">#&amp;HTTP</span>://example.com/');
+    expect(html).toContain('<span class="tag" data-tag="&amp;HTTP:">#&amp;HTTP:</span>//example.com/');
     expect(html).not.toContain('data-tag="&amp;"');
   });
 

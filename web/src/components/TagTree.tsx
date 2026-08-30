@@ -1,4 +1,4 @@
-import { ArrowUpToLineIcon, ChevronRightIcon, HashIcon } from "lucide-react";
+import { ChevronRightIcon, HashIcon } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import {
   SIDEBAR_ROW_BOX_CLASSES,
@@ -7,6 +7,7 @@ import {
   SIDEBAR_ROW_ICON_CLASSES,
   sidebarRowStateClasses,
 } from "@/components/AppSidebar/SidebarRow";
+import TagActionMenu from "@/components/AppSidebar/TagActionMenu";
 import { useLocalStorage, useOverflowTitle } from "@/hooks";
 import { cn } from "@/lib/utils";
 import { useTranslate } from "@/utils/i18n";
@@ -28,6 +29,8 @@ interface Props {
   scope: string;
   onTagClick: (tag: string) => void;
   onTogglePin?: (tag: string) => void;
+  onRenameTag?: (tag: string) => void;
+  pinnedTags?: ReadonlySet<string>;
   pinningTag?: string;
 }
 
@@ -97,10 +100,23 @@ interface TagItemProps {
   onTagClick: (tag: string) => void;
   onToggle: (path: string) => void;
   onTogglePin?: (tag: string) => void;
+  onRenameTag?: (tag: string) => void;
+  pinnedTags?: ReadonlySet<string>;
   pinningTag?: string;
 }
 
-const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle, onTogglePin, pinningTag }: TagItemProps) => {
+const TagItem = ({
+  tag,
+  depth,
+  activeTag,
+  expanded,
+  onTagClick,
+  onToggle,
+  onTogglePin,
+  onRenameTag,
+  pinnedTags,
+  pinningTag,
+}: TagItemProps) => {
   const t = useTranslate();
   const isTag = tag.amount !== undefined;
   const isActive = activeTag === tag.text;
@@ -118,6 +134,7 @@ const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle, onTogg
         aria-expanded={hasSubTags ? open : undefined}
         className={cn(
           SIDEBAR_ROW_BOX_CLASSES,
+          "group/tag",
           isTag ? sidebarRowStateClasses(isActive) : "font-medium text-muted-foreground/65",
           isAncestorOfActiveTag && !isActive && "text-foreground/75",
         )}
@@ -156,20 +173,14 @@ const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle, onTogg
             <Chevron open={open} />
           </button>
         )}
-        {isTag && onTogglePin && (
-          <button
-            type="button"
-            aria-label={`${t("common.pin")} #${tag.text}`}
-            title={`${t("common.pin")} #${tag.text}`}
-            disabled={pinningTag === tag.text}
-            className={cn(
-              "-mr-1 flex size-6 shrink-0 scale-95 items-center justify-center rounded text-muted-foreground transition-[background-color,color,opacity,scale] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-40 md:opacity-0 md:group-hover:scale-100 md:group-hover:opacity-100 md:focus-visible:scale-100 md:focus-visible:opacity-100",
-              SIDEBAR_ROW_FOCUS_CLASSES,
-            )}
-            onClick={() => onTogglePin(tag.text)}
-          >
-            <ArrowUpToLineIcon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
-          </button>
+        {isTag && (
+          <TagActionMenu
+            tag={tag.text}
+            pinned={pinnedTags?.has(tag.text) ?? false}
+            pinDisabled={pinningTag === tag.text}
+            onTogglePin={onTogglePin ? () => onTogglePin(tag.text) : undefined}
+            onRename={onRenameTag ? () => onRenameTag(tag.text) : undefined}
+          />
         )}
         {isTag && hasSubTags && (
           // A tag row's label filters, so its disclosure needs a control of its own.
@@ -200,6 +211,8 @@ const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle, onTogg
               onTagClick={onTagClick}
               onToggle={onToggle}
               onTogglePin={onTogglePin}
+              onRenameTag={onRenameTag}
+              pinnedTags={pinnedTags}
               pinningTag={pinningTag}
             />
           ))}
@@ -209,7 +222,7 @@ const TagItem = ({ tag, depth, activeTag, expanded, onTagClick, onToggle, onTogg
   );
 };
 
-const TagTree = ({ tagAmounts, activeTag, scope, onTagClick, onTogglePin, pinningTag }: Props) => {
+const TagTree = ({ tagAmounts, activeTag, scope, onTagClick, onTogglePin, onRenameTag, pinnedTags, pinningTag }: Props) => {
   const t = useTranslate();
   const tags = useMemo(() => buildTagTree(tagAmounts), [tagAmounts]);
   // Scoped per tenant: the paths are one account's tag names, so another user's profile tree
@@ -252,6 +265,8 @@ const TagTree = ({ tagAmounts, activeTag, scope, onTagClick, onTogglePin, pinnin
           onTagClick={onTagClick}
           onToggle={handleToggle}
           onTogglePin={onTogglePin}
+          onRenameTag={onRenameTag}
+          pinnedTags={pinnedTags}
           pinningTag={pinningTag}
         />
       ))}

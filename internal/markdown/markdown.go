@@ -558,8 +558,9 @@ func (s *service) RenameTag(content []byte, oldTag, newTag string) (string, erro
 	}
 
 	type sourceRange struct {
-		start int
-		end   int
+		start  int
+		end    int
+		suffix string
 	}
 	var ranges []sourceRange
 	err = gast.Walk(root, func(n gast.Node, entering bool) (gast.WalkStatus, error) {
@@ -568,8 +569,13 @@ func (s *service) RenameTag(content []byte, oldTag, newTag string) (string, erro
 		}
 
 		if tagNode, ok := asMemoTagNode(n); ok {
-			if string(tagNode.Tag) == oldTag && len(tagNode.Source) > 0 {
-				ranges = append(ranges, sourceRange{start: tagNode.Pos(), end: tagNode.Pos() + len(tagNode.Source)})
+			tag := string(tagNode.Tag)
+			if (tag == oldTag || strings.HasPrefix(tag, oldTag+"/")) && len(tagNode.Source) > 0 {
+				ranges = append(ranges, sourceRange{
+					start:  tagNode.Pos(),
+					end:    tagNode.Pos() + len(tagNode.Source),
+					suffix: strings.TrimPrefix(tag, oldTag),
+				})
 			}
 		}
 
@@ -588,6 +594,7 @@ func (s *service) RenameTag(content []byte, oldTag, newTag string) (string, erro
 		output.Write(content[cursor:sourceRange.start])
 		output.WriteByte('#')
 		output.WriteString(newTag)
+		output.WriteString(sourceRange.suffix)
 		cursor = sourceRange.end
 	}
 	output.Write(content[cursor:])

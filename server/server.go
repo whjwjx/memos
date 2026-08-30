@@ -85,6 +85,7 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 	// Register gRPC gateway as api v1 (includes SSE endpoint on CORS-enabled group).
 	apiV1Service.RegisterBackupRoutes(echoServer)
 	apiV1Service.RegisterImportExportRoutes(echoServer)
+	apiV1Service.RegisterTagRoutes(echoServer)
 	if err := apiV1Service.RegisterGateway(ctx, echoServer); err != nil {
 		return nil, errors.Wrap(err, "failed to register gRPC gateway")
 	}
