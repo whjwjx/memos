@@ -28,7 +28,19 @@ const openPopover = (container: HTMLElement) => {
 const getTimeInput = () => document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
 
 describe("ScheduleSelector", () => {
-  it("keeps the popover open after setting a time so duration options are reachable", () => {
+  it("shows schedule controls immediately without saving on open", () => {
+    const onChange = vi.fn();
+    const { container } = render(<ScheduleSelector onChange={onChange} />);
+
+    openPopover(container);
+
+    expect(screen.getByText("memo.schedule.duration")).toBeInTheDocument();
+    expect(screen.getByText("memo.schedule.repeat")).toBeInTheDocument();
+    expect(screen.queryByText("memo.schedule.clear")).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the popover open after setting a time", () => {
     const onChange = vi.fn();
     const Harness = () => {
       const [time, setTime] = useState<Date | undefined>();
@@ -48,7 +60,7 @@ describe("ScheduleSelector", () => {
     const { container } = render(<Harness />);
 
     openPopover(container);
-    expect(screen.queryByText("memo.schedule.duration")).not.toBeInTheDocument();
+    expect(screen.getByText("memo.schedule.duration")).toBeInTheDocument();
 
     fireEvent.change(getTimeInput(), { target: { value: "2026-08-23T15:00" } });
     fireEvent.blur(getTimeInput());
@@ -69,6 +81,16 @@ describe("ScheduleSelector", () => {
     expect(onChange).toHaveBeenCalledWith(expect.any(Date), 7200);
   });
 
+  it("hydrates the native datetime input with a valid local datetime value", () => {
+    const onChange = vi.fn();
+    const time = new Date(2026, 7, 23, 15, 5, 7);
+    const { container } = render(<ScheduleSelector value={time} duration={3600} onChange={onChange} />);
+
+    openPopover(container);
+
+    expect(getTimeInput().value).toBe("2026-08-23T15:05");
+  });
+
   it("passes the selected duration together with the current scheduled time", () => {
     const onChange = vi.fn();
     const time = new Date(2026, 7, 23, 15, 0, 0);
@@ -78,5 +100,15 @@ describe("ScheduleSelector", () => {
     fireEvent.click(screen.getByText("2h"));
 
     expect(onChange).toHaveBeenCalledWith(time, 7200);
+  });
+
+  it("creates a schedule with the draft time when setting duration first", () => {
+    const onChange = vi.fn();
+    const { container } = render(<ScheduleSelector onChange={onChange} />);
+
+    openPopover(container);
+    fireEvent.click(screen.getByText("2h"));
+
+    expect(onChange).toHaveBeenCalledWith(expect.any(Date), 7200);
   });
 });
