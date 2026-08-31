@@ -1735,18 +1735,28 @@ paths:
             parameters:
                 - name: pageSize
                   in: query
-                  description: "Optional. The maximum number of users to return.\r\n The service may return fewer than this value.\r\n If unspecified, at most 50 users will be returned.\r\n The maximum value is 1000; values above 1000 will be coerced to 1000."
+                  description: |-
+                    Optional. The maximum number of users to return.
+                     The service may return fewer than this value.
+                     If unspecified, at most 50 users will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
                     format: int32
                 - name: pageToken
                   in: query
-                  description: "Optional. A page token, received from a previous `ListUsers` call.\r\n Provide this to retrieve the subsequent page."
+                  description: |-
+                    Optional. A page token, received from a previous `ListUsers` call.
+                     Provide this to retrieve the subsequent page.
                   schema:
                     type: string
                 - name: filter
                   in: query
-                  description: "Optional. Filter to apply to the list results.\r\n Example: \"username == 'steven'\"\r\n Supported operators: ==\r\n Supported fields: username"
+                  description: |-
+                    Optional. Filter to apply to the list results.
+                     Example: "username == 'steven'"
+                     Supported operators: ==
+                     Supported fields: username
                   schema:
                     type: string
                 - name: showDeleted
@@ -1775,7 +1785,10 @@ paths:
             parameters:
                 - name: userId
                   in: query
-                  description: "Optional. The resource ID to use for this user. If set, it must equal\r\n user.username and follow the username format.\r\n Format: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,34}[a-zA-Z0-9])?$"
+                  description: |-
+                    Optional. The resource ID to use for this user. If set, it must equal
+                     user.username and follow the username format.
+                     Format: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,34}[a-zA-Z0-9])?$
                   schema:
                     type: string
                 - name: validateOnly
@@ -1785,7 +1798,9 @@ paths:
                     type: boolean
                 - name: requestId
                   in: query
-                  description: "Optional. An idempotency token that can be used to ensure that multiple\r\n requests to create a user have the same result."
+                  description: |-
+                    Optional. An idempotency token that can be used to ensure that multiple
+                     requests to create a user have the same result.
                   schema:
                     type: string
             requestBody:
@@ -1811,7 +1826,9 @@ paths:
         get:
             tags:
                 - UserService
-            description: "GetUser gets a user by username.\r\n Format: users/{user} (e.g., users/steven)"
+            description: |-
+                GetUser gets a user by username.
+                 Format: users/{user} (e.g., users/steven)
             operationId: UserService_GetUser
             parameters:
                 - name: user
@@ -1822,7 +1839,9 @@ paths:
                     type: string
                 - name: readMask
                   in: query
-                  description: "Optional. The fields to return in the response.\r\n If not specified, all fields are returned."
+                  description: |-
+                    Optional. The fields to return in the response.
+                     If not specified, all fields are returned.
                   schema:
                     type: string
                     format: field-mask
@@ -2139,7 +2158,9 @@ paths:
         get:
             tags:
                 - UserService
-            description: "ListPersonalAccessTokens returns a list of Personal Access Tokens (PATs) for a user.\r\n PATs are long-lived tokens for API/script access, distinct from short-lived JWT access tokens."
+            description: |-
+                ListPersonalAccessTokens returns a list of Personal Access Tokens (PATs) for a user.
+                 PATs are long-lived tokens for API/script access, distinct from short-lived JWT access tokens.
             operationId: UserService_ListPersonalAccessTokens
             parameters:
                 - name: user
@@ -2175,7 +2196,9 @@ paths:
         post:
             tags:
                 - UserService
-            description: "CreatePersonalAccessToken creates a new Personal Access Token for a user.\r\n The token value is only returned once upon creation."
+            description: |-
+                CreatePersonalAccessToken creates a new Personal Access Token for a user.
+                 The token value is only returned once upon creation.
             operationId: UserService_CreatePersonalAccessToken
             parameters:
                 - name: user
@@ -2247,13 +2270,19 @@ paths:
                     type: string
                 - name: pageSize
                   in: query
-                  description: "Optional. The maximum number of settings to return.\r\n The service may return fewer than this value.\r\n If unspecified, at most 50 settings will be returned.\r\n The maximum value is 1000; values above 1000 will be coerced to 1000."
+                  description: |-
+                    Optional. The maximum number of settings to return.
+                     The service may return fewer than this value.
+                     If unspecified, at most 50 settings will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
                     format: int32
                 - name: pageToken
                   in: query
-                  description: "Optional. A page token, received from a previous `ListUserSettings` call.\r\n Provide this to retrieve the subsequent page."
+                  description: |-
+                    Optional. A page token, received from a previous `ListUserSettings` call.
+                     Provide this to retrieve the subsequent page.
                   schema:
                     type: string
             responses:
@@ -2642,7 +2671,10 @@ paths:
         get:
             tags:
                 - UserService
-            description: "GetUserWebhookSigningSecret returns the signing secret for a webhook.\r\n The secret is returned only through this explicit, owner-gated call; it is\r\n never included in List/Create/Update responses."
+            description: |-
+                GetUserWebhookSigningSecret returns the signing secret for a webhook.
+                 The secret is returned only through this explicit, owner-gated call; it is
+                 never included in List/Create/Update responses.
             operationId: UserService_GetUserWebhookSigningSecret
             parameters:
                 - name: user
@@ -2740,7 +2772,9 @@ paths:
                     format: enum
                 - name: filter
                   in: query
-                  description: "Optional. Filter to apply to memo stats.\r\n Uses the same filter syntax as ListMemos."
+                  description: |-
+                    Optional. Filter to apply to memo stats.
+                     Uses the same filter syntax as ListMemos.
                   schema:
                     type: string
             responses:
@@ -3106,10 +3140,14 @@ components:
             properties:
                 parent:
                     type: string
-                    description: "Required. The parent user who owns the linked identity.\r\n Format: users/{user}"
+                    description: |-
+                        Required. The parent user who owns the linked identity.
+                         Format: users/{user}
                 idpName:
                     type: string
-                    description: "Required. The identity provider to link.\r\n Format: identity-providers/{idp}"
+                    description: |-
+                        Required. The identity provider to link.
+                         Format: identity-providers/{idp}
                 code:
                     type: string
                     description: Required. The authorization code from the identity provider.
@@ -3126,7 +3164,9 @@ components:
             properties:
                 parent:
                     type: string
-                    description: "Required. The parent resource where this token will be created.\r\n Format: users/{user}"
+                    description: |-
+                        Required. The parent resource where this token will be created.
+                         Format: users/{user}
                 description:
                     type: string
                     description: Optional. Description of the personal access token.
@@ -3143,7 +3183,9 @@ components:
                     description: The personal access token metadata.
                 token:
                     type: string
-                    description: "The actual token value - only returned on creation.\r\n This is the only time the token value will be visible."
+                    description: |-
+                        The actual token value - only returned on creation.
+                         This is the only time the token value will be visible.
         DeleteConversationResponse:
             type: object
             properties: {}
@@ -3750,11 +3792,15 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The resource name of the linked identity.\r\n Format: users/{user}/linkedIdentities/{linked_identity}"
+                    description: |-
+                        The resource name of the linked identity.
+                         Format: users/{user}/linkedIdentities/{linked_identity}
                 idpName:
                     readOnly: true
                     type: string
-                    description: "The resource name of the identity provider.\r\n Format: identity-providers/{idp}"
+                    description: |-
+                        The resource name of the identity provider.
+                         Format: identity-providers/{idp}
                 externUid:
                     readOnly: true
                     type: string
@@ -3925,7 +3971,9 @@ components:
                     description: The list of user settings.
                 nextPageToken:
                     type: string
-                    description: "A token that can be sent as `page_token` to retrieve the next page.\r\n If this field is omitted, there are no subsequent pages."
+                    description: |-
+                        A token that can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
             description: Response message for ListUserSettings method.
         ListUserWebhooksResponse:
             type: object
@@ -3945,7 +3993,9 @@ components:
                     description: The list of users.
                 nextPageToken:
                     type: string
-                    description: "A token that can be sent as `page_token` to retrieve the next page.\r\n If this field is omitted, there are no subsequent pages."
+                    description: |-
+                        A token that can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
         Location:
             type: object
             properties:
@@ -4215,6 +4265,7 @@ components:
                         - FREQUENCY_UNSPECIFIED
                         - DAILY
                         - WEEKLY
+                        - YEARLY
                     type: string
                     description: Required. The recurrence cadence.
                     format: enum
@@ -4404,7 +4455,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The resource name of the personal access token.\r\n Format: users/{user}/personalAccessTokens/{personal_access_token}"
+                    description: |-
+                        The resource name of the personal access token.
+                         Format: users/{user}/personalAccessTokens/{personal_access_token}
                 description:
                     type: string
                     description: The description of the token.
@@ -4422,7 +4475,9 @@ components:
                     type: string
                     description: Output only. The last used timestamp.
                     format: date-time
-            description: "PersonalAccessToken represents a long-lived token for API/script access.\r\n PATs are distinct from short-lived JWT access tokens used for session authentication."
+            description: |-
+                PersonalAccessToken represents a long-lived token for API/script access.
+                 PATs are distinct from short-lived JWT access tokens used for session authentication.
         PhotoMetadata:
             type: object
             properties:
@@ -4910,7 +4965,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The resource name of the user.\r\n Format: users/{user}"
+                    description: |-
+                        The resource name of the user.
+                         Format: users/{user}
                 role:
                     enum:
                         - ROLE_UNSPECIFIED
@@ -4962,11 +5019,15 @@ components:
                 name:
                     readOnly: true
                     type: string
-                    description: "The resource name of the notification.\r\n Format: users/{user}/notifications/{notification}"
+                    description: |-
+                        The resource name of the notification.
+                         Format: users/{user}/notifications/{notification}
                 sender:
                     readOnly: true
                     type: string
-                    description: "The sender of the notification.\r\n Format: users/{user}"
+                    description: |-
+                        The sender of the notification.
+                         Format: users/{user}
                 senderUser:
                     readOnly: true
                     allOf:
@@ -5007,10 +5068,14 @@ components:
             properties:
                 memo:
                     type: string
-                    description: "The memo name of comment.\r\n Format: memos/{memo}"
+                    description: |-
+                        The memo name of comment.
+                         Format: memos/{memo}
                 relatedMemo:
                     type: string
-                    description: "The name of related memo.\r\n Format: memos/{memo}"
+                    description: |-
+                        The name of related memo.
+                         Format: memos/{memo}
                 memoSnippet:
                     type: string
                     description: Preview text of the comment memo.
@@ -5022,10 +5087,14 @@ components:
             properties:
                 memo:
                     type: string
-                    description: "The memo that contains the mention.\r\n Format: memos/{memo}"
+                    description: |-
+                        The memo that contains the mention.
+                         Format: memos/{memo}
                 relatedMemo:
                     type: string
-                    description: "The related parent memo when the mention was created in a comment.\r\n Format: memos/{memo}"
+                    description: |-
+                        The related parent memo when the mention was created in a comment.
+                         Format: memos/{memo}
                 memoSnippet:
                     type: string
                     description: Preview text of the memo that contains the mention.
@@ -5037,7 +5106,10 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The name of the user setting.\r\n Format: users/{user}/settings/{setting}, {setting} is the key for the setting.\r\n For example, \"users/steven/settings/GENERAL\" for general settings."
+                    description: |-
+                        The name of the user setting.
+                         Format: users/{user}/settings/{setting}, {setting} is the key for the setting.
+                         For example, "users/steven/settings/GENERAL" for general settings.
                 generalSetting:
                     $ref: '#/components/schemas/UserSetting_GeneralSetting'
                 webhooksSetting:
@@ -5056,24 +5128,36 @@ components:
                     description: The default visibility of the memo.
                 theme:
                     type: string
-                    description: "The preferred theme of the user.\r\n This references a CSS file in the web/public/themes/ directory.\r\n If not set, the default theme will be used."
+                    description: |-
+                        The preferred theme of the user.
+                         This references a CSS file in the web/public/themes/ directory.
+                         If not set, the default theme will be used.
                 saveMediaMetadata:
                     type: boolean
                     description: Whether the official client should save metadata from future media uploads.
                 calendarDayStart:
                     type: integer
-                    description: "The start of the calendar day in minutes from midnight.\r\n Hours before this are hidden in the calendar week view. Defaults to 0."
+                    description: |-
+                        The start of the calendar day in minutes from midnight.
+                         Hours before this are hidden in the calendar week view. Defaults to 0.
                     format: int32
                 calendarDayEnd:
                     type: integer
-                    description: "The end of the calendar day in minutes from midnight.\r\n Hours after this are hidden in the calendar week view. Defaults to 1440."
+                    description: |-
+                        The end of the calendar day in minutes from midnight.
+                         Hours after this are hidden in the calendar week view. Defaults to 1440.
                     format: int32
                 showCommentPreview:
                     type: boolean
-                    description: "Whether to show the first few comments under each memo in the feed.\r\n When false, memo cards in the list no longer render the comment preview.\r\n Defaults to true."
+                    description: |-
+                        Whether to show the first few comments under each memo in the feed.
+                         When false, memo cards in the list no longer render the comment preview.
+                         Defaults to true.
                 commentIndicatorOnHover:
                     type: boolean
-                    description: "Whether the memo card comment count indicator is only shown on hover.\r\n When true, the indicator is hidden until the card is hovered. Defaults to false (always shown)."
+                    description: |-
+                        Whether the memo card comment count indicator is only shown on hover.
+                         When true, the indicator is hidden until the card is hovered. Defaults to false (always shown).
             description: General user settings configuration.
         UserSetting_TagMetadata:
             type: object
@@ -5098,7 +5182,9 @@ components:
                     type: object
                     additionalProperties:
                         $ref: '#/components/schemas/UserSetting_TagMetadata'
-                    description: "Map of tag name pattern to tag metadata.\r\n Each key is treated as an anchored regular expression (^pattern$)."
+                    description: |-
+                        Map of tag name pattern to tag metadata.
+                         Each key is treated as an anchored regular expression (^pattern$).
             description: User-specific tag metadata.
         UserSetting_WebhooksSetting:
             type: object
@@ -5114,7 +5200,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The resource name of the user statistics singleton.\r\n Format: users/{user}/stats"
+                    description: |-
+                        The resource name of the user statistics singleton.
+                         Format: users/{user}/stats
                 memoTypeStats:
                     allOf:
                         - $ref: '#/components/schemas/UserStats_MemoTypeStats'
@@ -5136,7 +5224,10 @@ components:
                     items:
                         type: string
                         format: date-time
-                    description: "The latest update timestamps of the user's memos (one per memo,\r\n mirrors memo_created_timestamps). Used by the activity heatmap when\r\n the client's view is set to update_time basis."
+                    description: |-
+                        The latest update timestamps of the user's memos (one per memo,
+                         mirrors memo_created_timestamps). Used by the activity heatmap when
+                         the client's view is set to update_time basis.
                 pinnedMemos:
                     type: array
                     items:
@@ -5168,7 +5259,9 @@ components:
             properties:
                 name:
                     type: string
-                    description: "The name of the webhook.\r\n Format: users/{user}/webhooks/{webhook}"
+                    description: |-
+                        The name of the webhook.
+                         Format: users/{user}/webhooks/{webhook}
                 url:
                     type: string
                     description: The URL to send the webhook to.
@@ -5188,7 +5281,9 @@ components:
                 signingSecret:
                     writeOnly: true
                     type: string
-                    description: "Optional. Signing secret used to HMAC-SHA256 sign the webhook request body.\r\n This field is input-only; it is never returned in responses."
+                    description: |-
+                        Optional. Signing secret used to HMAC-SHA256 sign the webhook request body.
+                         This field is input-only; it is never returned in responses.
                 signingSecretSet:
                     readOnly: true
                     type: boolean

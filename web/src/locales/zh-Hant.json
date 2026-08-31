@@ -254,6 +254,8 @@
     "exit-focus-mode": "退出專注模式",
     "focus-mode": "專注模式",
     "formatting-toolbar": "格式工具列",
+    "schedule-detected": "已識別日程",
+    "schedule-dismiss": "忽略識別的日程",
     "format": {
       "heading": "標題",
       "paragraph": "段落",
@@ -461,6 +463,7 @@
       "repeat-none": "不重複",
       "repeat-weekdays": "工作日",
       "repeat-weekends": "週末",
+      "repeat-yearly": "每年",
       "set": "日程",
       "stats-completed": "近 30 天完成",
       "stats-current-streak": "目前連續",

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
 
@@ -68,6 +69,34 @@ func TestExpandMemoScheduleOccurrencesDailyKeepsLocalClockAcrossDST(t *testing.T
 	}, occurrences)
 }
 
+func TestExpandMemoScheduleOccurrencesYearly(t *testing.T) {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	require.NoError(t, err)
+
+	scheduledTime := time.Date(2026, 8, 31, 9, 0, 0, 0, loc).Unix()
+	memo := &store.Memo{
+		ID:            1,
+		ScheduledTime: &scheduledTime,
+		ScheduledRecurrence: &store.MemoScheduleRecurrence{
+			Frequency: store.MemoScheduleRecurrenceYearly,
+			Interval:  1,
+			Timezone:  "Asia/Shanghai",
+		},
+	}
+
+	occurrences := expandMemoScheduleOccurrences(
+		memo,
+		time.Date(2026, 1, 1, 0, 0, 0, 0, loc),
+		time.Date(2029, 1, 1, 0, 0, 0, 0, loc),
+	)
+
+	require.Equal(t, []int64{
+		time.Date(2026, 8, 31, 9, 0, 0, 0, loc).Unix(),
+		time.Date(2027, 8, 31, 9, 0, 0, 0, loc).Unix(),
+		time.Date(2028, 8, 31, 9, 0, 0, 0, loc).Unix(),
+	}, occurrences)
+}
+
 func TestValidateScheduleRecurrence(t *testing.T) {
 	err := validateScheduleRecurrence(&store.MemoScheduleRecurrence{
 		Frequency:  store.MemoScheduleRecurrenceWeekly,
@@ -81,6 +110,23 @@ func TestValidateScheduleRecurrence(t *testing.T) {
 		Timezone:  "Asia/Shanghai",
 	})
 	require.NoError(t, err)
+
+	err = validateScheduleRecurrence(&store.MemoScheduleRecurrence{
+		Frequency: store.MemoScheduleRecurrenceYearly,
+		Timezone:  "Asia/Shanghai",
+	})
+	require.NoError(t, err)
+}
+
+func TestConvertScheduleRecurrenceToStoreYearly(t *testing.T) {
+	recurrence := convertScheduleRecurrenceToStore(&v1pb.MemoScheduleRecurrence{
+		Frequency: v1pb.MemoScheduleRecurrence_YEARLY,
+		Interval:  1,
+		Timezone:  "Asia/Shanghai",
+	})
+
+	require.Equal(t, store.MemoScheduleRecurrenceYearly, recurrence.Frequency)
+	require.NoError(t, validateScheduleRecurrence(recurrence))
 }
 
 func TestCalculateMemoScheduleStatsUsesScheduledDayStreaks(t *testing.T) {

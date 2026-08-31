@@ -89,6 +89,7 @@ const (
 	MemoScheduleRecurrence_FREQUENCY_UNSPECIFIED MemoScheduleRecurrence_Frequency = 0
 	MemoScheduleRecurrence_DAILY                 MemoScheduleRecurrence_Frequency = 1
 	MemoScheduleRecurrence_WEEKLY                MemoScheduleRecurrence_Frequency = 2
+	MemoScheduleRecurrence_YEARLY                MemoScheduleRecurrence_Frequency = 3
 )
 
 // Enum value maps for MemoScheduleRecurrence_Frequency.
@@ -97,11 +98,13 @@ var (
 		0: "FREQUENCY_UNSPECIFIED",
 		1: "DAILY",
 		2: "WEEKLY",
+		3: "YEARLY",
 	}
 	MemoScheduleRecurrence_Frequency_value = map[string]int32{
 		"FREQUENCY_UNSPECIFIED": 0,
 		"DAILY":                 1,
 		"WEEKLY":                2,
+		"YEARLY":                3,
 	}
 )
 
@@ -3088,19 +3091,21 @@ const file_api_v1_memo_service_proto_rawDesc = "" +
 	"\t_locationB\x11\n" +
 	"\x0f_scheduled_timeB\x15\n" +
 	"\x13_scheduled_durationB\x17\n" +
-	"\x15_scheduled_recurrenceJ\x04\b\x06\x10\aR\fdisplay_time\"\xd9\x02\n" +
+	"\x15_scheduled_recurrenceJ\x04\b\x06\x10\aR\fdisplay_time\"\xe5\x02\n" +
 	"\x16MemoScheduleRecurrence\x12Q\n" +
 	"\tfrequency\x18\x01 \x01(\x0e2..memos.api.v1.MemoScheduleRecurrence.FrequencyB\x03\xe0A\x02R\tfrequency\x12%\n" +
 	"\fdays_of_week\x18\x02 \x03(\x05B\x03\xe0A\x01R\n" +
 	"daysOfWeek\x12\x1f\n" +
 	"\binterval\x18\x03 \x01(\x05B\x03\xe0A\x01R\binterval\x12:\n" +
 	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x01H\x00R\x05until\x88\x01\x01\x12\x1f\n" +
-	"\btimezone\x18\x05 \x01(\tB\x03\xe0A\x01R\btimezone\"=\n" +
+	"\btimezone\x18\x05 \x01(\tB\x03\xe0A\x01R\btimezone\"I\n" +
 	"\tFrequency\x12\x19\n" +
 	"\x15FREQUENCY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05DAILY\x10\x01\x12\n" +
 	"\n" +
-	"\x06WEEKLY\x10\x02B\b\n" +
+	"\x06WEEKLY\x10\x02\x12\n" +
+	"\n" +
+	"\x06YEARLY\x10\x03B\b\n" +
 	"\x06_until\"\x88\x04\n" +
 	"\x16MemoScheduleOccurrence\x12-\n" +
 	"\x04memo\x18\x01 \x01(\tB\x19\xe0A\x02\xfaA\x13\n" +
