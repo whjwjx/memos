@@ -3,6 +3,7 @@ import { AttachmentListEditor, LocationDisplayEditor, RelationListEditor } from 
 import { extractManagedAttachmentUIDs } from "@/utils/managed-attachment";
 import { useEditorContext, useEditorSelector } from "../state";
 import type { EditorMetadataProps } from "../types";
+import { ScheduleSuggestion } from "./ScheduleSuggestion";
 
 export const EditorMetadata: FC<EditorMetadataProps> = ({ memoName, uploadingLocalFileURLs, onInsertAttachments, onInsertLocalFiles }) => {
   const { actions, dispatch } = useEditorContext();
@@ -18,6 +19,8 @@ export const EditorMetadata: FC<EditorMetadataProps> = ({ memoName, uploadingLoc
 
   return (
     <div className="w-full flex flex-col gap-2">
+      {!memoName && <ScheduleSuggestion />}
+
       <AttachmentListEditor
         attachments={attachments}
         localFiles={localFiles}

@@ -16,6 +16,8 @@ const (
 	MemoScheduleRecurrenceDaily MemoScheduleRecurrenceFrequency = "DAILY"
 	// MemoScheduleRecurrenceWeekly repeats a scheduled memo on selected weekdays.
 	MemoScheduleRecurrenceWeekly MemoScheduleRecurrenceFrequency = "WEEKLY"
+	// MemoScheduleRecurrenceYearly repeats a scheduled memo every year.
+	MemoScheduleRecurrenceYearly MemoScheduleRecurrenceFrequency = "YEARLY"
 )
 
 // MemoScheduleRecurrence stores the repeat rule for a scheduled memo.

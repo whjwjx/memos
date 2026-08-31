@@ -292,6 +292,8 @@
     "exit-focus-mode": "Exit Focus Mode",
     "focus-mode": "Focus Mode",
     "formatting-toolbar": "Formatting toolbar",
+    "schedule-detected": "Schedule",
+    "schedule-dismiss": "Ignore detected schedule",
     "format": {
       "heading": "Heading",
       "paragraph": "Paragraph",
@@ -502,6 +504,7 @@
       "repeat-none": "Does not repeat",
       "repeat-weekdays": "Weekdays",
       "repeat-weekends": "Weekends",
+      "repeat-yearly": "Yearly",
       "set": "Schedule",
       "stats-completed": "Completed in 30 days",
       "stats-current-streak": "Current streak",

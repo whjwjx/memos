@@ -320,6 +320,7 @@ message MemoScheduleRecurrence {
     FREQUENCY_UNSPECIFIED = 0;
     DAILY = 1;
     WEEKLY = 2;
+    YEARLY = 3;
   }
 
   // Required. The recurrence cadence.

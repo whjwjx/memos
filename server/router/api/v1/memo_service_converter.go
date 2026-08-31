@@ -370,6 +370,8 @@ func convertScheduleRecurrenceFromStore(recurrence *store.MemoScheduleRecurrence
 		message.Frequency = v1pb.MemoScheduleRecurrence_DAILY
 	case store.MemoScheduleRecurrenceWeekly:
 		message.Frequency = v1pb.MemoScheduleRecurrence_WEEKLY
+	case store.MemoScheduleRecurrenceYearly:
+		message.Frequency = v1pb.MemoScheduleRecurrence_YEARLY
 	default:
 		message.Frequency = v1pb.MemoScheduleRecurrence_FREQUENCY_UNSPECIFIED
 	}
@@ -393,6 +395,8 @@ func convertScheduleRecurrenceToStore(recurrence *v1pb.MemoScheduleRecurrence) *
 		message.Frequency = store.MemoScheduleRecurrenceDaily
 	case v1pb.MemoScheduleRecurrence_WEEKLY:
 		message.Frequency = store.MemoScheduleRecurrenceWeekly
+	case v1pb.MemoScheduleRecurrence_YEARLY:
+		message.Frequency = store.MemoScheduleRecurrenceYearly
 	}
 	if recurrence.Until != nil && recurrence.Until.IsValid() {
 		until := recurrence.Until.AsTime().Unix()

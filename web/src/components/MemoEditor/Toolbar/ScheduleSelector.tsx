@@ -24,7 +24,7 @@ const DEFAULT_DURATION = 3600;
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKENDS = [0, 6];
 
-type RepeatPreset = "none" | "daily" | "weekdays" | "weekends" | "custom";
+type RepeatPreset = "none" | "daily" | "weekdays" | "weekends" | "yearly" | "custom";
 
 function nextHour(date: Date): Date {
   const d = new Date(date);
@@ -54,6 +54,14 @@ function createWeeklyRecurrence(daysOfWeek: number[]): MemoScheduleRecurrence {
   });
 }
 
+function createYearlyRecurrence(): MemoScheduleRecurrence {
+  return create(MemoScheduleRecurrenceSchema, {
+    frequency: MemoScheduleRecurrence_Frequency.YEARLY,
+    interval: 1,
+    timezone: getTimezone(),
+  });
+}
+
 function sameDays(left: number[], right: number[]): boolean {
   if (left.length !== right.length) return false;
   const a = [...left].sort((x, y) => x - y);
@@ -64,6 +72,7 @@ function sameDays(left: number[], right: number[]): boolean {
 function getRepeatPreset(recurrence?: MemoScheduleRecurrence): RepeatPreset {
   if (!recurrence) return "none";
   if (recurrence.frequency === MemoScheduleRecurrence_Frequency.DAILY) return "daily";
+  if (recurrence.frequency === MemoScheduleRecurrence_Frequency.YEARLY) return "yearly";
   if (recurrence.frequency !== MemoScheduleRecurrence_Frequency.WEEKLY) return "none";
   if (sameDays(recurrence.daysOfWeek, WEEKDAYS)) return "weekdays";
   if (sameDays(recurrence.daysOfWeek, WEEKENDS)) return "weekends";
@@ -129,6 +138,8 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
       emitChange(scheduleTime, nextDuration, createWeeklyRecurrence(WEEKDAYS));
     } else if (preset === "weekends") {
       emitChange(scheduleTime, nextDuration, createWeeklyRecurrence(WEEKENDS));
+    } else if (preset === "yearly") {
+      emitChange(scheduleTime, nextDuration, createYearlyRecurrence());
     } else {
       const initialDay = scheduleTime.getDay();
       emitChange(scheduleTime, nextDuration, createWeeklyRecurrence(recurrence?.daysOfWeek.length ? recurrence.daysOfWeek : [initialDay]));
@@ -197,7 +208,7 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.repeat")}</span>
             <div className="grid grid-cols-2 gap-1">
-              {(["none", "daily", "weekdays", "weekends"] as const).map((preset) => (
+              {(["none", "daily", "weekdays", "weekends", "yearly"] as const).map((preset) => (
                 <button
                   key={preset}
                   type="button"

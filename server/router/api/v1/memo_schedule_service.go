@@ -48,6 +48,8 @@ func validateScheduleRecurrence(recurrence *store.MemoScheduleRecurrence) error 
 			seen[day] = true
 		}
 		return nil
+	case store.MemoScheduleRecurrenceYearly:
+		return nil
 	default:
 		return status.Errorf(codes.InvalidArgument, "scheduled_recurrence.frequency is invalid")
 	}
@@ -418,6 +420,8 @@ func memoScheduleRecurrenceMatches(recurrence *store.MemoScheduleRecurrence, bas
 			return false
 		}
 		return weeksBetween(base, occurrence)%int(interval) == 0
+	case store.MemoScheduleRecurrenceYearly:
+		return base.Month() == occurrence.Month() && base.Day() == occurrence.Day() && (occurrence.Year()-base.Year())%int(interval) == 0
 	default:
 		return false
 	}
