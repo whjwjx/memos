@@ -1,5 +1,5 @@
 import { useDirection } from "@base-ui/react/direction-provider";
-import { ChevronLeftIcon, ChevronRightIcon, LoaderCircleIcon, RefreshCwIcon, Settings2Icon, TagsIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, LoaderCircleIcon, RefreshCwIcon, Settings2Icon, TagsIcon, TrophyIcon } from "lucide-react";
 import { type CSSProperties, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { MentionResolutionProvider } from "@/components/MemoContent/MentionResolutionContext";
 import MemoView from "@/components/MemoView";
@@ -35,6 +35,15 @@ interface ReviewHistoryRecord {
 
 type ReviewHistory = Record<string, ReviewHistoryRecord>;
 
+interface ReviewSession {
+  dateKey: string;
+  userName: string;
+  settingsKey: string;
+  memoNames: string[];
+  activeIndex: number;
+  seenMemoNames: string[];
+}
+
 interface ReviewSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,6 +56,7 @@ interface ReviewSettingsDialogProps {
 
 const REVIEW_STORAGE_KEY = "memos-review-setting";
 const REVIEW_HISTORY_STORAGE_KEY = "memos-review-history";
+const REVIEW_SESSION_STORAGE_KEY = "memos-review-session";
 const REVIEW_PAGE_SIZE = 1000;
 const REVIEW_COOLDOWN_DAYS = 7;
 const REVIEW_SWIPE_DISTANCE_PX = 48;
@@ -60,6 +70,68 @@ const DEFAULT_SETTINGS: ReviewSettings = { tagMode: "all", tagName: "", timeRang
 const TAG_MODES: ReviewTagMode[] = ["all", "include", "exclude", "untagged"];
 const TIME_RANGES: ReviewTimeRange[] = ["all", "12m", "6m", "3m", "1m"];
 const REVIEW_COUNTS: ReviewCount[] = [4, 8, 12, 16, 20, 24];
+const REVIEW_COMPLETION_CONFETTI_CLASSES = [
+  "left-7 top-4 h-2 w-6 bg-amber-400 [--review-confetti-delay:0ms] [--review-confetti-drift:28px] [--review-confetti-fall:150px] [--review-confetti-spin:220deg]",
+  "left-1/4 top-7 h-2 w-5 bg-sky-400 [--review-confetti-delay:90ms] [--review-confetti-drift:-18px] [--review-confetti-fall:130px] [--review-confetti-spin:-190deg]",
+  "right-9 top-5 h-2 w-6 bg-rose-400 [--review-confetti-delay:40ms] [--review-confetti-drift:-26px] [--review-confetti-fall:155px] [--review-confetti-spin:-240deg]",
+  "right-1/4 top-10 size-2 rounded-full bg-emerald-400 [--review-confetti-delay:160ms] [--review-confetti-drift:20px] [--review-confetti-fall:120px] [--review-confetti-spin:180deg]",
+  "left-1/2 top-3 h-1.5 w-5 -translate-x-1/2 bg-primary [--review-confetti-delay:120ms] [--review-confetti-drift:12px] [--review-confetti-fall:145px] [--review-confetti-spin:260deg]",
+  "right-1/3 top-12 h-1.5 w-4 bg-amber-500 [--review-confetti-delay:220ms] [--review-confetti-drift:-14px] [--review-confetti-fall:115px] [--review-confetti-spin:-210deg]",
+  "left-10 top-16 size-2 rounded-full bg-violet-400 [--review-confetti-delay:260ms] [--review-confetti-drift:34px] [--review-confetti-fall:110px] [--review-confetti-spin:160deg]",
+  "right-14 top-20 h-2 w-5 bg-cyan-400 [--review-confetti-delay:300ms] [--review-confetti-drift:-30px] [--review-confetti-fall:105px] [--review-confetti-spin:-170deg]",
+];
+const REVIEW_COMPLETION_ANIMATION_CSS = `
+@keyframes review-confetti-burst {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -14px, 0) rotate(0deg) scale(0.7);
+  }
+  18% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--review-confetti-drift), var(--review-confetti-fall), 0) rotate(var(--review-confetti-spin)) scale(1);
+  }
+}
+
+@keyframes review-trophy-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.74) translateY(8px);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.08) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.review-completion-confetti {
+  animation: review-confetti-burst 1.15s cubic-bezier(0.16, 1, 0.3, 1) var(--review-confetti-delay) both;
+}
+
+.review-completion-trophy {
+  animation: review-trophy-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-completion-confetti,
+  .review-completion-trophy {
+    animation: none;
+  }
+
+  .review-completion-confetti {
+    opacity: 0.72;
+  }
+}
+`;
 type ReviewMotionPhase = "idle" | "leaving" | "entering";
 type ReviewMotionDirection = -1 | 0 | 1;
 
@@ -95,6 +167,44 @@ const normalizeReviewHistory = (value: unknown): ReviewHistory => {
 
     return history;
   }, {});
+};
+
+const uniqueMemoNames = (memoNames: string[]) => Array.from(new Set(memoNames.filter(Boolean)));
+
+const normalizeReviewSession = (value: unknown): ReviewSession | null => {
+  if (!value || typeof value !== "object") return null;
+
+  const data = value as Partial<ReviewSession>;
+  if (typeof data.dateKey !== "string" || typeof data.userName !== "string" || typeof data.settingsKey !== "string") {
+    return null;
+  }
+
+  return {
+    dateKey: data.dateKey,
+    userName: data.userName,
+    settingsKey: data.settingsKey,
+    memoNames: Array.isArray(data.memoNames) ? uniqueMemoNames(data.memoNames.filter((memoName) => typeof memoName === "string")) : [],
+    activeIndex: typeof data.activeIndex === "number" && Number.isFinite(data.activeIndex) ? Math.max(0, Math.floor(data.activeIndex)) : 0,
+    seenMemoNames: Array.isArray(data.seenMemoNames)
+      ? uniqueMemoNames(data.seenMemoNames.filter((memoName) => typeof memoName === "string"))
+      : [],
+  };
+};
+
+const areStringArraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+const areReviewSessionsEqual = (left: ReviewSession | null, right: ReviewSession | null): boolean => {
+  if (!left || !right) return left === right;
+
+  return (
+    left.dateKey === right.dateKey &&
+    left.userName === right.userName &&
+    left.settingsKey === right.settingsKey &&
+    left.activeIndex === right.activeIndex &&
+    areStringArraysEqual(left.memoNames, right.memoNames) &&
+    areStringArraysEqual(left.seenMemoNames, right.seenMemoNames)
+  );
 };
 
 const escapeFilterValue = (value: string) => JSON.stringify(value);
@@ -185,6 +295,22 @@ const pickDailyMemos = (memos: Memo[], seed: string, count: number, history: Rev
   return rankedMemos.slice(0, count).map(({ memo }) => memo);
 };
 
+const restoreReviewMemos = (memos: Memo[], pickedMemos: Memo[], session: ReviewSession | null, count: number): Memo[] => {
+  if (!session || session.memoNames.length === 0) {
+    return pickedMemos;
+  }
+
+  const memoByName = new Map(memos.map((memo) => [memo.name, memo]));
+  const restoredMemos = session.memoNames.flatMap((memoName) => {
+    const memo = memoByName.get(memoName);
+    return memo ? [memo] : [];
+  });
+  const restoredMemoNames = new Set(session.memoNames);
+  const fillMemos = pickedMemos.filter((memo) => !restoredMemoNames.has(memo.name));
+
+  return [...restoredMemos, ...fillMemos].slice(0, count);
+};
+
 const areReviewHistoriesEqual = (left: ReviewHistory, right: ReviewHistory): boolean => {
   const leftEntries = Object.entries(left);
   const rightEntries = Object.entries(right);
@@ -196,31 +322,57 @@ const areReviewHistoriesEqual = (left: ReviewHistory, right: ReviewHistory): boo
   });
 };
 
-const markReviewMemosSeen = (value: unknown, memos: Memo[], todayKey: string): ReviewHistory => {
+const markReviewMemoSeen = (value: unknown, memoName: string, todayKey: string): ReviewHistory => {
   const original = value && typeof value === "object" ? (value as ReviewHistory) : undefined;
   const current = normalizeReviewHistory(value);
   const nextHistory: ReviewHistory = {};
-  const memoNames = new Set(memos.map((memo) => memo.name));
 
   for (const [memoName, record] of Object.entries(current)) {
-    if (memoNames.has(memoName) || daysBetween(record.lastSeenDate, todayKey) <= 180) {
+    if (daysBetween(record.lastSeenDate, todayKey) <= 180) {
       nextHistory[memoName] = record;
     }
   }
 
-  for (const memo of memos) {
-    const previous = current[memo.name];
-    nextHistory[memo.name] = {
-      lastSeenDate: todayKey,
-      seenCount: previous?.lastSeenDate === todayKey ? previous.seenCount : (previous?.seenCount ?? 0) + 1,
-    };
-  }
+  const previous = current[memoName];
+  nextHistory[memoName] = {
+    lastSeenDate: todayKey,
+    seenCount: previous?.lastSeenDate === todayKey ? previous.seenCount : (previous?.seenCount ?? 0) + 1,
+  };
 
   if (areReviewHistoriesEqual(current, nextHistory)) {
     return original ?? current;
   }
 
   return nextHistory;
+};
+
+const upsertReviewSession = (
+  value: unknown,
+  scope: Pick<ReviewSession, "dateKey" | "userName" | "settingsKey">,
+  memoNames: string[],
+  activeIndex: number,
+  seenMemoName?: string,
+): ReviewSession => {
+  const original = value && typeof value === "object" ? (value as ReviewSession) : null;
+  const current = normalizeReviewSession(value);
+  const isSameScope =
+    current?.dateKey === scope.dateKey && current.userName === scope.userName && current.settingsKey === scope.settingsKey;
+  const memoNameSet = new Set(memoNames);
+  const seenMemoNames = uniqueMemoNames([...(isSameScope ? current.seenMemoNames : []), seenMemoName ?? ""]).filter((memoName) =>
+    memoNameSet.has(memoName),
+  );
+  const nextSession: ReviewSession = {
+    ...scope,
+    memoNames,
+    activeIndex: Math.min(Math.max(activeIndex, 0), memoNames.length),
+    seenMemoNames,
+  };
+
+  if (areReviewSessionsEqual(current, nextSession)) {
+    return original ?? nextSession;
+  }
+
+  return nextSession;
 };
 
 const ReviewSettingsDialog = ({
@@ -341,12 +493,15 @@ const Review = () => {
   const { currentUser, isUserSettingsInitialized } = useAuth();
   const [storedSettings, setStoredSettings] = useLocalStorage<ReviewSettings>(REVIEW_STORAGE_KEY, DEFAULT_SETTINGS);
   const [storedHistory, setStoredHistory] = useLocalStorage<ReviewHistory>(REVIEW_HISTORY_STORAGE_KEY, {});
+  const [storedSession, setStoredSession] = useLocalStorage<ReviewSession | null>(REVIEW_SESSION_STORAGE_KEY, null);
   const settings = useMemo(() => normalizeSettings(storedSettings), [storedSettings]);
   const reviewHistory = useMemo(() => normalizeReviewHistory(storedHistory), [storedHistory]);
-  const [seedNonce, setSeedNonce] = useState(0);
+  const reviewSession = useMemo(() => normalizeReviewSession(storedSession), [storedSession]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const restoredSessionKeyRef = useRef<string | null>(null);
+  const pendingSessionRestoreKeyRef = useRef<string | null>(null);
   const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -377,12 +532,27 @@ const Review = () => {
   );
   const memos = useMemo(() => data?.pages.flatMap((page) => page.memos) ?? [], [data]);
   const todayKey = getLocalDateKey();
-  const dailySeed = `${todayKey}:${seedNonce}:${currentUser?.name ?? ""}:${JSON.stringify(filterSettings)}`;
-  const reviewMemos = useMemo(
+  const settingsKey = useMemo(() => JSON.stringify(filterSettings), [filterSettings]);
+  const currentSession =
+    reviewSession?.dateKey === todayKey && reviewSession.userName === (currentUser?.name ?? "") && reviewSession.settingsKey === settingsKey
+      ? reviewSession
+      : null;
+  const dailySeed = `${todayKey}:${currentUser?.name ?? ""}:${settingsKey}`;
+  const pickedMemos = useMemo(
     () => pickDailyMemos(memos, dailySeed, settings.count, reviewHistory, todayKey),
     [dailySeed, memos, reviewHistory, settings.count, todayKey],
   );
+  const reviewMemos = useMemo(
+    () => restoreReviewMemos(memos, pickedMemos, currentSession, settings.count),
+    [currentSession, memos, pickedMemos, settings.count],
+  );
+  const currentSessionRestoreKey = currentSession
+    ? `${currentSession.dateKey}:${currentSession.userName}:${currentSession.settingsKey}:${currentSession.memoNames.join("\n")}`
+    : "";
+  const currentSessionActiveIndex = currentSession ? Math.min(currentSession.activeIndex, reviewMemos.length) : 0;
   const activeMemo = reviewMemos[activeIndex];
+  const isReviewComplete = reviewMemos.length > 0 && activeIndex >= reviewMemos.length;
+  const currentProgress = reviewMemos.length > 0 ? Math.min(activeIndex + 1, reviewMemos.length) : 0;
   const contents = useMemo(() => (activeMemo ? [activeMemo.content] : []), [activeMemo]);
   const userNames = useMemo(
     () => (activeMemo ? Array.from(new Set((activeMemo.reactions ?? []).map((reaction) => reaction.creator))) : []),
@@ -397,14 +567,87 @@ const Review = () => {
   }, [fetchNextPage, hasNextPage, isFetching]);
 
   useEffect(() => {
-    setActiveIndex((current) => Math.min(current, Math.max(reviewMemos.length - 1, 0)));
+    setActiveIndex((current) => Math.min(current, reviewMemos.length));
   }, [reviewMemos.length]);
 
   useEffect(() => {
-    if (reviewMemos.length > 0) {
-      setStoredHistory((current) => markReviewMemosSeen(current, reviewMemos, todayKey));
+    if (!currentSession || reviewMemos.length === 0) {
+      return;
     }
-  }, [reviewMemos, setStoredHistory, todayKey]);
+
+    if (restoredSessionKeyRef.current !== currentSessionRestoreKey) {
+      restoredSessionKeyRef.current = currentSessionRestoreKey;
+      pendingSessionRestoreKeyRef.current = currentSessionRestoreKey;
+      setActiveIndex(Math.min(currentSession.activeIndex, reviewMemos.length));
+    }
+  }, [currentSession, currentSessionRestoreKey, reviewMemos.length]);
+
+  useEffect(() => {
+    if (!currentUser?.name || reviewMemos.length === 0 || isLoadingAllCandidates) {
+      return;
+    }
+
+    if (currentSessionRestoreKey && pendingSessionRestoreKeyRef.current === currentSessionRestoreKey) {
+      if (activeIndex !== currentSessionActiveIndex) {
+        return;
+      }
+      pendingSessionRestoreKeyRef.current = null;
+    }
+
+    setStoredSession((current) =>
+      upsertReviewSession(
+        current,
+        { dateKey: todayKey, userName: currentUser.name, settingsKey },
+        reviewMemos.map((memo) => memo.name),
+        activeIndex,
+      ),
+    );
+  }, [
+    activeIndex,
+    currentSessionActiveIndex,
+    currentSessionRestoreKey,
+    currentUser?.name,
+    isLoadingAllCandidates,
+    reviewMemos,
+    setStoredSession,
+    settingsKey,
+    todayKey,
+  ]);
+
+  useEffect(() => {
+    if (!activeMemo || !currentUser?.name || reviewMemos.length === 0) {
+      return;
+    }
+
+    if (currentSessionRestoreKey && pendingSessionRestoreKeyRef.current === currentSessionRestoreKey) {
+      if (activeIndex !== currentSessionActiveIndex) {
+        return;
+      }
+      pendingSessionRestoreKeyRef.current = null;
+    }
+
+    setStoredHistory((current) => markReviewMemoSeen(current, activeMemo.name, todayKey));
+    setStoredSession((current) =>
+      upsertReviewSession(
+        current,
+        { dateKey: todayKey, userName: currentUser.name, settingsKey },
+        reviewMemos.map((memo) => memo.name),
+        activeIndex,
+        activeMemo.name,
+      ),
+    );
+  }, [
+    activeIndex,
+    activeMemo,
+    currentSessionActiveIndex,
+    currentSessionRestoreKey,
+    currentUser?.name,
+    reviewMemos,
+    setStoredHistory,
+    setStoredSession,
+    settingsKey,
+    todayKey,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -451,13 +694,12 @@ const Review = () => {
   };
 
   const goToNext = () => {
-    const nextIndex = Math.min(activeIndex + 1, reviewMemos.length - 1);
+    const nextIndex = Math.min(activeIndex + 1, reviewMemos.length);
     startCardTransition(nextIndex, direction === "rtl" ? 1 : -1);
   };
 
   const updateSettings = (patch: Partial<ReviewSettings>) => {
     setActiveIndex(0);
-    setSeedNonce(0);
     setStoredSettings((current) => normalizeSettings({ ...current, ...patch }));
   };
 
@@ -468,9 +710,8 @@ const Review = () => {
     });
   };
 
-  const handleShuffle = () => {
+  const handleReviewAgain = () => {
     setActiveIndex(0);
-    setSeedNonce((current) => current + 1);
   };
 
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
@@ -569,6 +810,7 @@ const Review = () => {
 
   return (
     <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-3xl flex-col pb-8">
+      <style>{REVIEW_COMPLETION_ANIMATION_CSS}</style>
       <h1 className="sr-only">{t("review.title")}</h1>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-muted/40 px-3 py-5 sm:px-6">
@@ -612,6 +854,33 @@ const Review = () => {
               </div>
             </div>
           </MentionResolutionProvider>
+        ) : isReviewComplete ? (
+          <div className="relative flex min-h-[min(32rem,calc(100vh-14rem))] w-full max-w-xl overflow-hidden rounded-xl border border-border/70 bg-card px-6 py-12 text-center shadow-lg">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,theme(colors.emerald.400),theme(colors.amber.400),theme(colors.sky.400),theme(colors.rose.400))]" />
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+              {REVIEW_COMPLETION_CONFETTI_CLASSES.map((className) => (
+                <span key={className} className={cn("review-completion-confetti absolute opacity-0 shadow-sm", className)} />
+              ))}
+            </div>
+
+            <div className="relative z-10 mx-auto flex max-w-sm flex-col items-center justify-center">
+              <div className="relative">
+                <div className="absolute -inset-4 rounded-full border border-primary/20 bg-primary/5" />
+                <div className="review-completion-trophy relative flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/20">
+                  <TrophyIcon className="size-8" />
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs">
+                {t("review.completed-count", { count: reviewMemos.length })}
+              </div>
+              <p className="mt-4 text-xl font-semibold text-foreground">{t("review.completed-title")}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("review.completed-description")}</p>
+              <Button className="mt-7 shadow-sm" onClick={handleReviewAgain}>
+                {t("review.review-again")}
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="flex w-full max-w-xl flex-col items-center rounded-lg border border-dashed border-border bg-background px-4 py-12 text-center">
             {isLoadingAllCandidates ? (
@@ -630,17 +899,6 @@ const Review = () => {
 
         <div className="flex w-full max-w-xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="icon-sm"
-              className="size-9 rounded-full bg-background shadow-xs"
-              onClick={handleShuffle}
-              disabled={memos.length === 0}
-              aria-label={t("review.shuffle")}
-              title={t("review.shuffle")}
-            >
-              <RefreshCwIcon className="size-4" />
-            </Button>
             <Button
               variant="secondary"
               size="icon-sm"
@@ -664,30 +922,19 @@ const Review = () => {
               <ChevronLeftIcon className="size-4" />
             </Button>
             <span className="min-w-14 rounded-full bg-background px-3 py-1 text-center text-xs font-medium text-muted-foreground shadow-xs">
-              {reviewMemos.length > 0 ? t("review.progress", { current: activeIndex + 1, total: reviewMemos.length }) : "0/0"}
+              {reviewMemos.length > 0 ? t("review.progress", { current: currentProgress, total: reviewMemos.length }) : "0/0"}
             </span>
             <Button
               variant="secondary"
               size="icon-sm"
               className="rounded-full bg-background shadow-xs"
               onClick={goToNext}
-              disabled={activeIndex >= reviewMemos.length - 1 || reviewMemos.length === 0}
+              disabled={activeIndex >= reviewMemos.length || reviewMemos.length === 0}
               aria-label={t("review.next")}
             >
               <ChevronRightIcon className="size-4" />
             </Button>
           </div>
-        </div>
-
-        <div className="min-h-5 text-center text-xs text-muted-foreground">
-          {isLoadingAllCandidates ? (
-            <span className="inline-flex items-center gap-1">
-              <LoaderCircleIcon className="size-3.5 animate-spin" />
-              {t("review.loading")}
-            </span>
-          ) : (
-            t("review.candidate-count", { count: memos.length })
-          )}
         </div>
       </div>
 

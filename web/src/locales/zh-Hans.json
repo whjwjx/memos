@@ -502,7 +502,9 @@
     "unused-resources": "未使用资源"
   },
   "review": {
-    "candidate-count": "{{count}} 条候选",
+    "completed-count": "已回顾 {{count}} 条",
+    "completed-description": "完成了一轮小小的记忆复习。今日内容已保存，可以随时重新查看。",
+    "completed-title": "做得不错，今日回顾完成",
     "content-range": "内容范围",
     "count-option": "{{count}} 条/天",
     "daily-count": "每日数量",
@@ -515,10 +517,10 @@
     "open-settings": "打开回顾设置",
     "previous": "上一条",
     "progress": "{{current}}/{{total}}",
+    "review-again": "重新查看今日回顾",
     "select-tag": "选择标签",
     "settings-description": "设置每日回顾的内容范围、时间范围和每日数量。",
     "settings-title": "每日回顾设置",
-    "shuffle": "换一批",
     "tag-mode": {
       "all": "全部",
       "exclude": "排除标签",

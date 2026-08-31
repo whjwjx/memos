@@ -74,6 +74,7 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
   const { value, duration, recurrence, onChange, onOpenChange, mobileIconOnly } = props;
   const t = useTranslate();
   const [open, setOpen] = useState(false);
+  const [draftTime, setDraftTime] = useState(() => nextHour(new Date()));
   const repeatPreset = getRepeatPreset(recurrence);
   const weekdayLabels = [
     t("common.days.sun"),
@@ -94,6 +95,9 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
   };
 
   const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setDraftTime(value ?? nextHour(new Date()));
+    }
     setOpen(next);
     onOpenChange?.(next);
   };
@@ -103,9 +107,7 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
   };
 
   const handleSetDuration = (next: number) => {
-    if (value) {
-      emitChange(value, next, recurrence);
-    }
+    emitChange(value ?? draftTime, next, recurrence);
   };
 
   const handleClear = () => {
@@ -114,38 +116,37 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
   };
 
   const handleRepeatPreset = (preset: RepeatPreset) => {
-    if (!value) {
+    if (preset === "none" && !value) {
       return;
     }
+    const scheduleTime = value ?? draftTime;
     const nextDuration = duration ?? DEFAULT_DURATION;
     if (preset === "none") {
-      emitChange(value, nextDuration);
+      emitChange(scheduleTime, nextDuration);
     } else if (preset === "daily") {
-      emitChange(value, nextDuration, createDailyRecurrence());
+      emitChange(scheduleTime, nextDuration, createDailyRecurrence());
     } else if (preset === "weekdays") {
-      emitChange(value, nextDuration, createWeeklyRecurrence(WEEKDAYS));
+      emitChange(scheduleTime, nextDuration, createWeeklyRecurrence(WEEKDAYS));
     } else if (preset === "weekends") {
-      emitChange(value, nextDuration, createWeeklyRecurrence(WEEKENDS));
+      emitChange(scheduleTime, nextDuration, createWeeklyRecurrence(WEEKENDS));
     } else {
-      const initialDay = value.getDay();
-      emitChange(value, nextDuration, createWeeklyRecurrence(recurrence?.daysOfWeek.length ? recurrence.daysOfWeek : [initialDay]));
+      const initialDay = scheduleTime.getDay();
+      emitChange(scheduleTime, nextDuration, createWeeklyRecurrence(recurrence?.daysOfWeek.length ? recurrence.daysOfWeek : [initialDay]));
     }
   };
 
   const handleToggleCustomDay = (day: number) => {
-    if (!value) {
-      return;
-    }
-    const currentDays = recurrence?.frequency === MemoScheduleRecurrence_Frequency.WEEKLY ? recurrence.daysOfWeek : [value.getDay()];
+    const scheduleTime = value ?? draftTime;
+    const currentDays = recurrence?.frequency === MemoScheduleRecurrence_Frequency.WEEKLY ? recurrence.daysOfWeek : [scheduleTime.getDay()];
     const nextDays = currentDays.includes(day) ? currentDays.filter((value) => value !== day) : [...currentDays, day];
     if (nextDays.length === 0) {
       return;
     }
-    emitChange(value, duration ?? DEFAULT_DURATION, createWeeklyRecurrence(nextDays));
+    emitChange(scheduleTime, duration ?? DEFAULT_DURATION, createWeeklyRecurrence(nextDays));
   };
 
   const label = value ? dayjs(value).format("MM/DD HH:mm") : t("memo.schedule.set");
-  const defaultDate = value ?? nextHour(new Date());
+  const effectiveTime = value ?? draftTime;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -169,89 +170,89 @@ const ScheduleSelector = (props: ScheduleSelectorProps) => {
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(18rem,calc(100vw-1rem))] p-3">
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.time")}</span>
-            <DateTimeInput key={value?.getTime() ?? "empty"} value={defaultDate} onChange={handleSetTime} />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-foreground">{t("memo.schedule.time")}</span>
+            <DateTimeInput key={effectiveTime.getTime()} value={effectiveTime} onChange={handleSetTime} />
           </div>
-          {value && (
-            <>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.duration")}</span>
-                <div className="flex flex-wrap gap-1">
-                  {DURATION_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => handleSetDuration(opt.value)}
-                      className={cn(
-                        "rounded-md border px-2 py-1 text-xs transition-colors",
-                        duration === opt.value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.repeat")}</span>
-                <div className="grid grid-cols-2 gap-1">
-                  {(["none", "daily", "weekdays", "weekends"] as const).map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => handleRepeatPreset(preset)}
-                      className={cn(
-                        "inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
-                        repeatPreset === preset ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
-                      )}
-                    >
-                      {preset !== "none" && <RepeatIcon className="size-3" />}
-                      {t(`memo.schedule.repeat-${preset}`)}
-                    </button>
-                  ))}
-                </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.duration")}</span>
+            <div className="flex flex-wrap gap-1">
+              {DURATION_OPTIONS.map((opt) => (
                 <button
+                  key={opt.value}
                   type="button"
-                  onClick={() => handleRepeatPreset("custom")}
+                  onClick={() => handleSetDuration(opt.value)}
                   className={cn(
                     "rounded-md border px-2 py-1 text-xs transition-colors",
-                    repeatPreset === "custom" ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
+                    (duration ?? DEFAULT_DURATION) === opt.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "hover:bg-accent border-border",
                   )}
                 >
-                  {t("memo.schedule.repeat-custom")}
+                  {opt.label}
                 </button>
-                {repeatPreset === "custom" && (
-                  <div className="flex flex-wrap gap-1">
-                    {weekdayLabels.map((label, index) => {
-                      const selected = recurrence?.daysOfWeek.includes(index) ?? false;
-                      return (
-                        <button
-                          key={label}
-                          type="button"
-                          onClick={() => handleToggleCustomDay(index)}
-                          className={cn(
-                            "size-7 rounded-md border text-xs transition-colors",
-                            selected ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
-                          )}
-                          aria-pressed={selected}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">{t("memo.schedule.repeat")}</span>
+            <div className="grid grid-cols-2 gap-1">
+              {(["none", "daily", "weekdays", "weekends"] as const).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => handleRepeatPreset(preset)}
+                  className={cn(
+                    "inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
+                    repeatPreset === preset ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
+                  )}
+                >
+                  {preset !== "none" && <RepeatIcon className="size-3" />}
+                  {t(`memo.schedule.repeat-${preset}`)}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleRepeatPreset("custom")}
+              className={cn(
+                "rounded-md border px-2 py-1 text-xs transition-colors",
+                repeatPreset === "custom" ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
+              )}
+            >
+              {t("memo.schedule.repeat-custom")}
+            </button>
+            {repeatPreset === "custom" && (
+              <div className="flex flex-wrap gap-1">
+                {weekdayLabels.map((label, index) => {
+                  const selected = recurrence?.daysOfWeek.includes(index) ?? false;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => handleToggleCustomDay(index)}
+                      className={cn(
+                        "size-7 rounded-md border text-xs transition-colors",
+                        selected ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-border",
+                      )}
+                      aria-pressed={selected}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                type="button"
-                onClick={handleClear}
-                className="inline-flex items-center justify-center gap-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 px-2 py-1 text-xs transition-colors"
-              >
-                <Trash2Icon className="w-3.5 h-3.5" />
-                {t("memo.schedule.clear")}
-              </button>
-            </>
+            )}
+          </div>
+          {value && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="inline-flex items-center justify-center gap-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 px-2 py-1 text-xs transition-colors"
+            >
+              <Trash2Icon className="w-3.5 h-3.5" />
+              {t("memo.schedule.clear")}
+            </button>
           )}
         </div>
       </PopoverContent>

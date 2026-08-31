@@ -577,7 +577,9 @@
     "unused-resources": "Unused resources"
   },
   "review": {
-    "candidate-count": "{{count}} candidates",
+    "completed-count": "{{count}} memos reviewed",
+    "completed-description": "A small round of memory work done. Today's set is saved whenever you want to revisit it.",
+    "completed-title": "Nice work, review complete",
     "content-range": "Content range",
     "count-option": "{{count}}/day",
     "daily-count": "Daily count",
@@ -590,10 +592,10 @@
     "open-settings": "Open review settings",
     "previous": "Previous",
     "progress": "{{current}}/{{total}}",
+    "review-again": "Review again",
     "select-tag": "Select tag",
     "settings-description": "Set the content range, time range, and daily count for Daily Review.",
     "settings-title": "Daily Review settings",
-    "shuffle": "Shuffle",
     "tag-mode": {
       "all": "All",
       "exclude": "Exclude tag",
