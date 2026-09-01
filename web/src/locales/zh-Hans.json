@@ -305,6 +305,8 @@
     "wysiwyg-editor": "所见即所得编辑器"
   },
   "inbox": {
+    "archive-all": "全部归档",
+    "archive-all-success": "已归档 {{count}} 条通知",
     "failed-to-load": "加载失败",
     "memo-comment": "{{user}} 评论了您的“{{memo}}”。",
     "no-archived": "无已归档通知",

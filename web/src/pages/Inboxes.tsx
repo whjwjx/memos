@@ -1,18 +1,24 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { sortBy } from "lodash-es";
-import { BellIcon } from "lucide-react";
+import { ArchiveIcon, BellIcon, LoaderIcon } from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
 import MemoCommentMessage from "@/components/Inbox/MemoCommentMessage";
 import MemoMentionMessage from "@/components/Inbox/MemoMentionMessage";
 import ScheduleReminderMessage from "@/components/Inbox/ScheduleReminderMessage";
 import Placeholder from "@/components/Placeholder";
+import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/contexts/AppSidebarContext";
-import { useNotifications } from "@/hooks/useUserQueries";
+import { useNotifications, useUpdateUserNotification } from "@/hooks/useUserQueries";
+import { handleError } from "@/lib/error";
 import { UserNotification, UserNotification_Status, UserNotification_Type } from "@/types/proto/api/v1/user_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
 const Inboxes = () => {
   const t = useTranslate();
   const { inboxFilter: filter } = useAppSidebar();
+  const [archivingAll, setArchivingAll] = useState(false);
+  const updateNotification = useUpdateUserNotification();
 
   // Fetch notifications with React Query
   const { data: fetchedNotifications = [] } = useNotifications();
@@ -28,6 +34,35 @@ const Inboxes = () => {
   });
 
   const unreadCount = allNotifications.filter((n) => n.status === UserNotification_Status.UNREAD).length;
+  const unreadNotifications = allNotifications.filter((notification) => notification.status === UserNotification_Status.UNREAD);
+  const showArchiveAll = filter !== "archived" && unreadNotifications.length > 0;
+
+  const handleArchiveAll = async () => {
+    if (unreadNotifications.length === 0) {
+      return;
+    }
+
+    try {
+      setArchivingAll(true);
+      await Promise.all(
+        unreadNotifications.map((notification) =>
+          updateNotification.mutateAsync({
+            notification: {
+              name: notification.name,
+              status: UserNotification_Status.ARCHIVED,
+            },
+            updateMask: ["status"],
+          }),
+        ),
+      );
+      toast.success(t("inbox.archive-all-success", { count: unreadNotifications.length }));
+    } catch (error: unknown) {
+      await handleError(error, toast.error, { context: "Archive all notifications" });
+    } finally {
+      setArchivingAll(false);
+    }
+  };
+
   return (
     <section className="@container w-full max-w-5xl min-h-full flex flex-col justify-start items-center sm:pt-3 md:pt-6 pb-8">
       <div className="w-full px-4 sm:px-6">
@@ -44,6 +79,12 @@ const Inboxes = () => {
                   </span>
                 )}
               </div>
+              {showArchiveAll && (
+                <Button variant="ghost" size="sm" disabled={archivingAll} onClick={handleArchiveAll}>
+                  {archivingAll ? <LoaderIcon className="size-4 animate-spin" /> : <ArchiveIcon className="size-4" />}
+                  {t("inbox.archive-all")}
+                </Button>
+              )}
             </div>
           </div>
 

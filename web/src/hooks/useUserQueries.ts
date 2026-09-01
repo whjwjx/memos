@@ -9,6 +9,8 @@ import {
   type ListAllUserStatsRequest,
   ListAllUserStatsRequestSchema,
   User,
+  type UserNotification,
+  UserNotification_Status,
   type UserPushSubscription,
   UserPushSubscriptionSchema,
   UserSetting,
@@ -105,6 +107,73 @@ export function useNotifications() {
     enabled: !!currentUser?.name,
     staleTime: 1000 * 30, // 30 seconds - notifications should update frequently
     refetchInterval: 1000 * 15,
+  });
+}
+
+export function useUpdateUserNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ notification, updateMask }: { notification: Pick<UserNotification, "name" | "status">; updateMask: string[] }) => {
+      return userServiceClient.updateUserNotification({
+        notification,
+        updateMask: create(FieldMaskSchema, { paths: updateMask }),
+      });
+    },
+    onMutate: async ({ notification, updateMask }) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.notifications() });
+      const previousNotifications = queryClient.getQueryData<UserNotification[]>(userKeys.notifications());
+
+      if (updateMask.includes("status") && notification.status !== UserNotification_Status.STATUS_UNSPECIFIED) {
+        queryClient.setQueryData<UserNotification[]>(userKeys.notifications(), (notifications = []) =>
+          notifications.map((item) => (item.name === notification.name ? { ...item, status: notification.status } : item)),
+        );
+      }
+
+      return { previousNotifications };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(userKeys.notifications(), context.previousNotifications);
+      }
+    },
+    onSuccess: (updatedNotification) => {
+      queryClient.setQueryData<UserNotification[]>(userKeys.notifications(), (notifications = []) =>
+        notifications.map((item) => (item.name === updatedNotification.name ? updatedNotification : item)),
+      );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.notifications() });
+    },
+  });
+}
+
+export function useDeleteUserNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (name: string) => {
+      await userServiceClient.deleteUserNotification({ name });
+      return name;
+    },
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.notifications() });
+      const previousNotifications = queryClient.getQueryData<UserNotification[]>(userKeys.notifications());
+
+      queryClient.setQueryData<UserNotification[]>(userKeys.notifications(), (notifications = []) =>
+        notifications.filter((notification) => notification.name !== name),
+      );
+
+      return { previousNotifications };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(userKeys.notifications(), context.previousNotifications);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.notifications() });
+    },
   });
 }
 

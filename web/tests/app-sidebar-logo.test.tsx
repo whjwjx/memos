@@ -97,7 +97,12 @@ vi.mock("@/hooks/useUserQueries", () => ({
     memoViews: (parent?: string) => ["users", "memoViews", parent],
   },
   useMemoViews: () => ({ data: authState.memoViews }),
-  useNotifications: () => ({ data: [] }),
+  useNotifications: () => ({
+    data: [
+      { name: "users/test/notifications/1", status: 1 },
+      { name: "users/test/notifications/2", status: 2 },
+    ],
+  }),
   useUser: () => ({ data: undefined }),
 }));
 
@@ -260,6 +265,21 @@ describe("App sidebar logo", () => {
     expect(await screen.findByRole("menuitem", { name: "common.home" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "common.explore" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "common.archived" })).toBeInTheDocument();
+  });
+
+  it("orders inbox filters with unread first", () => {
+    render(
+      <MemoryRouter initialEntries={["/inbox"]}>
+        <AppSidebar />
+      </MemoryRouter>,
+    );
+
+    const unread = screen.getByRole("button", { name: /inbox\.unread\s*1/ });
+    const all = screen.getByRole("button", { name: /common\.all\s*2/ });
+    const archived = screen.getByRole("button", { name: /common\.archived\s*1/ });
+
+    expect(unread.compareDocumentPosition(all) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(all.compareDocumentPosition(archived) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("uses compact text-only actions for a saved view", async () => {

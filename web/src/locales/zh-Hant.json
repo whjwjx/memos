@@ -336,6 +336,8 @@
     }
   },
   "inbox": {
+    "archive-all": "全部封存",
+    "archive-all-success": "已封存 {{count}} 則通知",
     "failed-to-load": "載入失敗",
     "memo-comment": "{{user}} 對您的 {{memo}} 發表了評論。",
     "no-archived": "無已封存通知",

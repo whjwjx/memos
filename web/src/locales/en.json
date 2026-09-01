@@ -374,6 +374,8 @@
     }
   },
   "inbox": {
+    "archive-all": "Archive all",
+    "archive-all-success": "Archived {{count}} notifications",
     "failed-to-load": "Failed to load inbox item",
     "memo-comment": "{{user}} has a comment on your {{memo}}.",
     "no-archived": "No archived notifications",

@@ -1,19 +1,29 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MentionResolutionProvider, useResolvedMentionUsernames, useResolvedUser } from "@/components/MemoContent/MentionResolutionContext";
 import { useResolvedRelationMemos } from "@/components/MemoMetadata/Relation/useResolvedRelationMemos";
 import { memoKeys } from "@/hooks/useMemoQueries";
-import { useMemoViews, userKeys, useUser, useUsersByNames, useUsersByUsernames } from "@/hooks/useUserQueries";
+import {
+  useDeleteUserNotification,
+  useMemoViews,
+  userKeys,
+  useUpdateUserNotification,
+  useUser,
+  useUsersByNames,
+  useUsersByUsernames,
+} from "@/hooks/useUserQueries";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
-import type { User } from "@/types/proto/api/v1/user_service_pb";
+import { type User, type UserNotification, UserNotification_Status } from "@/types/proto/api/v1/user_service_pb";
 
 const clients = vi.hoisted(() => ({
   batchGetUsers: vi.fn(),
+  deleteUserNotification: vi.fn(),
   getMemo: vi.fn(),
   getUser: vi.fn(),
   listMemoViews: vi.fn(),
+  updateUserNotification: vi.fn(),
 }));
 
 vi.mock("@/connect", () => ({
@@ -25,7 +35,9 @@ vi.mock("@/connect", () => ({
   },
   userServiceClient: {
     batchGetUsers: clients.batchGetUsers,
+    deleteUserNotification: clients.deleteUserNotification,
     getUser: clients.getUser,
+    updateUserNotification: clients.updateUserNotification,
   },
 }));
 
@@ -46,9 +58,11 @@ const createWrapper = (queryClient: QueryClient) =>
 describe("query deduplication", () => {
   beforeEach(() => {
     clients.batchGetUsers.mockReset();
+    clients.deleteUserNotification.mockReset();
     clients.getMemo.mockReset();
     clients.getUser.mockReset();
     clients.listMemoViews.mockReset();
+    clients.updateUserNotification.mockReset();
   });
 
   it("scopes memo-view queries by parent and skips requests without one", async () => {
@@ -181,5 +195,40 @@ describe("query deduplication", () => {
 
     expect(clients.getMemo).toHaveBeenCalledTimes(1);
     expect(clients.getMemo).toHaveBeenCalledWith({ name: missingMemo.name });
+  });
+
+  it("updates the cached notification status after archiving", async () => {
+    const unread = { name: "users/alice/notifications/1", status: UserNotification_Status.UNREAD } as UserNotification;
+    const archived = { ...unread, status: UserNotification_Status.ARCHIVED } as UserNotification;
+    clients.updateUserNotification.mockResolvedValue(archived);
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(userKeys.notifications(), [unread]);
+
+    const { result } = renderHook(() => useUpdateUserNotification(), { wrapper: createWrapper(queryClient) });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        notification: { name: unread.name, status: UserNotification_Status.ARCHIVED },
+        updateMask: ["status"],
+      });
+    });
+
+    expect(queryClient.getQueryData(userKeys.notifications())).toEqual([archived]);
+  });
+
+  it("removes deleted notifications from the cache", async () => {
+    const first = { name: "users/alice/notifications/1", status: UserNotification_Status.UNREAD } as UserNotification;
+    const second = { name: "users/alice/notifications/2", status: UserNotification_Status.UNREAD } as UserNotification;
+    clients.deleteUserNotification.mockResolvedValue(undefined);
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(userKeys.notifications(), [first, second]);
+
+    const { result } = renderHook(() => useDeleteUserNotification(), { wrapper: createWrapper(queryClient) });
+
+    await act(async () => {
+      await result.current.mutateAsync(first.name);
+    });
+
+    expect(queryClient.getQueryData(userKeys.notifications())).toEqual([second]);
   });
 });

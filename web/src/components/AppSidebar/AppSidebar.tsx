@@ -372,13 +372,13 @@ const InboxSidebarContent = () => {
   const { inboxFilter, setInboxFilter, setMobileOpen } = useAppSidebar();
   const { data: notifications = [] } = useNotifications();
   const rows: Array<{ value: InboxFilter; icon: LucideIcon; label: string; count: number }> = [
-    { value: "all", icon: ListIcon, label: t("common.all"), count: notifications.length },
     {
       value: "unread",
       icon: BellIcon,
       label: t("inbox.unread"),
       count: notifications.filter((item) => item.status === UserNotification_Status.UNREAD).length,
     },
+    { value: "all", icon: ListIcon, label: t("common.all"), count: notifications.length },
     {
       value: "archived",
       icon: ArchiveIcon,
