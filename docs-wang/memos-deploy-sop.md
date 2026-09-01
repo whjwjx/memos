@@ -315,6 +315,17 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 校验：公网前端资产 `index-DV-bR2IL.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB，词典功能持续生效）。
 - 备注：本次 C 盘 49GB 充足，无需 `go clean -cache`。容器内 `wget | grep` 资产校验因 gzip 编码差异返回空（工具问题，非部署问题），公网侧已确认资产与构建一致，故判定通过。
 
+### 8.9 部署记录（2026-09-01，晚）
+
+> 完整重新部署：纳入 GitHub themes（`e7af61ce`）、inbox notifications 缓存即时刷新（`8e1c75d0`）。纯代码部署，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `3a31ed77`（Merge add-github-themes）。
+- 构建：`pnpm release`（资产 `index-CAj7IgwY.js`，5129 modules）→ `go build`（linux/amd64，103298245 字节 / ≈98.5MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260901_2252/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `86cb1d68`），容器 recreate 时间 `2026-09-01T22:52:35+08:00`（北京时间 9-01 22:52）。
+- 校验：公网前端资产 `index-CAj7IgwY.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB，词典功能持续生效）。
+- 备注：本次 C 盘 48.8GB 充足，无需 `go clean -cache`。注意：网关 SSH 对 `$(date)`/`%`/`*` 特殊字符做了处理（见 9.4），备份改用本地日期串 + 显式文件名。
+
 ---
 
 ## 9. 部署踩坑与注意事项
@@ -344,3 +355,16 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - **现象**：前端/二进制构建中途失败或极慢。
 - **根因**：Windows C 盘（Go 缓存、npm 缓存）空间不足。
 - **解决**：构建前先查 `Get-PSDrive C | Select-Object @{N='FreeGB';E={[math]::Round($_.Free/1GB,2)}}`；若低于约 3GB，先 `go clean -cache` 释放（实测可腾出数 GB）。近期 C 盘多在 40–50GB，基本无需清理。
+
+### 9.4 SSH 网关对特殊字符的处理（备份/命令执行踩坑）
+
+- **现象**：
+  - 备份用 `sudo bash -c "mkdir ... && cp ..."` → 远端把整串当单命令（`No such file or directory`）。
+  - `ssh host 'date +%Y%m%d_%H%M'` → `bash: line 1: date +%Y%m%d_%H%M: command not found`（整串当命令名，`%` 触发网关处理）。
+  - `sudo cp /root/.memos/memos_prod.db*` → `cannot stat '...memos_prod.db*'`（`*` 未展开，被当字面量）。
+- **根因**：跳板/网关（115.191.10.0:45623）对命令中的非字母数字特殊字符（`$`、`%`、`*`、`<`、`>`）做了转义/单命令化/不展开处理；且 `sudo bash -c "..."` 的嵌套引号会被剥离。普通命令（`ls`、`echo A && echo B`）与 `&&` 分隔均正常。
+- **稳健做法**：
+  1. **日期目录名本地生成**：`$d = Get-Date -Format 'yyyyMMdd_HHmm'`，远端用固定路径 `/home/deployer/backups/memos_data_$d`（PowerShell 双引号展开 `$d`，远端无 `$(date)`/`%`）。
+  2. **备份 db 用显式文件名**：`sudo cp /root/.memos/memos_prod.db /root/.memos/memos_prod.db-shm /root/.memos/memos_prod.db-wal /dest/`，避免 `*` 通配符。
+  3. **避免 `sudo bash -c "..."` 嵌套**：拆成多条独立简单命令（每条仅普通字符 + `&&`）。
+  4. **含 `>`/`|` 的远端命令**：PowerShell 双引号 ssh 会本地解析 `>`/`|`；改用 PowerShell **单引号**包裹整个 ssh 命令（如 `ssh host 'curl ... > /tmp/x; grep ... /tmp/x'`），远端命令避免 `%`（`%` 亦触发网关问题）。
