@@ -235,6 +235,9 @@ func (s *APIV1Service) UpdateInstanceSetting(ctx context.Context, request *v1pb.
 				notif.Email.SmtpPassword = existing.Email.SmtpPassword
 			}
 		}
+		if err := s.prepareInstanceNotificationSettingForUpdate(ctx, updateSetting.GetNotificationSetting()); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid notification setting: %v", err)
+		}
 	case storepb.InstanceSettingKey_STORAGE:
 		existing, err := s.Store.GetInstanceStorageSetting(ctx)
 		if err != nil {
@@ -344,6 +347,42 @@ func sameSMTPConnectionIdentity(setting, existing *storepb.InstanceNotificationS
 		strings.TrimSpace(setting.SmtpUsername) == strings.TrimSpace(existing.SmtpUsername) &&
 		setting.UseTls == existing.UseTls &&
 		setting.UseSsl == existing.UseSsl
+}
+
+func (s *APIV1Service) prepareInstanceNotificationSettingForUpdate(ctx context.Context, setting *storepb.InstanceNotificationSetting) error {
+	if setting == nil {
+		return nil
+	}
+	existing, err := s.Store.GetInstanceNotificationSetting(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to load existing notification setting")
+	}
+	if setting.WebPush == nil {
+		if existing != nil {
+			setting.WebPush = existing.GetWebPush()
+		}
+		return nil
+	}
+	if existingWebPush := existing.GetWebPush(); existingWebPush != nil {
+		if setting.WebPush.VapidPublicKey == "" {
+			setting.WebPush.VapidPublicKey = existingWebPush.VapidPublicKey
+		}
+		if setting.WebPush.VapidPrivateKey == "" {
+			setting.WebPush.VapidPrivateKey = existingWebPush.VapidPrivateKey
+		}
+	}
+	if setting.WebPush.Subject == "" {
+		setting.WebPush.Subject = notification.DefaultWebPushSubject()
+	}
+	if setting.WebPush.VapidPublicKey == "" || setting.WebPush.VapidPrivateKey == "" {
+		publicKey, privateKey, err := notification.GenerateWebPushVAPIDKeys()
+		if err != nil {
+			return errors.Wrap(err, "failed to generate VAPID keys")
+		}
+		setting.WebPush.VapidPublicKey = publicKey
+		setting.WebPush.VapidPrivateKey = privateKey
+	}
+	return nil
 }
 
 func (s *APIV1Service) GetInstanceAdmin(ctx context.Context) (*v1pb.User, error) {

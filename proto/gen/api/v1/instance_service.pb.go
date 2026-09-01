@@ -1535,8 +1535,9 @@ func (x *InstanceSetting_TagsSetting) GetTags() map[string]*InstanceSetting_TagM
 
 // Notification transport configuration.
 type InstanceSetting_NotificationSetting struct {
-	state         protoimpl.MessageState                            `protogen:"open.v1"`
-	Email         *InstanceSetting_NotificationSetting_EmailSetting `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	state         protoimpl.MessageState                              `protogen:"open.v1"`
+	Email         *InstanceSetting_NotificationSetting_EmailSetting   `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	WebPush       *InstanceSetting_NotificationSetting_WebPushSetting `protobuf:"bytes,2,opt,name=web_push,json=webPush,proto3" json:"web_push,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1574,6 +1575,13 @@ func (*InstanceSetting_NotificationSetting) Descriptor() ([]byte, []int) {
 func (x *InstanceSetting_NotificationSetting) GetEmail() *InstanceSetting_NotificationSetting_EmailSetting {
 	if x != nil {
 		return x.Email
+	}
+	return nil
+}
+
+func (x *InstanceSetting_NotificationSetting) GetWebPush() *InstanceSetting_NotificationSetting_WebPushSetting {
+	if x != nil {
+		return x.WebPush
 	}
 	return nil
 }
@@ -2840,6 +2848,75 @@ func (x *InstanceSetting_NotificationSetting_EmailSetting) GetUseSsl() bool {
 	return false
 }
 
+// Web Push delivery configuration for browser notifications.
+type InstanceSetting_NotificationSetting_WebPushSetting struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Enabled         bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	VapidPublicKey  string                 `protobuf:"bytes,2,opt,name=vapid_public_key,json=vapidPublicKey,proto3" json:"vapid_public_key,omitempty"`
+	VapidPrivateKey string                 `protobuf:"bytes,3,opt,name=vapid_private_key,json=vapidPrivateKey,proto3" json:"vapid_private_key,omitempty"`
+	Subject         string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *InstanceSetting_NotificationSetting_WebPushSetting) Reset() {
+	*x = InstanceSetting_NotificationSetting_WebPushSetting{}
+	mi := &file_api_v1_instance_service_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstanceSetting_NotificationSetting_WebPushSetting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstanceSetting_NotificationSetting_WebPushSetting) ProtoMessage() {}
+
+func (x *InstanceSetting_NotificationSetting_WebPushSetting) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_instance_service_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstanceSetting_NotificationSetting_WebPushSetting.ProtoReflect.Descriptor instead.
+func (*InstanceSetting_NotificationSetting_WebPushSetting) Descriptor() ([]byte, []int) {
+	return file_api_v1_instance_service_proto_rawDescGZIP(), []int{2, 6, 1}
+}
+
+func (x *InstanceSetting_NotificationSetting_WebPushSetting) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *InstanceSetting_NotificationSetting_WebPushSetting) GetVapidPublicKey() string {
+	if x != nil {
+		return x.VapidPublicKey
+	}
+	return ""
+}
+
+func (x *InstanceSetting_NotificationSetting_WebPushSetting) GetVapidPrivateKey() string {
+	if x != nil {
+		return x.VapidPrivateKey
+	}
+	return ""
+}
+
+func (x *InstanceSetting_NotificationSetting_WebPushSetting) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
 // Database size statistics.
 type InstanceStats_DatabaseStats struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -2853,7 +2930,7 @@ type InstanceStats_DatabaseStats struct {
 
 func (x *InstanceStats_DatabaseStats) Reset() {
 	*x = InstanceStats_DatabaseStats{}
-	mi := &file_api_v1_instance_service_proto_msgTypes[36]
+	mi := &file_api_v1_instance_service_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2865,7 +2942,7 @@ func (x *InstanceStats_DatabaseStats) String() string {
 func (*InstanceStats_DatabaseStats) ProtoMessage() {}
 
 func (x *InstanceStats_DatabaseStats) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v1_instance_service_proto_msgTypes[36]
+	mi := &file_api_v1_instance_service_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2908,7 +2985,7 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\x06commit\x18\b \x01(\tR\x06commit\x12\x1f\n" +
 	"\vneeds_setup\x18\t \x01(\bR\n" +
 	"needsSetup\"\x1b\n" +
-	"\x19GetInstanceProfileRequest\"\x86/\n" +
+	"\x19GetInstanceProfileRequest\"\x851\n" +
 	"\x0fInstanceSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12W\n" +
 	"\x0fgeneral_setting\x18\x02 \x01(\v2,.memos.api.v1.InstanceSetting.GeneralSettingH\x00R\x0egeneralSetting\x12W\n" +
@@ -2979,9 +3056,10 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\x04tags\x18\x01 \x03(\v23.memos.api.v1.InstanceSetting.TagsSetting.TagsEntryR\x04tags\x1ab\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12?\n" +
-	"\x05value\x18\x02 \x01(\v2).memos.api.v1.InstanceSetting.TagMetadataR\x05value:\x028\x01\x1a\xa8\x03\n" +
+	"\x05value\x18\x02 \x01(\v2).memos.api.v1.InstanceSetting.TagMetadataR\x05value:\x028\x01\x1a\xa7\x05\n" +
 	"\x13NotificationSetting\x12T\n" +
-	"\x05email\x18\x01 \x01(\v2>.memos.api.v1.InstanceSetting.NotificationSetting.EmailSettingR\x05email\x1a\xba\x02\n" +
+	"\x05email\x18\x01 \x01(\v2>.memos.api.v1.InstanceSetting.NotificationSetting.EmailSettingR\x05email\x12[\n" +
+	"\bweb_push\x18\x02 \x01(\v2@.memos.api.v1.InstanceSetting.NotificationSetting.WebPushSettingR\awebPush\x1a\xba\x02\n" +
 	"\fEmailSetting\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1b\n" +
 	"\tsmtp_host\x18\x02 \x01(\tR\bsmtpHost\x12\x1b\n" +
@@ -2994,7 +3072,12 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\breply_to\x18\b \x01(\tR\areplyTo\x12\x17\n" +
 	"\ause_tls\x18\t \x01(\bR\x06useTls\x12\x17\n" +
 	"\ause_ssl\x18\n" +
-	" \x01(\bR\x06useSsl\x1a\xd0\x05\n" +
+	" \x01(\bR\x06useSsl\x1a\x9f\x01\n" +
+	"\x0eWebPushSetting\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12(\n" +
+	"\x10vapid_public_key\x18\x02 \x01(\tR\x0evapidPublicKey\x12/\n" +
+	"\x11vapid_private_key\x18\x03 \x01(\tB\x03\xe0A\x04R\x0fvapidPrivateKey\x12\x18\n" +
+	"\asubject\x18\x04 \x01(\tR\asubject\x1a\xd0\x05\n" +
 	"\tAISetting\x12L\n" +
 	"\tproviders\x18\x01 \x03(\v2..memos.api.v1.InstanceSetting.AIProviderConfigR\tproviders\x12W\n" +
 	"\rtranscription\x18\x02 \x01(\v21.memos.api.v1.InstanceSetting.TranscriptionConfigR\rtranscription\x12A\n" +
@@ -3155,7 +3238,7 @@ func file_api_v1_instance_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v1_instance_service_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_api_v1_instance_service_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_api_v1_instance_service_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_api_v1_instance_service_proto_goTypes = []any{
 	(InstanceSetting_Key)(0),                             // 0: memos.api.v1.InstanceSetting.Key
 	(InstanceSetting_StorageType)(0),                     // 1: memos.api.v1.InstanceSetting.StorageType
@@ -3195,17 +3278,18 @@ var file_api_v1_instance_service_proto_goTypes = []any{
 	(*InstanceSetting_Storage_S3Config)(nil),             // 35: memos.api.v1.InstanceSetting.Storage.S3Config
 	(*InstanceSetting_StorageSetting_S3Config)(nil),      // 36: memos.api.v1.InstanceSetting.StorageSetting.S3Config
 	nil, // 37: memos.api.v1.InstanceSetting.TagsSetting.TagsEntry
-	(*InstanceSetting_NotificationSetting_EmailSetting)(nil), // 38: memos.api.v1.InstanceSetting.NotificationSetting.EmailSetting
-	nil,                                 // 39: memos.api.v1.InstanceSetting.AISetting.ToolsEntry
-	(*InstanceStats_DatabaseStats)(nil), // 40: memos.api.v1.InstanceStats.DatabaseStats
-	(*User)(nil),                        // 41: memos.api.v1.User
-	(*fieldmaskpb.FieldMask)(nil),       // 42: google.protobuf.FieldMask
-	(*timestamppb.Timestamp)(nil),       // 43: google.protobuf.Timestamp
-	(*color.Color)(nil),                 // 44: google.type.Color
-	(*emptypb.Empty)(nil),               // 45: google.protobuf.Empty
+	(*InstanceSetting_NotificationSetting_EmailSetting)(nil),   // 38: memos.api.v1.InstanceSetting.NotificationSetting.EmailSetting
+	(*InstanceSetting_NotificationSetting_WebPushSetting)(nil), // 39: memos.api.v1.InstanceSetting.NotificationSetting.WebPushSetting
+	nil,                                 // 40: memos.api.v1.InstanceSetting.AISetting.ToolsEntry
+	(*InstanceStats_DatabaseStats)(nil), // 41: memos.api.v1.InstanceStats.DatabaseStats
+	(*User)(nil),                        // 42: memos.api.v1.User
+	(*fieldmaskpb.FieldMask)(nil),       // 43: google.protobuf.FieldMask
+	(*timestamppb.Timestamp)(nil),       // 44: google.protobuf.Timestamp
+	(*color.Color)(nil),                 // 45: google.type.Color
+	(*emptypb.Empty)(nil),               // 46: google.protobuf.Empty
 }
 var file_api_v1_instance_service_proto_depIdxs = []int32{
-	41, // 0: memos.api.v1.InstanceProfile.admin:type_name -> memos.api.v1.User
+	42, // 0: memos.api.v1.InstanceProfile.admin:type_name -> memos.api.v1.User
 	17, // 1: memos.api.v1.InstanceSetting.general_setting:type_name -> memos.api.v1.InstanceSetting.GeneralSetting
 	19, // 2: memos.api.v1.InstanceSetting.storage_setting:type_name -> memos.api.v1.InstanceSetting.StorageSetting
 	20, // 3: memos.api.v1.InstanceSetting.memo_related_setting:type_name -> memos.api.v1.InstanceSetting.MemoRelatedSetting
@@ -3215,50 +3299,51 @@ var file_api_v1_instance_service_proto_depIdxs = []int32{
 	14, // 7: memos.api.v1.InstanceSetting.log_setting:type_name -> memos.api.v1.LogSetting
 	6,  // 8: memos.api.v1.BatchGetInstanceSettingsResponse.settings:type_name -> memos.api.v1.InstanceSetting
 	6,  // 9: memos.api.v1.UpdateInstanceSettingRequest.setting:type_name -> memos.api.v1.InstanceSetting
-	42, // 10: memos.api.v1.UpdateInstanceSettingRequest.update_mask:type_name -> google.protobuf.FieldMask
+	43, // 10: memos.api.v1.UpdateInstanceSettingRequest.update_mask:type_name -> google.protobuf.FieldMask
 	38, // 11: memos.api.v1.TestInstanceEmailSettingRequest.email:type_name -> memos.api.v1.InstanceSetting.NotificationSetting.EmailSetting
-	40, // 12: memos.api.v1.InstanceStats.database:type_name -> memos.api.v1.InstanceStats.DatabaseStats
-	43, // 13: memos.api.v1.InstanceStats.generated_time:type_name -> google.protobuf.Timestamp
+	41, // 12: memos.api.v1.InstanceStats.database:type_name -> memos.api.v1.InstanceStats.DatabaseStats
+	44, // 13: memos.api.v1.InstanceStats.generated_time:type_name -> google.protobuf.Timestamp
 	34, // 14: memos.api.v1.InstanceSetting.GeneralSetting.custom_profile:type_name -> memos.api.v1.InstanceSetting.GeneralSetting.CustomProfile
 	1,  // 15: memos.api.v1.InstanceSetting.Storage.type:type_name -> memos.api.v1.InstanceSetting.StorageType
 	35, // 16: memos.api.v1.InstanceSetting.Storage.s3_config:type_name -> memos.api.v1.InstanceSetting.Storage.S3Config
 	3,  // 17: memos.api.v1.InstanceSetting.StorageSetting.storage_type:type_name -> memos.api.v1.InstanceSetting.StorageSetting.StorageType
 	36, // 18: memos.api.v1.InstanceSetting.StorageSetting.s3_config:type_name -> memos.api.v1.InstanceSetting.StorageSetting.S3Config
 	18, // 19: memos.api.v1.InstanceSetting.StorageSetting.storages:type_name -> memos.api.v1.InstanceSetting.Storage
-	44, // 20: memos.api.v1.InstanceSetting.TagMetadata.background_color:type_name -> google.type.Color
+	45, // 20: memos.api.v1.InstanceSetting.TagMetadata.background_color:type_name -> google.type.Color
 	37, // 21: memos.api.v1.InstanceSetting.TagsSetting.tags:type_name -> memos.api.v1.InstanceSetting.TagsSetting.TagsEntry
 	38, // 22: memos.api.v1.InstanceSetting.NotificationSetting.email:type_name -> memos.api.v1.InstanceSetting.NotificationSetting.EmailSetting
-	32, // 23: memos.api.v1.InstanceSetting.AISetting.providers:type_name -> memos.api.v1.InstanceSetting.AIProviderConfig
-	33, // 24: memos.api.v1.InstanceSetting.AISetting.transcription:type_name -> memos.api.v1.InstanceSetting.TranscriptionConfig
-	30, // 25: memos.api.v1.InstanceSetting.AISetting.agents:type_name -> memos.api.v1.InstanceSetting.AgentConfig
-	31, // 26: memos.api.v1.InstanceSetting.AISetting.taggers:type_name -> memos.api.v1.InstanceSetting.TaggerConfig
-	28, // 27: memos.api.v1.InstanceSetting.AISetting.chat_agents:type_name -> memos.api.v1.InstanceSetting.ChatAgentConfig
-	39, // 28: memos.api.v1.InstanceSetting.AISetting.tools:type_name -> memos.api.v1.InstanceSetting.AISetting.ToolsEntry
-	26, // 29: memos.api.v1.InstanceSetting.AISetting.memory:type_name -> memos.api.v1.InstanceSetting.MemoryConfig
-	25, // 30: memos.api.v1.InstanceSetting.AISetting.translation:type_name -> memos.api.v1.InstanceSetting.TranslationConfig
-	27, // 31: memos.api.v1.InstanceSetting.MemoryConfig.entries:type_name -> memos.api.v1.InstanceSetting.MemoryEntry
-	2,  // 32: memos.api.v1.InstanceSetting.AIProviderConfig.type:type_name -> memos.api.v1.InstanceSetting.AIProviderType
-	21, // 33: memos.api.v1.InstanceSetting.TagsSetting.TagsEntry.value:type_name -> memos.api.v1.InstanceSetting.TagMetadata
-	29, // 34: memos.api.v1.InstanceSetting.AISetting.ToolsEntry.value:type_name -> memos.api.v1.InstanceSetting.ToolConfig
-	5,  // 35: memos.api.v1.InstanceService.GetInstanceProfile:input_type -> memos.api.v1.GetInstanceProfileRequest
-	7,  // 36: memos.api.v1.InstanceService.GetInstanceSetting:input_type -> memos.api.v1.GetInstanceSettingRequest
-	8,  // 37: memos.api.v1.InstanceService.BatchGetInstanceSettings:input_type -> memos.api.v1.BatchGetInstanceSettingsRequest
-	10, // 38: memos.api.v1.InstanceService.UpdateInstanceSetting:input_type -> memos.api.v1.UpdateInstanceSettingRequest
-	11, // 39: memos.api.v1.InstanceService.TestInstanceEmailSetting:input_type -> memos.api.v1.TestInstanceEmailSettingRequest
-	12, // 40: memos.api.v1.InstanceService.GetInstanceStats:input_type -> memos.api.v1.GetInstanceStatsRequest
-	15, // 41: memos.api.v1.InstanceService.GetInstanceLogStats:input_type -> memos.api.v1.GetInstanceLogStatsRequest
-	4,  // 42: memos.api.v1.InstanceService.GetInstanceProfile:output_type -> memos.api.v1.InstanceProfile
-	6,  // 43: memos.api.v1.InstanceService.GetInstanceSetting:output_type -> memos.api.v1.InstanceSetting
-	9,  // 44: memos.api.v1.InstanceService.BatchGetInstanceSettings:output_type -> memos.api.v1.BatchGetInstanceSettingsResponse
-	6,  // 45: memos.api.v1.InstanceService.UpdateInstanceSetting:output_type -> memos.api.v1.InstanceSetting
-	45, // 46: memos.api.v1.InstanceService.TestInstanceEmailSetting:output_type -> google.protobuf.Empty
-	13, // 47: memos.api.v1.InstanceService.GetInstanceStats:output_type -> memos.api.v1.InstanceStats
-	16, // 48: memos.api.v1.InstanceService.GetInstanceLogStats:output_type -> memos.api.v1.InstanceLogStats
-	42, // [42:49] is the sub-list for method output_type
-	35, // [35:42] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	39, // 23: memos.api.v1.InstanceSetting.NotificationSetting.web_push:type_name -> memos.api.v1.InstanceSetting.NotificationSetting.WebPushSetting
+	32, // 24: memos.api.v1.InstanceSetting.AISetting.providers:type_name -> memos.api.v1.InstanceSetting.AIProviderConfig
+	33, // 25: memos.api.v1.InstanceSetting.AISetting.transcription:type_name -> memos.api.v1.InstanceSetting.TranscriptionConfig
+	30, // 26: memos.api.v1.InstanceSetting.AISetting.agents:type_name -> memos.api.v1.InstanceSetting.AgentConfig
+	31, // 27: memos.api.v1.InstanceSetting.AISetting.taggers:type_name -> memos.api.v1.InstanceSetting.TaggerConfig
+	28, // 28: memos.api.v1.InstanceSetting.AISetting.chat_agents:type_name -> memos.api.v1.InstanceSetting.ChatAgentConfig
+	40, // 29: memos.api.v1.InstanceSetting.AISetting.tools:type_name -> memos.api.v1.InstanceSetting.AISetting.ToolsEntry
+	26, // 30: memos.api.v1.InstanceSetting.AISetting.memory:type_name -> memos.api.v1.InstanceSetting.MemoryConfig
+	25, // 31: memos.api.v1.InstanceSetting.AISetting.translation:type_name -> memos.api.v1.InstanceSetting.TranslationConfig
+	27, // 32: memos.api.v1.InstanceSetting.MemoryConfig.entries:type_name -> memos.api.v1.InstanceSetting.MemoryEntry
+	2,  // 33: memos.api.v1.InstanceSetting.AIProviderConfig.type:type_name -> memos.api.v1.InstanceSetting.AIProviderType
+	21, // 34: memos.api.v1.InstanceSetting.TagsSetting.TagsEntry.value:type_name -> memos.api.v1.InstanceSetting.TagMetadata
+	29, // 35: memos.api.v1.InstanceSetting.AISetting.ToolsEntry.value:type_name -> memos.api.v1.InstanceSetting.ToolConfig
+	5,  // 36: memos.api.v1.InstanceService.GetInstanceProfile:input_type -> memos.api.v1.GetInstanceProfileRequest
+	7,  // 37: memos.api.v1.InstanceService.GetInstanceSetting:input_type -> memos.api.v1.GetInstanceSettingRequest
+	8,  // 38: memos.api.v1.InstanceService.BatchGetInstanceSettings:input_type -> memos.api.v1.BatchGetInstanceSettingsRequest
+	10, // 39: memos.api.v1.InstanceService.UpdateInstanceSetting:input_type -> memos.api.v1.UpdateInstanceSettingRequest
+	11, // 40: memos.api.v1.InstanceService.TestInstanceEmailSetting:input_type -> memos.api.v1.TestInstanceEmailSettingRequest
+	12, // 41: memos.api.v1.InstanceService.GetInstanceStats:input_type -> memos.api.v1.GetInstanceStatsRequest
+	15, // 42: memos.api.v1.InstanceService.GetInstanceLogStats:input_type -> memos.api.v1.GetInstanceLogStatsRequest
+	4,  // 43: memos.api.v1.InstanceService.GetInstanceProfile:output_type -> memos.api.v1.InstanceProfile
+	6,  // 44: memos.api.v1.InstanceService.GetInstanceSetting:output_type -> memos.api.v1.InstanceSetting
+	9,  // 45: memos.api.v1.InstanceService.BatchGetInstanceSettings:output_type -> memos.api.v1.BatchGetInstanceSettingsResponse
+	6,  // 46: memos.api.v1.InstanceService.UpdateInstanceSetting:output_type -> memos.api.v1.InstanceSetting
+	46, // 47: memos.api.v1.InstanceService.TestInstanceEmailSetting:output_type -> google.protobuf.Empty
+	13, // 48: memos.api.v1.InstanceService.GetInstanceStats:output_type -> memos.api.v1.InstanceStats
+	16, // 49: memos.api.v1.InstanceService.GetInstanceLogStats:output_type -> memos.api.v1.InstanceLogStats
+	43, // [43:50] is the sub-list for method output_type
+	36, // [36:43] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_api_v1_instance_service_proto_init() }
@@ -3285,7 +3370,7 @@ func file_api_v1_instance_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v1_instance_service_proto_rawDesc), len(file_api_v1_instance_service_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   37,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -169,6 +169,7 @@ message InstanceTagsSetting {
 
 message InstanceNotificationSetting {
   EmailSetting email = 1;
+  WebPushSetting web_push = 2;
 
   message EmailSetting {
     bool enabled = 1;
@@ -181,6 +182,13 @@ message InstanceNotificationSetting {
     string reply_to = 8;
     bool use_tls = 9;
     bool use_ssl = 10;
+  }
+
+  message WebPushSetting {
+    bool enabled = 1;
+    string vapid_public_key = 2;
+    string vapid_private_key = 3;
+    string subject = 4;
   }
 }
 

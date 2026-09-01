@@ -3,6 +3,7 @@ import { sortBy } from "lodash-es";
 import { BellIcon } from "lucide-react";
 import MemoCommentMessage from "@/components/Inbox/MemoCommentMessage";
 import MemoMentionMessage from "@/components/Inbox/MemoMentionMessage";
+import ScheduleReminderMessage from "@/components/Inbox/ScheduleReminderMessage";
 import Placeholder from "@/components/Placeholder";
 import { useAppSidebar } from "@/contexts/AppSidebarContext";
 import { useNotifications } from "@/hooks/useUserQueries";
@@ -61,6 +62,9 @@ const Inboxes = () => {
                   }
                   if (notification.type === UserNotification_Type.MEMO_MENTION) {
                     return <MemoMentionMessage key={notification.name} notification={notification} />;
+                  }
+                  if (notification.type === UserNotification_Type.SCHEDULE_REMINDER) {
+                    return <ScheduleReminderMessage key={notification.name} notification={notification} />;
                   }
                   return null;
                 })}

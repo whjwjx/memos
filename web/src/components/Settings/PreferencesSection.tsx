@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { useMemo } from "react";
 import ActiveHoursSetting from "@/components/CalendarView/ActiveHoursSetting";
+import BrowserPushNotificationSetting from "@/components/Settings/BrowserPushNotificationSetting";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
@@ -235,6 +236,14 @@ const PreferencesSection = () => {
             />
           </SettingListItem>
         </SettingList>
+      </SettingGroup>
+
+      <SettingGroup
+        title={t("setting.preference.notifications-title")}
+        description={t("setting.preference.notifications-description")}
+        showSeparator
+      >
+        <BrowserPushNotificationSetting parent={currentUser?.name} />
       </SettingGroup>
     </SettingSection>
   );

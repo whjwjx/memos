@@ -38,6 +38,12 @@ type Driver interface {
 	UpsertMemoScheduleOccurrence(ctx context.Context, upsert *MemoScheduleOccurrence) (*MemoScheduleOccurrence, error)
 	ListMemoScheduleOccurrences(ctx context.Context, find *FindMemoScheduleOccurrence) ([]*MemoScheduleOccurrence, error)
 	DeleteMemoScheduleOccurrence(ctx context.Context, delete *DeleteMemoScheduleOccurrence) error
+	UpsertUserPushSubscription(ctx context.Context, upsert *UserPushSubscription) (*UserPushSubscription, error)
+	ListUserPushSubscriptions(ctx context.Context, find *FindUserPushSubscription) ([]*UserPushSubscription, error)
+	DeleteUserPushSubscription(ctx context.Context, delete *DeleteUserPushSubscription) error
+	DisableUserPushSubscription(ctx context.Context, update *DisableUserPushSubscription) error
+	CreateMemoScheduleReminderDelivery(ctx context.Context, create *MemoScheduleReminderDelivery) (*MemoScheduleReminderDelivery, bool, error)
+	CreateMemoScheduleReminderInboxDelivery(ctx context.Context, create *MemoScheduleReminderInboxDelivery) (*MemoScheduleReminderInboxDelivery, bool, error)
 
 	// MemoRelation model related methods.
 	UpsertMemoRelation(ctx context.Context, create *MemoRelation) (*MemoRelation, error)

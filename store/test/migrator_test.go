@@ -171,7 +171,81 @@ func TestMigrationAddsMemoScheduleOccurrenceCompletedTs(t *testing.T) {
 
 	setting, err := ts.GetInstanceBasicSetting(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "0.36.2", setting.SchemaVersion)
+	require.Equal(t, "0.37.2", setting.SchemaVersion)
+}
+
+func TestMigrationAddsScheduleReminderInboxDelivery(t *testing.T) {
+	if getDriverFromEnv() != "sqlite" {
+		t.Skip("skipping focused migration fixture for non-sqlite driver")
+	}
+
+	ctx := context.Background()
+	dsn := fmt.Sprintf("%s/memos_schedule_reminder_inbox_delivery_migration.db", t.TempDir())
+	db, err := sql.Open("sqlite", dsn)
+	require.NoError(t, err)
+
+	_, err = db.ExecContext(ctx, `
+		CREATE TABLE system_setting (
+			name TEXT NOT NULL,
+			value TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			UNIQUE(name)
+		);
+		CREATE TABLE user (
+			id INTEGER PRIMARY KEY AUTOINCREMENT
+		);
+		CREATE TABLE memo (
+			id INTEGER PRIMARY KEY AUTOINCREMENT
+		);
+		CREATE TABLE user_push_subscription (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			endpoint TEXT NOT NULL,
+			p256dh TEXT NOT NULL,
+			auth TEXT NOT NULL,
+			user_agent TEXT NOT NULL DEFAULT '',
+			last_seen_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			disabled_ts BIGINT DEFAULT NULL,
+			created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			UNIQUE(endpoint),
+			FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+		);
+		CREATE TABLE memo_schedule_reminder_delivery (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			memo_id INTEGER NOT NULL,
+			occurrence_time BIGINT NOT NULL,
+			reminder_offset_seconds INTEGER NOT NULL DEFAULT 0,
+			subscription_id INTEGER NOT NULL,
+			created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			UNIQUE(user_id, memo_id, occurrence_time, reminder_offset_seconds, subscription_id),
+			FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+			FOREIGN KEY (memo_id) REFERENCES memo(id) ON DELETE CASCADE,
+			FOREIGN KEY (subscription_id) REFERENCES user_push_subscription(id) ON DELETE CASCADE
+		);
+	`)
+	require.NoError(t, err)
+	basicSettingBytes, err := protojson.Marshal(&storepb.InstanceBasicSetting{SchemaVersion: "0.37.1"})
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, "INSERT INTO system_setting (name, value, description) VALUES ('BASIC', ?, '')", string(basicSettingBytes))
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	ts := NewTestingStoreWithDSN(ctx, t, "sqlite", dsn)
+	require.NoError(t, ts.Migrate(ctx))
+	defer ts.Close()
+
+	var tableName string
+	require.NoError(t, ts.GetDriver().GetDB().QueryRowContext(
+		ctx,
+		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'memo_schedule_reminder_inbox_delivery'",
+	).Scan(&tableName))
+	require.Equal(t, "memo_schedule_reminder_inbox_delivery", tableName)
+
+	setting, err := ts.GetInstanceBasicSetting(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "0.37.2", setting.SchemaVersion)
 }
 
 // TestMigrationStorageSetting verifies that the legacy singleton storage

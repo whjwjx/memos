@@ -1117,8 +1117,9 @@ func (x *InstanceTagsSetting) GetTags() map[string]*InstanceTagMetadata {
 }
 
 type InstanceNotificationSetting struct {
-	state         protoimpl.MessageState                    `protogen:"open.v1"`
-	Email         *InstanceNotificationSetting_EmailSetting `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	state         protoimpl.MessageState                      `protogen:"open.v1"`
+	Email         *InstanceNotificationSetting_EmailSetting   `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	WebPush       *InstanceNotificationSetting_WebPushSetting `protobuf:"bytes,2,opt,name=web_push,json=webPush,proto3" json:"web_push,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1156,6 +1157,13 @@ func (*InstanceNotificationSetting) Descriptor() ([]byte, []int) {
 func (x *InstanceNotificationSetting) GetEmail() *InstanceNotificationSetting_EmailSetting {
 	if x != nil {
 		return x.Email
+	}
+	return nil
+}
+
+func (x *InstanceNotificationSetting) GetWebPush() *InstanceNotificationSetting_WebPushSetting {
+	if x != nil {
+		return x.WebPush
 	}
 	return nil
 }
@@ -2234,6 +2242,74 @@ func (x *InstanceNotificationSetting_EmailSetting) GetUseSsl() bool {
 	return false
 }
 
+type InstanceNotificationSetting_WebPushSetting struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Enabled         bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	VapidPublicKey  string                 `protobuf:"bytes,2,opt,name=vapid_public_key,json=vapidPublicKey,proto3" json:"vapid_public_key,omitempty"`
+	VapidPrivateKey string                 `protobuf:"bytes,3,opt,name=vapid_private_key,json=vapidPrivateKey,proto3" json:"vapid_private_key,omitempty"`
+	Subject         string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *InstanceNotificationSetting_WebPushSetting) Reset() {
+	*x = InstanceNotificationSetting_WebPushSetting{}
+	mi := &file_store_instance_setting_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstanceNotificationSetting_WebPushSetting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstanceNotificationSetting_WebPushSetting) ProtoMessage() {}
+
+func (x *InstanceNotificationSetting_WebPushSetting) ProtoReflect() protoreflect.Message {
+	mi := &file_store_instance_setting_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstanceNotificationSetting_WebPushSetting.ProtoReflect.Descriptor instead.
+func (*InstanceNotificationSetting_WebPushSetting) Descriptor() ([]byte, []int) {
+	return file_store_instance_setting_proto_rawDescGZIP(), []int{10, 1}
+}
+
+func (x *InstanceNotificationSetting_WebPushSetting) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *InstanceNotificationSetting_WebPushSetting) GetVapidPublicKey() string {
+	if x != nil {
+		return x.VapidPublicKey
+	}
+	return ""
+}
+
+func (x *InstanceNotificationSetting_WebPushSetting) GetVapidPrivateKey() string {
+	if x != nil {
+		return x.VapidPrivateKey
+	}
+	return ""
+}
+
+func (x *InstanceNotificationSetting_WebPushSetting) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
 var File_store_instance_setting_proto protoreflect.FileDescriptor
 
 const file_store_instance_setting_proto_rawDesc = "" +
@@ -2307,9 +2383,10 @@ const file_store_instance_setting_proto_rawDesc = "" +
 	"\x04tags\x18\x01 \x03(\v2*.memos.store.InstanceTagsSetting.TagsEntryR\x04tags\x1aY\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x126\n" +
-	"\x05value\x18\x02 \x01(\v2 .memos.store.InstanceTagMetadataR\x05value:\x028\x01\"\xa2\x03\n" +
+	"\x05value\x18\x02 \x01(\v2 .memos.store.InstanceTagMetadataR\x05value:\x028\x01\"\x93\x05\n" +
 	"\x1bInstanceNotificationSetting\x12K\n" +
-	"\x05email\x18\x01 \x01(\v25.memos.store.InstanceNotificationSetting.EmailSettingR\x05email\x1a\xb5\x02\n" +
+	"\x05email\x18\x01 \x01(\v25.memos.store.InstanceNotificationSetting.EmailSettingR\x05email\x12R\n" +
+	"\bweb_push\x18\x02 \x01(\v27.memos.store.InstanceNotificationSetting.WebPushSettingR\awebPush\x1a\xb5\x02\n" +
 	"\fEmailSetting\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1b\n" +
 	"\tsmtp_host\x18\x02 \x01(\tR\bsmtpHost\x12\x1b\n" +
@@ -2322,7 +2399,12 @@ const file_store_instance_setting_proto_rawDesc = "" +
 	"\breply_to\x18\b \x01(\tR\areplyTo\x12\x17\n" +
 	"\ause_tls\x18\t \x01(\bR\x06useTls\x12\x17\n" +
 	"\ause_ssl\x18\n" +
-	" \x01(\bR\x06useSsl\"\xc9\x04\n" +
+	" \x01(\bR\x06useSsl\x1a\x9a\x01\n" +
+	"\x0eWebPushSetting\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12(\n" +
+	"\x10vapid_public_key\x18\x02 \x01(\tR\x0evapidPublicKey\x12*\n" +
+	"\x11vapid_private_key\x18\x03 \x01(\tR\x0fvapidPrivateKey\x12\x18\n" +
+	"\asubject\x18\x04 \x01(\tR\asubject\"\xc9\x04\n" +
 	"\x11InstanceAISetting\x12;\n" +
 	"\tproviders\x18\x01 \x03(\v2\x1d.memos.store.AIProviderConfigR\tproviders\x12F\n" +
 	"\rtranscription\x18\x02 \x01(\v2 .memos.store.TranscriptionConfigR\rtranscription\x122\n" +
@@ -2440,38 +2522,39 @@ func file_store_instance_setting_proto_rawDescGZIP() []byte {
 }
 
 var file_store_instance_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_store_instance_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_store_instance_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_store_instance_setting_proto_goTypes = []any{
-	(InstanceSettingKey)(0),                          // 0: memos.store.InstanceSettingKey
-	(StorageType)(0),                                 // 1: memos.store.StorageType
-	(AIProviderType)(0),                              // 2: memos.store.AIProviderType
-	(InstanceStorageSetting_StorageType)(0),          // 3: memos.store.InstanceStorageSetting.StorageType
-	(*InstanceSetting)(nil),                          // 4: memos.store.InstanceSetting
-	(*InstanceBasicSetting)(nil),                     // 5: memos.store.InstanceBasicSetting
-	(*InstanceGeneralSetting)(nil),                   // 6: memos.store.InstanceGeneralSetting
-	(*InstanceCustomProfile)(nil),                    // 7: memos.store.InstanceCustomProfile
-	(*Storage)(nil),                                  // 8: memos.store.Storage
-	(*InstanceStorageSetting)(nil),                   // 9: memos.store.InstanceStorageSetting
-	(*StorageS3Config)(nil),                          // 10: memos.store.StorageS3Config
-	(*InstanceMemoRelatedSetting)(nil),               // 11: memos.store.InstanceMemoRelatedSetting
-	(*InstanceTagMetadata)(nil),                      // 12: memos.store.InstanceTagMetadata
-	(*InstanceTagsSetting)(nil),                      // 13: memos.store.InstanceTagsSetting
-	(*InstanceNotificationSetting)(nil),              // 14: memos.store.InstanceNotificationSetting
-	(*InstanceAISetting)(nil),                        // 15: memos.store.InstanceAISetting
-	(*TranslationConfig)(nil),                        // 16: memos.store.TranslationConfig
-	(*MemoryConfig)(nil),                             // 17: memos.store.MemoryConfig
-	(*MemoryEntry)(nil),                              // 18: memos.store.MemoryEntry
-	(*ChatAgentConfig)(nil),                          // 19: memos.store.ChatAgentConfig
-	(*ToolConfig)(nil),                               // 20: memos.store.ToolConfig
-	(*AIAgentConfig)(nil),                            // 21: memos.store.AIAgentConfig
-	(*TaggerConfig)(nil),                             // 22: memos.store.TaggerConfig
-	(*AIProviderConfig)(nil),                         // 23: memos.store.AIProviderConfig
-	(*TranscriptionConfig)(nil),                      // 24: memos.store.TranscriptionConfig
-	(*InstanceLogSetting)(nil),                       // 25: memos.store.InstanceLogSetting
-	nil,                                              // 26: memos.store.InstanceTagsSetting.TagsEntry
-	(*InstanceNotificationSetting_EmailSetting)(nil), // 27: memos.store.InstanceNotificationSetting.EmailSetting
-	nil,                 // 28: memos.store.InstanceAISetting.ToolsEntry
-	(*color.Color)(nil), // 29: google.type.Color
+	(InstanceSettingKey)(0),                            // 0: memos.store.InstanceSettingKey
+	(StorageType)(0),                                   // 1: memos.store.StorageType
+	(AIProviderType)(0),                                // 2: memos.store.AIProviderType
+	(InstanceStorageSetting_StorageType)(0),            // 3: memos.store.InstanceStorageSetting.StorageType
+	(*InstanceSetting)(nil),                            // 4: memos.store.InstanceSetting
+	(*InstanceBasicSetting)(nil),                       // 5: memos.store.InstanceBasicSetting
+	(*InstanceGeneralSetting)(nil),                     // 6: memos.store.InstanceGeneralSetting
+	(*InstanceCustomProfile)(nil),                      // 7: memos.store.InstanceCustomProfile
+	(*Storage)(nil),                                    // 8: memos.store.Storage
+	(*InstanceStorageSetting)(nil),                     // 9: memos.store.InstanceStorageSetting
+	(*StorageS3Config)(nil),                            // 10: memos.store.StorageS3Config
+	(*InstanceMemoRelatedSetting)(nil),                 // 11: memos.store.InstanceMemoRelatedSetting
+	(*InstanceTagMetadata)(nil),                        // 12: memos.store.InstanceTagMetadata
+	(*InstanceTagsSetting)(nil),                        // 13: memos.store.InstanceTagsSetting
+	(*InstanceNotificationSetting)(nil),                // 14: memos.store.InstanceNotificationSetting
+	(*InstanceAISetting)(nil),                          // 15: memos.store.InstanceAISetting
+	(*TranslationConfig)(nil),                          // 16: memos.store.TranslationConfig
+	(*MemoryConfig)(nil),                               // 17: memos.store.MemoryConfig
+	(*MemoryEntry)(nil),                                // 18: memos.store.MemoryEntry
+	(*ChatAgentConfig)(nil),                            // 19: memos.store.ChatAgentConfig
+	(*ToolConfig)(nil),                                 // 20: memos.store.ToolConfig
+	(*AIAgentConfig)(nil),                              // 21: memos.store.AIAgentConfig
+	(*TaggerConfig)(nil),                               // 22: memos.store.TaggerConfig
+	(*AIProviderConfig)(nil),                           // 23: memos.store.AIProviderConfig
+	(*TranscriptionConfig)(nil),                        // 24: memos.store.TranscriptionConfig
+	(*InstanceLogSetting)(nil),                         // 25: memos.store.InstanceLogSetting
+	nil,                                                // 26: memos.store.InstanceTagsSetting.TagsEntry
+	(*InstanceNotificationSetting_EmailSetting)(nil),   // 27: memos.store.InstanceNotificationSetting.EmailSetting
+	(*InstanceNotificationSetting_WebPushSetting)(nil), // 28: memos.store.InstanceNotificationSetting.WebPushSetting
+	nil,                 // 29: memos.store.InstanceAISetting.ToolsEntry
+	(*color.Color)(nil), // 30: google.type.Color
 }
 var file_store_instance_setting_proto_depIdxs = []int32{
 	0,  // 0: memos.store.InstanceSetting.key:type_name -> memos.store.InstanceSettingKey
@@ -2489,26 +2572,27 @@ var file_store_instance_setting_proto_depIdxs = []int32{
 	3,  // 12: memos.store.InstanceStorageSetting.storage_type:type_name -> memos.store.InstanceStorageSetting.StorageType
 	10, // 13: memos.store.InstanceStorageSetting.s3_config:type_name -> memos.store.StorageS3Config
 	8,  // 14: memos.store.InstanceStorageSetting.storages:type_name -> memos.store.Storage
-	29, // 15: memos.store.InstanceTagMetadata.background_color:type_name -> google.type.Color
+	30, // 15: memos.store.InstanceTagMetadata.background_color:type_name -> google.type.Color
 	26, // 16: memos.store.InstanceTagsSetting.tags:type_name -> memos.store.InstanceTagsSetting.TagsEntry
 	27, // 17: memos.store.InstanceNotificationSetting.email:type_name -> memos.store.InstanceNotificationSetting.EmailSetting
-	23, // 18: memos.store.InstanceAISetting.providers:type_name -> memos.store.AIProviderConfig
-	24, // 19: memos.store.InstanceAISetting.transcription:type_name -> memos.store.TranscriptionConfig
-	21, // 20: memos.store.InstanceAISetting.agents:type_name -> memos.store.AIAgentConfig
-	22, // 21: memos.store.InstanceAISetting.taggers:type_name -> memos.store.TaggerConfig
-	19, // 22: memos.store.InstanceAISetting.chat_agents:type_name -> memos.store.ChatAgentConfig
-	28, // 23: memos.store.InstanceAISetting.tools:type_name -> memos.store.InstanceAISetting.ToolsEntry
-	17, // 24: memos.store.InstanceAISetting.memory:type_name -> memos.store.MemoryConfig
-	16, // 25: memos.store.InstanceAISetting.translation:type_name -> memos.store.TranslationConfig
-	18, // 26: memos.store.MemoryConfig.entries:type_name -> memos.store.MemoryEntry
-	2,  // 27: memos.store.AIProviderConfig.type:type_name -> memos.store.AIProviderType
-	12, // 28: memos.store.InstanceTagsSetting.TagsEntry.value:type_name -> memos.store.InstanceTagMetadata
-	20, // 29: memos.store.InstanceAISetting.ToolsEntry.value:type_name -> memos.store.ToolConfig
-	30, // [30:30] is the sub-list for method output_type
-	30, // [30:30] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	28, // 18: memos.store.InstanceNotificationSetting.web_push:type_name -> memos.store.InstanceNotificationSetting.WebPushSetting
+	23, // 19: memos.store.InstanceAISetting.providers:type_name -> memos.store.AIProviderConfig
+	24, // 20: memos.store.InstanceAISetting.transcription:type_name -> memos.store.TranscriptionConfig
+	21, // 21: memos.store.InstanceAISetting.agents:type_name -> memos.store.AIAgentConfig
+	22, // 22: memos.store.InstanceAISetting.taggers:type_name -> memos.store.TaggerConfig
+	19, // 23: memos.store.InstanceAISetting.chat_agents:type_name -> memos.store.ChatAgentConfig
+	29, // 24: memos.store.InstanceAISetting.tools:type_name -> memos.store.InstanceAISetting.ToolsEntry
+	17, // 25: memos.store.InstanceAISetting.memory:type_name -> memos.store.MemoryConfig
+	16, // 26: memos.store.InstanceAISetting.translation:type_name -> memos.store.TranslationConfig
+	18, // 27: memos.store.MemoryConfig.entries:type_name -> memos.store.MemoryEntry
+	2,  // 28: memos.store.AIProviderConfig.type:type_name -> memos.store.AIProviderType
+	12, // 29: memos.store.InstanceTagsSetting.TagsEntry.value:type_name -> memos.store.InstanceTagMetadata
+	20, // 30: memos.store.InstanceAISetting.ToolsEntry.value:type_name -> memos.store.ToolConfig
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_store_instance_setting_proto_init() }
@@ -2535,7 +2619,7 @@ func file_store_instance_setting_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_instance_setting_proto_rawDesc), len(file_store_instance_setting_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   25,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

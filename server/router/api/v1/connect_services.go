@@ -309,6 +309,46 @@ func (s *ConnectServiceHandler) DeleteUserNotification(ctx context.Context, req 
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) GetUserPushNotificationConfig(ctx context.Context, req *connect.Request[v1pb.GetUserPushNotificationConfigRequest]) (*connect.Response[v1pb.UserPushNotificationConfig], error) {
+	resp, err := s.APIV1Service.GetUserPushNotificationConfig(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ListUserPushSubscriptions(ctx context.Context, req *connect.Request[v1pb.ListUserPushSubscriptionsRequest]) (*connect.Response[v1pb.ListUserPushSubscriptionsResponse], error) {
+	resp, err := s.APIV1Service.ListUserPushSubscriptions(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) CreateUserPushSubscription(ctx context.Context, req *connect.Request[v1pb.CreateUserPushSubscriptionRequest]) (*connect.Response[v1pb.UserPushSubscription], error) {
+	resp, err := s.APIV1Service.CreateUserPushSubscription(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) DeleteUserPushSubscription(ctx context.Context, req *connect.Request[v1pb.DeleteUserPushSubscriptionRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.DeleteUserPushSubscription(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) TestUserPushNotification(ctx context.Context, req *connect.Request[v1pb.TestUserPushNotificationRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.TestUserPushNotification(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // MemoService
 
 func (s *ConnectServiceHandler) CreateMemo(ctx context.Context, req *connect.Request[v1pb.CreateMemoRequest]) (*connect.Response[v1pb.Memo], error) {

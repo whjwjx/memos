@@ -107,6 +107,21 @@ const (
 	// UserServiceDeleteUserNotificationProcedure is the fully-qualified name of the UserService's
 	// DeleteUserNotification RPC.
 	UserServiceDeleteUserNotificationProcedure = "/memos.api.v1.UserService/DeleteUserNotification"
+	// UserServiceGetUserPushNotificationConfigProcedure is the fully-qualified name of the
+	// UserService's GetUserPushNotificationConfig RPC.
+	UserServiceGetUserPushNotificationConfigProcedure = "/memos.api.v1.UserService/GetUserPushNotificationConfig"
+	// UserServiceListUserPushSubscriptionsProcedure is the fully-qualified name of the UserService's
+	// ListUserPushSubscriptions RPC.
+	UserServiceListUserPushSubscriptionsProcedure = "/memos.api.v1.UserService/ListUserPushSubscriptions"
+	// UserServiceCreateUserPushSubscriptionProcedure is the fully-qualified name of the UserService's
+	// CreateUserPushSubscription RPC.
+	UserServiceCreateUserPushSubscriptionProcedure = "/memos.api.v1.UserService/CreateUserPushSubscription"
+	// UserServiceDeleteUserPushSubscriptionProcedure is the fully-qualified name of the UserService's
+	// DeleteUserPushSubscription RPC.
+	UserServiceDeleteUserPushSubscriptionProcedure = "/memos.api.v1.UserService/DeleteUserPushSubscription"
+	// UserServiceTestUserPushNotificationProcedure is the fully-qualified name of the UserService's
+	// TestUserPushNotification RPC.
+	UserServiceTestUserPushNotificationProcedure = "/memos.api.v1.UserService/TestUserPushNotification"
 )
 
 // UserServiceClient is a client for the memos.api.v1.UserService service.
@@ -168,6 +183,16 @@ type UserServiceClient interface {
 	UpdateUserNotification(context.Context, *connect.Request[v1.UpdateUserNotificationRequest]) (*connect.Response[v1.UserNotification], error)
 	// DeleteUserNotification deletes a notification.
 	DeleteUserNotification(context.Context, *connect.Request[v1.DeleteUserNotificationRequest]) (*connect.Response[emptypb.Empty], error)
+	// GetUserPushNotificationConfig returns the Web Push public key for browser notifications.
+	GetUserPushNotificationConfig(context.Context, *connect.Request[v1.GetUserPushNotificationConfigRequest]) (*connect.Response[v1.UserPushNotificationConfig], error)
+	// ListUserPushSubscriptions lists browser push subscriptions for a user.
+	ListUserPushSubscriptions(context.Context, *connect.Request[v1.ListUserPushSubscriptionsRequest]) (*connect.Response[v1.ListUserPushSubscriptionsResponse], error)
+	// CreateUserPushSubscription creates or refreshes a browser push subscription.
+	CreateUserPushSubscription(context.Context, *connect.Request[v1.CreateUserPushSubscriptionRequest]) (*connect.Response[v1.UserPushSubscription], error)
+	// DeleteUserPushSubscription deletes a browser push subscription.
+	DeleteUserPushSubscription(context.Context, *connect.Request[v1.DeleteUserPushSubscriptionRequest]) (*connect.Response[emptypb.Empty], error)
+	// TestUserPushNotification sends a test notification to the user's active browser subscriptions.
+	TestUserPushNotification(context.Context, *connect.Request[v1.TestUserPushNotificationRequest]) (*connect.Response[emptypb.Empty], error)
 }
 
 // NewUserServiceClient constructs a client for the memos.api.v1.UserService service. By default, it
@@ -337,37 +362,72 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("DeleteUserNotification")),
 			connect.WithClientOptions(opts...),
 		),
+		getUserPushNotificationConfig: connect.NewClient[v1.GetUserPushNotificationConfigRequest, v1.UserPushNotificationConfig](
+			httpClient,
+			baseURL+UserServiceGetUserPushNotificationConfigProcedure,
+			connect.WithSchema(userServiceMethods.ByName("GetUserPushNotificationConfig")),
+			connect.WithClientOptions(opts...),
+		),
+		listUserPushSubscriptions: connect.NewClient[v1.ListUserPushSubscriptionsRequest, v1.ListUserPushSubscriptionsResponse](
+			httpClient,
+			baseURL+UserServiceListUserPushSubscriptionsProcedure,
+			connect.WithSchema(userServiceMethods.ByName("ListUserPushSubscriptions")),
+			connect.WithClientOptions(opts...),
+		),
+		createUserPushSubscription: connect.NewClient[v1.CreateUserPushSubscriptionRequest, v1.UserPushSubscription](
+			httpClient,
+			baseURL+UserServiceCreateUserPushSubscriptionProcedure,
+			connect.WithSchema(userServiceMethods.ByName("CreateUserPushSubscription")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteUserPushSubscription: connect.NewClient[v1.DeleteUserPushSubscriptionRequest, emptypb.Empty](
+			httpClient,
+			baseURL+UserServiceDeleteUserPushSubscriptionProcedure,
+			connect.WithSchema(userServiceMethods.ByName("DeleteUserPushSubscription")),
+			connect.WithClientOptions(opts...),
+		),
+		testUserPushNotification: connect.NewClient[v1.TestUserPushNotificationRequest, emptypb.Empty](
+			httpClient,
+			baseURL+UserServiceTestUserPushNotificationProcedure,
+			connect.WithSchema(userServiceMethods.ByName("TestUserPushNotification")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // userServiceClient implements UserServiceClient.
 type userServiceClient struct {
-	listUsers                   *connect.Client[v1.ListUsersRequest, v1.ListUsersResponse]
-	batchGetUsers               *connect.Client[v1.BatchGetUsersRequest, v1.BatchGetUsersResponse]
-	getUser                     *connect.Client[v1.GetUserRequest, v1.User]
-	createUser                  *connect.Client[v1.CreateUserRequest, v1.User]
-	updateUser                  *connect.Client[v1.UpdateUserRequest, v1.User]
-	deleteUser                  *connect.Client[v1.DeleteUserRequest, emptypb.Empty]
-	listAllUserStats            *connect.Client[v1.ListAllUserStatsRequest, v1.ListAllUserStatsResponse]
-	getUserStats                *connect.Client[v1.GetUserStatsRequest, v1.UserStats]
-	getUserSetting              *connect.Client[v1.GetUserSettingRequest, v1.UserSetting]
-	updateUserSetting           *connect.Client[v1.UpdateUserSettingRequest, v1.UserSetting]
-	listUserSettings            *connect.Client[v1.ListUserSettingsRequest, v1.ListUserSettingsResponse]
-	listLinkedIdentities        *connect.Client[v1.ListLinkedIdentitiesRequest, v1.ListLinkedIdentitiesResponse]
-	createLinkedIdentity        *connect.Client[v1.CreateLinkedIdentityRequest, v1.LinkedIdentity]
-	getLinkedIdentity           *connect.Client[v1.GetLinkedIdentityRequest, v1.LinkedIdentity]
-	deleteLinkedIdentity        *connect.Client[v1.DeleteLinkedIdentityRequest, emptypb.Empty]
-	listPersonalAccessTokens    *connect.Client[v1.ListPersonalAccessTokensRequest, v1.ListPersonalAccessTokensResponse]
-	createPersonalAccessToken   *connect.Client[v1.CreatePersonalAccessTokenRequest, v1.CreatePersonalAccessTokenResponse]
-	deletePersonalAccessToken   *connect.Client[v1.DeletePersonalAccessTokenRequest, emptypb.Empty]
-	listUserWebhooks            *connect.Client[v1.ListUserWebhooksRequest, v1.ListUserWebhooksResponse]
-	createUserWebhook           *connect.Client[v1.CreateUserWebhookRequest, v1.UserWebhook]
-	updateUserWebhook           *connect.Client[v1.UpdateUserWebhookRequest, v1.UserWebhook]
-	deleteUserWebhook           *connect.Client[v1.DeleteUserWebhookRequest, emptypb.Empty]
-	getUserWebhookSigningSecret *connect.Client[v1.GetUserWebhookSigningSecretRequest, v1.GetUserWebhookSigningSecretResponse]
-	listUserNotifications       *connect.Client[v1.ListUserNotificationsRequest, v1.ListUserNotificationsResponse]
-	updateUserNotification      *connect.Client[v1.UpdateUserNotificationRequest, v1.UserNotification]
-	deleteUserNotification      *connect.Client[v1.DeleteUserNotificationRequest, emptypb.Empty]
+	listUsers                     *connect.Client[v1.ListUsersRequest, v1.ListUsersResponse]
+	batchGetUsers                 *connect.Client[v1.BatchGetUsersRequest, v1.BatchGetUsersResponse]
+	getUser                       *connect.Client[v1.GetUserRequest, v1.User]
+	createUser                    *connect.Client[v1.CreateUserRequest, v1.User]
+	updateUser                    *connect.Client[v1.UpdateUserRequest, v1.User]
+	deleteUser                    *connect.Client[v1.DeleteUserRequest, emptypb.Empty]
+	listAllUserStats              *connect.Client[v1.ListAllUserStatsRequest, v1.ListAllUserStatsResponse]
+	getUserStats                  *connect.Client[v1.GetUserStatsRequest, v1.UserStats]
+	getUserSetting                *connect.Client[v1.GetUserSettingRequest, v1.UserSetting]
+	updateUserSetting             *connect.Client[v1.UpdateUserSettingRequest, v1.UserSetting]
+	listUserSettings              *connect.Client[v1.ListUserSettingsRequest, v1.ListUserSettingsResponse]
+	listLinkedIdentities          *connect.Client[v1.ListLinkedIdentitiesRequest, v1.ListLinkedIdentitiesResponse]
+	createLinkedIdentity          *connect.Client[v1.CreateLinkedIdentityRequest, v1.LinkedIdentity]
+	getLinkedIdentity             *connect.Client[v1.GetLinkedIdentityRequest, v1.LinkedIdentity]
+	deleteLinkedIdentity          *connect.Client[v1.DeleteLinkedIdentityRequest, emptypb.Empty]
+	listPersonalAccessTokens      *connect.Client[v1.ListPersonalAccessTokensRequest, v1.ListPersonalAccessTokensResponse]
+	createPersonalAccessToken     *connect.Client[v1.CreatePersonalAccessTokenRequest, v1.CreatePersonalAccessTokenResponse]
+	deletePersonalAccessToken     *connect.Client[v1.DeletePersonalAccessTokenRequest, emptypb.Empty]
+	listUserWebhooks              *connect.Client[v1.ListUserWebhooksRequest, v1.ListUserWebhooksResponse]
+	createUserWebhook             *connect.Client[v1.CreateUserWebhookRequest, v1.UserWebhook]
+	updateUserWebhook             *connect.Client[v1.UpdateUserWebhookRequest, v1.UserWebhook]
+	deleteUserWebhook             *connect.Client[v1.DeleteUserWebhookRequest, emptypb.Empty]
+	getUserWebhookSigningSecret   *connect.Client[v1.GetUserWebhookSigningSecretRequest, v1.GetUserWebhookSigningSecretResponse]
+	listUserNotifications         *connect.Client[v1.ListUserNotificationsRequest, v1.ListUserNotificationsResponse]
+	updateUserNotification        *connect.Client[v1.UpdateUserNotificationRequest, v1.UserNotification]
+	deleteUserNotification        *connect.Client[v1.DeleteUserNotificationRequest, emptypb.Empty]
+	getUserPushNotificationConfig *connect.Client[v1.GetUserPushNotificationConfigRequest, v1.UserPushNotificationConfig]
+	listUserPushSubscriptions     *connect.Client[v1.ListUserPushSubscriptionsRequest, v1.ListUserPushSubscriptionsResponse]
+	createUserPushSubscription    *connect.Client[v1.CreateUserPushSubscriptionRequest, v1.UserPushSubscription]
+	deleteUserPushSubscription    *connect.Client[v1.DeleteUserPushSubscriptionRequest, emptypb.Empty]
+	testUserPushNotification      *connect.Client[v1.TestUserPushNotificationRequest, emptypb.Empty]
 }
 
 // ListUsers calls memos.api.v1.UserService.ListUsers.
@@ -500,6 +560,31 @@ func (c *userServiceClient) DeleteUserNotification(ctx context.Context, req *con
 	return c.deleteUserNotification.CallUnary(ctx, req)
 }
 
+// GetUserPushNotificationConfig calls memos.api.v1.UserService.GetUserPushNotificationConfig.
+func (c *userServiceClient) GetUserPushNotificationConfig(ctx context.Context, req *connect.Request[v1.GetUserPushNotificationConfigRequest]) (*connect.Response[v1.UserPushNotificationConfig], error) {
+	return c.getUserPushNotificationConfig.CallUnary(ctx, req)
+}
+
+// ListUserPushSubscriptions calls memos.api.v1.UserService.ListUserPushSubscriptions.
+func (c *userServiceClient) ListUserPushSubscriptions(ctx context.Context, req *connect.Request[v1.ListUserPushSubscriptionsRequest]) (*connect.Response[v1.ListUserPushSubscriptionsResponse], error) {
+	return c.listUserPushSubscriptions.CallUnary(ctx, req)
+}
+
+// CreateUserPushSubscription calls memos.api.v1.UserService.CreateUserPushSubscription.
+func (c *userServiceClient) CreateUserPushSubscription(ctx context.Context, req *connect.Request[v1.CreateUserPushSubscriptionRequest]) (*connect.Response[v1.UserPushSubscription], error) {
+	return c.createUserPushSubscription.CallUnary(ctx, req)
+}
+
+// DeleteUserPushSubscription calls memos.api.v1.UserService.DeleteUserPushSubscription.
+func (c *userServiceClient) DeleteUserPushSubscription(ctx context.Context, req *connect.Request[v1.DeleteUserPushSubscriptionRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.deleteUserPushSubscription.CallUnary(ctx, req)
+}
+
+// TestUserPushNotification calls memos.api.v1.UserService.TestUserPushNotification.
+func (c *userServiceClient) TestUserPushNotification(ctx context.Context, req *connect.Request[v1.TestUserPushNotificationRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.testUserPushNotification.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the memos.api.v1.UserService service.
 type UserServiceHandler interface {
 	// ListUsers returns a list of users.
@@ -559,6 +644,16 @@ type UserServiceHandler interface {
 	UpdateUserNotification(context.Context, *connect.Request[v1.UpdateUserNotificationRequest]) (*connect.Response[v1.UserNotification], error)
 	// DeleteUserNotification deletes a notification.
 	DeleteUserNotification(context.Context, *connect.Request[v1.DeleteUserNotificationRequest]) (*connect.Response[emptypb.Empty], error)
+	// GetUserPushNotificationConfig returns the Web Push public key for browser notifications.
+	GetUserPushNotificationConfig(context.Context, *connect.Request[v1.GetUserPushNotificationConfigRequest]) (*connect.Response[v1.UserPushNotificationConfig], error)
+	// ListUserPushSubscriptions lists browser push subscriptions for a user.
+	ListUserPushSubscriptions(context.Context, *connect.Request[v1.ListUserPushSubscriptionsRequest]) (*connect.Response[v1.ListUserPushSubscriptionsResponse], error)
+	// CreateUserPushSubscription creates or refreshes a browser push subscription.
+	CreateUserPushSubscription(context.Context, *connect.Request[v1.CreateUserPushSubscriptionRequest]) (*connect.Response[v1.UserPushSubscription], error)
+	// DeleteUserPushSubscription deletes a browser push subscription.
+	DeleteUserPushSubscription(context.Context, *connect.Request[v1.DeleteUserPushSubscriptionRequest]) (*connect.Response[emptypb.Empty], error)
+	// TestUserPushNotification sends a test notification to the user's active browser subscriptions.
+	TestUserPushNotification(context.Context, *connect.Request[v1.TestUserPushNotificationRequest]) (*connect.Response[emptypb.Empty], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -724,6 +819,36 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("DeleteUserNotification")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceGetUserPushNotificationConfigHandler := connect.NewUnaryHandler(
+		UserServiceGetUserPushNotificationConfigProcedure,
+		svc.GetUserPushNotificationConfig,
+		connect.WithSchema(userServiceMethods.ByName("GetUserPushNotificationConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceListUserPushSubscriptionsHandler := connect.NewUnaryHandler(
+		UserServiceListUserPushSubscriptionsProcedure,
+		svc.ListUserPushSubscriptions,
+		connect.WithSchema(userServiceMethods.ByName("ListUserPushSubscriptions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceCreateUserPushSubscriptionHandler := connect.NewUnaryHandler(
+		UserServiceCreateUserPushSubscriptionProcedure,
+		svc.CreateUserPushSubscription,
+		connect.WithSchema(userServiceMethods.ByName("CreateUserPushSubscription")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceDeleteUserPushSubscriptionHandler := connect.NewUnaryHandler(
+		UserServiceDeleteUserPushSubscriptionProcedure,
+		svc.DeleteUserPushSubscription,
+		connect.WithSchema(userServiceMethods.ByName("DeleteUserPushSubscription")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceTestUserPushNotificationHandler := connect.NewUnaryHandler(
+		UserServiceTestUserPushNotificationProcedure,
+		svc.TestUserPushNotification,
+		connect.WithSchema(userServiceMethods.ByName("TestUserPushNotification")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/memos.api.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceListUsersProcedure:
@@ -778,6 +903,16 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceUpdateUserNotificationHandler.ServeHTTP(w, r)
 		case UserServiceDeleteUserNotificationProcedure:
 			userServiceDeleteUserNotificationHandler.ServeHTTP(w, r)
+		case UserServiceGetUserPushNotificationConfigProcedure:
+			userServiceGetUserPushNotificationConfigHandler.ServeHTTP(w, r)
+		case UserServiceListUserPushSubscriptionsProcedure:
+			userServiceListUserPushSubscriptionsHandler.ServeHTTP(w, r)
+		case UserServiceCreateUserPushSubscriptionProcedure:
+			userServiceCreateUserPushSubscriptionHandler.ServeHTTP(w, r)
+		case UserServiceDeleteUserPushSubscriptionProcedure:
+			userServiceDeleteUserPushSubscriptionHandler.ServeHTTP(w, r)
+		case UserServiceTestUserPushNotificationProcedure:
+			userServiceTestUserPushNotificationHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -889,4 +1024,24 @@ func (UnimplementedUserServiceHandler) UpdateUserNotification(context.Context, *
 
 func (UnimplementedUserServiceHandler) DeleteUserNotification(context.Context, *connect.Request[v1.DeleteUserNotificationRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.UserService.DeleteUserNotification is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetUserPushNotificationConfig(context.Context, *connect.Request[v1.GetUserPushNotificationConfigRequest]) (*connect.Response[v1.UserPushNotificationConfig], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.UserService.GetUserPushNotificationConfig is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) ListUserPushSubscriptions(context.Context, *connect.Request[v1.ListUserPushSubscriptionsRequest]) (*connect.Response[v1.ListUserPushSubscriptionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.UserService.ListUserPushSubscriptions is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) CreateUserPushSubscription(context.Context, *connect.Request[v1.CreateUserPushSubscriptionRequest]) (*connect.Response[v1.UserPushSubscription], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.UserService.CreateUserPushSubscription is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) DeleteUserPushSubscription(context.Context, *connect.Request[v1.DeleteUserPushSubscriptionRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.UserService.DeleteUserPushSubscription is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) TestUserPushNotification(context.Context, *connect.Request[v1.TestUserPushNotificationRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.UserService.TestUserPushNotification is not implemented"))
 }

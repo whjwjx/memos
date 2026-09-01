@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -232,6 +233,11 @@ func collectInboxMemoIDs(inboxes []*store.Inbox) []int32 {
 			if payload != nil {
 				memoIDs = append(memoIDs, payload.MemoId, payload.RelatedMemoId)
 			}
+		case storepb.InboxMessage_SCHEDULE_REMINDER:
+			payload := inbox.Message.GetScheduleReminder()
+			if payload != nil {
+				memoIDs = append(memoIDs, payload.MemoId)
+			}
 		default:
 			// Ignore notification types without memo references.
 		}
@@ -289,6 +295,17 @@ func (s *APIV1Service) convertInboxToUserNotificationWithUsersAndMemos(inbox *st
 			if payload != nil {
 				notification.Payload = &v1pb.UserNotification_MemoMention{
 					MemoMention: payload,
+				}
+			}
+		case storepb.InboxMessage_SCHEDULE_REMINDER:
+			notification.Type = v1pb.UserNotification_SCHEDULE_REMINDER
+			payload, err := s.convertScheduleReminderNotificationPayload(viewer, inbox.Message, memosByID)
+			if err != nil {
+				return nil, err
+			}
+			if payload != nil {
+				notification.Payload = &v1pb.UserNotification_ScheduleReminder{
+					ScheduleReminder: payload,
 				}
 			}
 		default:
@@ -393,4 +410,28 @@ func (s *APIV1Service) convertMemoMentionNotificationPayload(viewer *store.User,
 	}
 
 	return payload, nil
+}
+
+func (s *APIV1Service) convertScheduleReminderNotificationPayload(viewer *store.User, message *storepb.InboxMessage, memosByID map[int32]*store.Memo) (*v1pb.UserNotification_ScheduleReminderPayload, error) {
+	scheduleReminder := message.GetScheduleReminder()
+	if message == nil || message.Type != storepb.InboxMessage_SCHEDULE_REMINDER || scheduleReminder == nil {
+		return nil, nil
+	}
+
+	memo := memosByID[scheduleReminder.MemoId]
+	if !canViewerAccessMemo(viewer, memo) {
+		return nil, nil
+	}
+
+	memoSnippet, err := s.memoNotificationSnippet(memo)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get schedule reminder memo snippet")
+	}
+
+	return &v1pb.UserNotification_ScheduleReminderPayload{
+		Memo:           fmt.Sprintf("%s%s", MemoNamePrefix, memo.UID),
+		MemoSnippet:    memoSnippet,
+		OccurrenceTime: timestamppb.New(time.Unix(scheduleReminder.OccurrenceTime, 0)),
+		ReminderOffset: durationpb.New(time.Duration(scheduleReminder.ReminderOffsetSeconds) * time.Second),
+	}, nil
 }

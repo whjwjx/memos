@@ -20,32 +20,37 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_ListUsers_FullMethodName                   = "/memos.api.v1.UserService/ListUsers"
-	UserService_BatchGetUsers_FullMethodName               = "/memos.api.v1.UserService/BatchGetUsers"
-	UserService_GetUser_FullMethodName                     = "/memos.api.v1.UserService/GetUser"
-	UserService_CreateUser_FullMethodName                  = "/memos.api.v1.UserService/CreateUser"
-	UserService_UpdateUser_FullMethodName                  = "/memos.api.v1.UserService/UpdateUser"
-	UserService_DeleteUser_FullMethodName                  = "/memos.api.v1.UserService/DeleteUser"
-	UserService_ListAllUserStats_FullMethodName            = "/memos.api.v1.UserService/ListAllUserStats"
-	UserService_GetUserStats_FullMethodName                = "/memos.api.v1.UserService/GetUserStats"
-	UserService_GetUserSetting_FullMethodName              = "/memos.api.v1.UserService/GetUserSetting"
-	UserService_UpdateUserSetting_FullMethodName           = "/memos.api.v1.UserService/UpdateUserSetting"
-	UserService_ListUserSettings_FullMethodName            = "/memos.api.v1.UserService/ListUserSettings"
-	UserService_ListLinkedIdentities_FullMethodName        = "/memos.api.v1.UserService/ListLinkedIdentities"
-	UserService_CreateLinkedIdentity_FullMethodName        = "/memos.api.v1.UserService/CreateLinkedIdentity"
-	UserService_GetLinkedIdentity_FullMethodName           = "/memos.api.v1.UserService/GetLinkedIdentity"
-	UserService_DeleteLinkedIdentity_FullMethodName        = "/memos.api.v1.UserService/DeleteLinkedIdentity"
-	UserService_ListPersonalAccessTokens_FullMethodName    = "/memos.api.v1.UserService/ListPersonalAccessTokens"
-	UserService_CreatePersonalAccessToken_FullMethodName   = "/memos.api.v1.UserService/CreatePersonalAccessToken"
-	UserService_DeletePersonalAccessToken_FullMethodName   = "/memos.api.v1.UserService/DeletePersonalAccessToken"
-	UserService_ListUserWebhooks_FullMethodName            = "/memos.api.v1.UserService/ListUserWebhooks"
-	UserService_CreateUserWebhook_FullMethodName           = "/memos.api.v1.UserService/CreateUserWebhook"
-	UserService_UpdateUserWebhook_FullMethodName           = "/memos.api.v1.UserService/UpdateUserWebhook"
-	UserService_DeleteUserWebhook_FullMethodName           = "/memos.api.v1.UserService/DeleteUserWebhook"
-	UserService_GetUserWebhookSigningSecret_FullMethodName = "/memos.api.v1.UserService/GetUserWebhookSigningSecret"
-	UserService_ListUserNotifications_FullMethodName       = "/memos.api.v1.UserService/ListUserNotifications"
-	UserService_UpdateUserNotification_FullMethodName      = "/memos.api.v1.UserService/UpdateUserNotification"
-	UserService_DeleteUserNotification_FullMethodName      = "/memos.api.v1.UserService/DeleteUserNotification"
+	UserService_ListUsers_FullMethodName                     = "/memos.api.v1.UserService/ListUsers"
+	UserService_BatchGetUsers_FullMethodName                 = "/memos.api.v1.UserService/BatchGetUsers"
+	UserService_GetUser_FullMethodName                       = "/memos.api.v1.UserService/GetUser"
+	UserService_CreateUser_FullMethodName                    = "/memos.api.v1.UserService/CreateUser"
+	UserService_UpdateUser_FullMethodName                    = "/memos.api.v1.UserService/UpdateUser"
+	UserService_DeleteUser_FullMethodName                    = "/memos.api.v1.UserService/DeleteUser"
+	UserService_ListAllUserStats_FullMethodName              = "/memos.api.v1.UserService/ListAllUserStats"
+	UserService_GetUserStats_FullMethodName                  = "/memos.api.v1.UserService/GetUserStats"
+	UserService_GetUserSetting_FullMethodName                = "/memos.api.v1.UserService/GetUserSetting"
+	UserService_UpdateUserSetting_FullMethodName             = "/memos.api.v1.UserService/UpdateUserSetting"
+	UserService_ListUserSettings_FullMethodName              = "/memos.api.v1.UserService/ListUserSettings"
+	UserService_ListLinkedIdentities_FullMethodName          = "/memos.api.v1.UserService/ListLinkedIdentities"
+	UserService_CreateLinkedIdentity_FullMethodName          = "/memos.api.v1.UserService/CreateLinkedIdentity"
+	UserService_GetLinkedIdentity_FullMethodName             = "/memos.api.v1.UserService/GetLinkedIdentity"
+	UserService_DeleteLinkedIdentity_FullMethodName          = "/memos.api.v1.UserService/DeleteLinkedIdentity"
+	UserService_ListPersonalAccessTokens_FullMethodName      = "/memos.api.v1.UserService/ListPersonalAccessTokens"
+	UserService_CreatePersonalAccessToken_FullMethodName     = "/memos.api.v1.UserService/CreatePersonalAccessToken"
+	UserService_DeletePersonalAccessToken_FullMethodName     = "/memos.api.v1.UserService/DeletePersonalAccessToken"
+	UserService_ListUserWebhooks_FullMethodName              = "/memos.api.v1.UserService/ListUserWebhooks"
+	UserService_CreateUserWebhook_FullMethodName             = "/memos.api.v1.UserService/CreateUserWebhook"
+	UserService_UpdateUserWebhook_FullMethodName             = "/memos.api.v1.UserService/UpdateUserWebhook"
+	UserService_DeleteUserWebhook_FullMethodName             = "/memos.api.v1.UserService/DeleteUserWebhook"
+	UserService_GetUserWebhookSigningSecret_FullMethodName   = "/memos.api.v1.UserService/GetUserWebhookSigningSecret"
+	UserService_ListUserNotifications_FullMethodName         = "/memos.api.v1.UserService/ListUserNotifications"
+	UserService_UpdateUserNotification_FullMethodName        = "/memos.api.v1.UserService/UpdateUserNotification"
+	UserService_DeleteUserNotification_FullMethodName        = "/memos.api.v1.UserService/DeleteUserNotification"
+	UserService_GetUserPushNotificationConfig_FullMethodName = "/memos.api.v1.UserService/GetUserPushNotificationConfig"
+	UserService_ListUserPushSubscriptions_FullMethodName     = "/memos.api.v1.UserService/ListUserPushSubscriptions"
+	UserService_CreateUserPushSubscription_FullMethodName    = "/memos.api.v1.UserService/CreateUserPushSubscription"
+	UserService_DeleteUserPushSubscription_FullMethodName    = "/memos.api.v1.UserService/DeleteUserPushSubscription"
+	UserService_TestUserPushNotification_FullMethodName      = "/memos.api.v1.UserService/TestUserPushNotification"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -109,6 +114,16 @@ type UserServiceClient interface {
 	UpdateUserNotification(ctx context.Context, in *UpdateUserNotificationRequest, opts ...grpc.CallOption) (*UserNotification, error)
 	// DeleteUserNotification deletes a notification.
 	DeleteUserNotification(ctx context.Context, in *DeleteUserNotificationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetUserPushNotificationConfig returns the Web Push public key for browser notifications.
+	GetUserPushNotificationConfig(ctx context.Context, in *GetUserPushNotificationConfigRequest, opts ...grpc.CallOption) (*UserPushNotificationConfig, error)
+	// ListUserPushSubscriptions lists browser push subscriptions for a user.
+	ListUserPushSubscriptions(ctx context.Context, in *ListUserPushSubscriptionsRequest, opts ...grpc.CallOption) (*ListUserPushSubscriptionsResponse, error)
+	// CreateUserPushSubscription creates or refreshes a browser push subscription.
+	CreateUserPushSubscription(ctx context.Context, in *CreateUserPushSubscriptionRequest, opts ...grpc.CallOption) (*UserPushSubscription, error)
+	// DeleteUserPushSubscription deletes a browser push subscription.
+	DeleteUserPushSubscription(ctx context.Context, in *DeleteUserPushSubscriptionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// TestUserPushNotification sends a test notification to the user's active browser subscriptions.
+	TestUserPushNotification(ctx context.Context, in *TestUserPushNotificationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type userServiceClient struct {
@@ -379,6 +394,56 @@ func (c *userServiceClient) DeleteUserNotification(ctx context.Context, in *Dele
 	return out, nil
 }
 
+func (c *userServiceClient) GetUserPushNotificationConfig(ctx context.Context, in *GetUserPushNotificationConfigRequest, opts ...grpc.CallOption) (*UserPushNotificationConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserPushNotificationConfig)
+	err := c.cc.Invoke(ctx, UserService_GetUserPushNotificationConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) ListUserPushSubscriptions(ctx context.Context, in *ListUserPushSubscriptionsRequest, opts ...grpc.CallOption) (*ListUserPushSubscriptionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListUserPushSubscriptionsResponse)
+	err := c.cc.Invoke(ctx, UserService_ListUserPushSubscriptions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) CreateUserPushSubscription(ctx context.Context, in *CreateUserPushSubscriptionRequest, opts ...grpc.CallOption) (*UserPushSubscription, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserPushSubscription)
+	err := c.cc.Invoke(ctx, UserService_CreateUserPushSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) DeleteUserPushSubscription(ctx context.Context, in *DeleteUserPushSubscriptionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, UserService_DeleteUserPushSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) TestUserPushNotification(ctx context.Context, in *TestUserPushNotificationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, UserService_TestUserPushNotification_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -440,6 +505,16 @@ type UserServiceServer interface {
 	UpdateUserNotification(context.Context, *UpdateUserNotificationRequest) (*UserNotification, error)
 	// DeleteUserNotification deletes a notification.
 	DeleteUserNotification(context.Context, *DeleteUserNotificationRequest) (*emptypb.Empty, error)
+	// GetUserPushNotificationConfig returns the Web Push public key for browser notifications.
+	GetUserPushNotificationConfig(context.Context, *GetUserPushNotificationConfigRequest) (*UserPushNotificationConfig, error)
+	// ListUserPushSubscriptions lists browser push subscriptions for a user.
+	ListUserPushSubscriptions(context.Context, *ListUserPushSubscriptionsRequest) (*ListUserPushSubscriptionsResponse, error)
+	// CreateUserPushSubscription creates or refreshes a browser push subscription.
+	CreateUserPushSubscription(context.Context, *CreateUserPushSubscriptionRequest) (*UserPushSubscription, error)
+	// DeleteUserPushSubscription deletes a browser push subscription.
+	DeleteUserPushSubscription(context.Context, *DeleteUserPushSubscriptionRequest) (*emptypb.Empty, error)
+	// TestUserPushNotification sends a test notification to the user's active browser subscriptions.
+	TestUserPushNotification(context.Context, *TestUserPushNotificationRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -527,6 +602,21 @@ func (UnimplementedUserServiceServer) UpdateUserNotification(context.Context, *U
 }
 func (UnimplementedUserServiceServer) DeleteUserNotification(context.Context, *DeleteUserNotificationRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteUserNotification not implemented")
+}
+func (UnimplementedUserServiceServer) GetUserPushNotificationConfig(context.Context, *GetUserPushNotificationConfigRequest) (*UserPushNotificationConfig, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserPushNotificationConfig not implemented")
+}
+func (UnimplementedUserServiceServer) ListUserPushSubscriptions(context.Context, *ListUserPushSubscriptionsRequest) (*ListUserPushSubscriptionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListUserPushSubscriptions not implemented")
+}
+func (UnimplementedUserServiceServer) CreateUserPushSubscription(context.Context, *CreateUserPushSubscriptionRequest) (*UserPushSubscription, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateUserPushSubscription not implemented")
+}
+func (UnimplementedUserServiceServer) DeleteUserPushSubscription(context.Context, *DeleteUserPushSubscriptionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteUserPushSubscription not implemented")
+}
+func (UnimplementedUserServiceServer) TestUserPushNotification(context.Context, *TestUserPushNotificationRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestUserPushNotification not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -1017,6 +1107,96 @@ func _UserService_DeleteUserNotification_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_GetUserPushNotificationConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserPushNotificationConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetUserPushNotificationConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetUserPushNotificationConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetUserPushNotificationConfig(ctx, req.(*GetUserPushNotificationConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_ListUserPushSubscriptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUserPushSubscriptionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).ListUserPushSubscriptions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_ListUserPushSubscriptions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).ListUserPushSubscriptions(ctx, req.(*ListUserPushSubscriptionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_CreateUserPushSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateUserPushSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).CreateUserPushSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_CreateUserPushSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).CreateUserPushSubscription(ctx, req.(*CreateUserPushSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_DeleteUserPushSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteUserPushSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).DeleteUserPushSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_DeleteUserPushSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).DeleteUserPushSubscription(ctx, req.(*DeleteUserPushSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_TestUserPushNotification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestUserPushNotificationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).TestUserPushNotification(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_TestUserPushNotification_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).TestUserPushNotification(ctx, req.(*TestUserPushNotificationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1127,6 +1307,26 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteUserNotification",
 			Handler:    _UserService_DeleteUserNotification_Handler,
+		},
+		{
+			MethodName: "GetUserPushNotificationConfig",
+			Handler:    _UserService_GetUserPushNotificationConfig_Handler,
+		},
+		{
+			MethodName: "ListUserPushSubscriptions",
+			Handler:    _UserService_ListUserPushSubscriptions_Handler,
+		},
+		{
+			MethodName: "CreateUserPushSubscription",
+			Handler:    _UserService_CreateUserPushSubscription_Handler,
+		},
+		{
+			MethodName: "DeleteUserPushSubscription",
+			Handler:    _UserService_DeleteUserPushSubscription_Handler,
+		},
+		{
+			MethodName: "TestUserPushNotification",
+			Handler:    _UserService_TestUserPushNotification_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
