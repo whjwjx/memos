@@ -13,10 +13,10 @@ export const INTENSITY_THRESHOLDS = {
 } as const;
 
 export const CELL_STYLES = {
-  HIGH: "bg-blue-400/60 text-foreground/85",
-  MEDIUM: "bg-blue-400/45 text-foreground/80",
-  LOW: "bg-blue-400/30 text-foreground/80",
-  MINIMAL: "bg-blue-400/18 text-foreground/75",
+  HIGH: "bg-primary/45 text-foreground/85",
+  MEDIUM: "bg-primary/35 text-foreground/80",
+  LOW: "bg-primary/25 text-foreground/80",
+  MINIMAL: "bg-primary/15 text-foreground/75",
   // Hover reads off the cell, not the chip, so the whole column responds to the pointer.
   EMPTY: "bg-transparent text-foreground/75 group-hover/day:bg-muted/40",
 } as const;

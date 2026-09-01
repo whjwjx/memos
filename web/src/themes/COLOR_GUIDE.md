@@ -14,6 +14,7 @@ The color system supports both light and dark themes automatically through CSS c
 | ---------------------- | ------------- | --------------- | ------------------------------ |
 | `--primary`            | Golden yellow | Brighter golden | Main brand color, primary CTAs |
 | `--primary-foreground` | White         | White           | Text on primary backgrounds    |
+| `--link`               | Primary color | Primary color   | Text links and link decoration |
 
 **When to use:**
 
@@ -21,6 +22,10 @@ The color system supports both light and dark themes automatically through CSS c
 - Active navigation items
 - Important links and highlights
 - Brand elements
+
+Use `--link` instead of `--primary` for plain text links when a theme needs
+separate action and link colors. For example, the GitHub themes use green for
+primary actions and blue for links.
 
 ```css
 /* Example usage */

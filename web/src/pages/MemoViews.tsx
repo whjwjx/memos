@@ -462,7 +462,7 @@ const MemoViews = () => {
                   <p className="mt-1 text-sm text-muted-foreground">Name the view and define the memo filter expression it should apply.</p>
                 </div>
                 <a
-                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-link hover:underline"
                   href="https://www.usememos.com/docs"
                   target="_blank"
                   rel="noopener noreferrer"

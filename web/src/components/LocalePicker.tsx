@@ -70,7 +70,7 @@ export const LocaleSearchList = (props: LocaleSearchListProps) => {
               href={MISSING_LANGUAGE_FEEDBACK_URL}
               target="_blank"
               rel="noreferrer"
-              className="text-primary underline-offset-4 hover:underline"
+              className="text-link underline-offset-4 hover:underline"
             >
               {t("locale-picker.no-language-feedback")}
             </a>

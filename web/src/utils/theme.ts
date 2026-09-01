@@ -1,11 +1,13 @@
 import defaultDarkThemeContent from "../themes/default-dark.css?raw";
+import githubThemeContent from "../themes/github.css?raw";
+import githubDarkThemeContent from "../themes/github-dark.css?raw";
 import paperThemeContent from "../themes/paper.css?raw";
 
 // ============================================================================
 // Types and Constants
 // ============================================================================
 
-const VALID_THEMES = ["system", "default", "default-dark", "paper"] as const;
+const VALID_THEMES = ["system", "default", "default-dark", "paper", "github", "github-dark"] as const;
 
 export type Theme = (typeof VALID_THEMES)[number];
 export type ResolvedTheme = Exclude<Theme, "system">;
@@ -22,12 +24,16 @@ const THEME_CONTENT: Record<ResolvedTheme, string | null> = {
   default: null,
   "default-dark": defaultDarkThemeContent,
   paper: paperThemeContent,
+  github: githubThemeContent,
+  "github-dark": githubDarkThemeContent,
 };
 
 const THEME_COLORS: Record<ResolvedTheme, string> = {
   default: "#faf9f5",
   "default-dark": "#1d1f23",
   paper: "#f5ede4",
+  github: "#ffffff",
+  "github-dark": "#0d1117",
 };
 
 export const THEME_OPTIONS: ThemeOption[] = [
@@ -35,6 +41,8 @@ export const THEME_OPTIONS: ThemeOption[] = [
   { value: "default", label: "Light" },
   { value: "default-dark", label: "Dark" },
   { value: "paper", label: "Paper" },
+  { value: "github", label: "GitHub Light" },
+  { value: "github-dark", label: "GitHub Dark" },
 ];
 
 // ============================================================================

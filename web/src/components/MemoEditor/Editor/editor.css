@@ -60,7 +60,7 @@
     color: var(--foreground);
   }
   & .cm-md-link {
-    color: var(--primary);
+    color: var(--link);
     text-decoration: underline;
   }
   & .cm-md-url {
