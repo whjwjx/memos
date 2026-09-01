@@ -314,3 +314,33 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 镜像：`memos-ai:local`（哈希 `3301aa93`），容器 recreate 时间 `2026-09-01T07:20:05Z`（北京时间 9-01 15:20）。
 - 校验：公网前端资产 `index-DV-bR2IL.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB，词典功能持续生效）。
 - 备注：本次 C 盘 49GB 充足，无需 `go clean -cache`。容器内 `wget | grep` 资产校验因 gzip 编码差异返回空（工具问题，非部署问题），公网侧已确认资产与构建一致，故判定通过。
+
+---
+
+## 9. 部署踩坑与注意事项
+
+### 9.1 资产校验：容器内 `wget | grep` 返回空（gzip 编码）
+
+- **现象**：部署后执行 `docker exec memos sh -c 'wget -qO- http://localhost:5230/ | grep -o assets/index-*.js'` 无输出，但服务、API 均正常。
+- **根因**：memos 首页经 gzip 压缩；容器内 `wget` 未声明 `Accept-Encoding: identity` 时，服务端返回压缩字节流，`grep` 匹配不到明文 `assets/index-...js`。
+- **解决（二选一）**：
+  1. **以公网 curl 校验为准**（推荐）：`curl -s https://memos.huajiang.wang/ | grep -o assets/index-*.js`。nginx 反代返回明文 HTML，其与**构建输出**（本地 `dist/index.html` 里的资产名）一致即可判定通过——公网正本就来自该容器，等价证明容器内前端资产正确。
+  2. 容器内强制明文：`docker exec memos sh -c 'wget -qO- --header=Accept-Encoding:identity http://localhost:5230/ | grep -o assets/index-*.js'`（header 值用单引号包裹，避免引号嵌套，见 9.2）。
+- **结论**：公网资产名与构建输出一致 = 部署成功，不必纠结容器内 `wget` 输出为空。
+
+### 9.2 PowerShell + ssh 引号转义（命令执行踩坑）
+
+- **现象**：验证命令多次报错——`grep : 无法将“grep”项识别为 cmdlet`（PowerShell 把 `| grep` 当本地管道）、`unterminated quoted string` / `wget: missing URL`（内层双引号被 PowerShell 吃掉）。
+- **根因**：Windows PowerShell 在 `ssh "..."` 双引号串内，仍会解析 `|`（本地管道）和 `"`（提前结束字符串），导致远程命令被截断/篡改。
+- **稳健模式（实测可用）**：
+  - **模式 A（推荐）**：整个 ssh 参数用 PowerShell 双引号，内部 `sh -c` 用单引号，且 grep pattern **裸写不加引号**：
+    `ssh user@host "docker exec memos sh -c 'wget -qO- http://localhost:5230/ | grep -o assets/index-[a-zA-Z0-9]*.js'"`
+  - **模式 B（最稳，零嵌套）**：先落盘再 grep，全程无管道：
+    `ssh user@host "curl -s https://memos.huajiang.wang/ > /tmp/p.html ; docker exec memos sh -c 'wget -qO- http://localhost:5230/ > /tmp/i.html' ; grep -o 'assets/index-[a-zA-Z0-9_.-]*\.js' /tmp/p.html /tmp/i.html"`
+  - **避免**：ssh 双引号内写 `sh -c "双引号..."`（内层双引号被吃掉）、双引号内直接 `| grep`（被当本地管道）。
+
+### 9.3 C 盘空间不足导致 `go build` 失败
+
+- **现象**：前端/二进制构建中途失败或极慢。
+- **根因**：Windows C 盘（Go 缓存、npm 缓存）空间不足。
+- **解决**：构建前先查 `Get-PSDrive C | Select-Object @{N='FreeGB';E={[math]::Round($_.Free/1GB,2)}}`；若低于约 3GB，先 `go clean -cache` 释放（实测可腾出数 GB）。近期 C 盘多在 40–50GB，基本无需清理。
