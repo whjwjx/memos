@@ -1,9 +1,8 @@
-import { create } from "@bufbuild/protobuf";
-import { FieldMaskSchema, timestampDate } from "@bufbuild/protobuf/wkt";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { CalendarClockIcon, CheckIcon, TrashIcon, XIcon } from "lucide-react";
 import toast from "react-hot-toast";
-import { userServiceClient } from "@/connect";
 import useNavigateTo from "@/hooks/useNavigateTo";
+import { useDeleteUserNotification, useUpdateUserNotification } from "@/hooks/useUserQueries";
 import { cn } from "@/lib/utils";
 import { UserNotification, UserNotification_Status } from "@/types/proto/api/v1/user_service_pb";
 import { useTranslate } from "@/utils/i18n";
@@ -15,15 +14,17 @@ interface Props {
 function ScheduleReminderMessage({ notification }: Props) {
   const t = useTranslate();
   const navigateTo = useNavigateTo();
+  const updateNotification = useUpdateUserNotification();
+  const deleteNotification = useDeleteUserNotification();
   const reminderPayload = notification.payload?.case === "scheduleReminder" ? notification.payload.value : undefined;
 
   const handleArchiveMessage = async (silence = false) => {
-    await userServiceClient.updateUserNotification({
+    await updateNotification.mutateAsync({
       notification: {
         name: notification.name,
         status: UserNotification_Status.ARCHIVED,
       },
-      updateMask: create(FieldMaskSchema, { paths: ["status"] }),
+      updateMask: ["status"],
     });
     if (!silence) {
       toast.success(t("message.archived-successfully"));
@@ -31,9 +32,7 @@ function ScheduleReminderMessage({ notification }: Props) {
   };
 
   const handleDeleteMessage = async () => {
-    await userServiceClient.deleteUserNotification({
-      name: notification.name,
-    });
+    await deleteNotification.mutateAsync(notification.name);
     toast.success(t("message.deleted-successfully"));
   };
 

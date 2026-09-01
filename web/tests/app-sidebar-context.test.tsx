@@ -13,8 +13,8 @@ const Harness = () => {
       <button type="button" onClick={() => setAttachmentSection("media")}>
         Select media
       </button>
-      <button type="button" onClick={() => setInboxFilter("unread")}>
-        Select unread
+      <button type="button" onClick={() => setInboxFilter("all")}>
+        Select all inbox
       </button>
       <button type="button" onClick={() => navigate("/inbox")}>
         Change route
@@ -34,12 +34,12 @@ describe("AppSidebarProvider", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Select media" }));
-    fireEvent.click(screen.getByRole("button", { name: "Select unread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select all inbox" }));
     expect(screen.getByTestId("attachment-section")).toHaveTextContent("media");
-    expect(screen.getByTestId("inbox-filter")).toHaveTextContent("unread");
+    expect(screen.getByTestId("inbox-filter")).toHaveTextContent("all");
 
     fireEvent.click(screen.getByRole("button", { name: "Change route" }));
     expect(screen.getByTestId("attachment-section")).toHaveTextContent("all");
-    expect(screen.getByTestId("inbox-filter")).toHaveTextContent("all");
+    expect(screen.getByTestId("inbox-filter")).toHaveTextContent("unread");
   });
 });

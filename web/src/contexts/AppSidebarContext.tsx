@@ -33,7 +33,7 @@ const AppSidebarContext = createContext<AppSidebarContextValue | null>(null);
 export const AppSidebarProvider = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const [attachmentSection, setAttachmentSection] = useState<AttachmentSection>("all");
-  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("unread");
   const [memoDetail, setMemoDetailState] = useState<MemoDetailSidebarDescriptor>();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quickFindOpen, setQuickFindOpen] = useState(false);
@@ -42,7 +42,7 @@ export const AppSidebarProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     setMobileOpen(false);
     setAttachmentSection("all");
-    setInboxFilter("all");
+    setInboxFilter("unread");
   }, [location.pathname]);
 
   const setMemoDetail = useCallback((descriptor?: MemoDetailSidebarDescriptor) => {
