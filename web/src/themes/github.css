@@ -1,0 +1,41 @@
+:root {
+  /* GitHub Primer Light - clean canvas, muted rails, green actions, and blue links */
+  --background: oklch(1 0 89.8756);
+  --foreground: oklch(0.2542 0.0111 254.038);
+
+  --card: oklch(1 0 89.8756);
+  --card-foreground: oklch(0.2542 0.0111 254.038);
+
+  --popover: oklch(1 0 89.8756);
+  --popover-foreground: oklch(0.2542 0.0111 254.038);
+
+  --primary: oklch(0.5244 0.1401 148.0394);
+  --primary-foreground: oklch(1 0 89.8756);
+  --link: oklch(0.5399 0.1906 257.4815);
+
+  --secondary: oklch(0.9782 0.0034 247.8578);
+  --secondary-foreground: oklch(0.2785 0.0132 253.0364);
+
+  --muted: oklch(0.9782 0.0034 247.8578);
+  --muted-foreground: oklch(0.4849 0.0196 251.0209);
+
+  --accent: oklch(0.9782 0.0034 247.8578);
+  --accent-foreground: oklch(0.2542 0.0111 254.038);
+
+  --destructive: oklch(0.5567 0.2056 24.6099);
+  --destructive-foreground: oklch(1 0 89.8756);
+
+  --success: oklch(0.5244 0.1401 148.0394);
+  --success-foreground: oklch(1 0 89.8756);
+  --warning: oklch(0.6619 0.1374 79.2504);
+  --warning-foreground: oklch(0.2785 0.0132 253.0364);
+
+  --border: oklch(0.8758 0.0123 247.9675);
+  --input: oklch(0.7783 0.0163 248.0373);
+  --ring: oklch(0.5244 0.1401 148.0394);
+
+  --sidebar: oklch(0.9782 0.0034 247.8578);
+  --sidebar-foreground: oklch(0.2785 0.0132 253.0364);
+  --sidebar-accent: oklch(0.8758 0.0123 247.9675);
+  --sidebar-accent-foreground: oklch(0.2542 0.0111 254.038);
+}

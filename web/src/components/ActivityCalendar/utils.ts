@@ -24,7 +24,7 @@ export const getCellIntensityClass = (day: CalendarDayCell, maxCount: number): s
 };
 
 export const getCalendarCellStateClass = (day: Pick<CalendarDayCell, "isSelected">): string =>
-  day.isSelected ? "z-10 ring-2 ring-blue-500/70 ring-inset" : "";
+  day.isSelected ? "z-10 ring-2 ring-primary/70 ring-inset" : "";
 
 export const generateMonthsForYear = (year: number): string[] => {
   return Array.from({ length: MONTHS_IN_YEAR }, (_, i) => dayjs(`${year}-01-01`).add(i, "month").format("YYYY-MM"));

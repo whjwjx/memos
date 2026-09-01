@@ -44,7 +44,7 @@ export const AuthEmptyState = ({
 export const AuthLinkPrompt = ({ prompt, to, label }: { prompt: string; to: string; label: string }) => (
   <p className="mt-5 text-center text-sm text-muted-foreground">
     {prompt}{" "}
-    <Link to={to} className="text-primary hover:underline" viewTransition>
+    <Link to={to} className="text-link hover:underline" viewTransition>
       {label}
     </Link>
   </p>

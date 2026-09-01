@@ -59,10 +59,7 @@ export const CalendarCell = memo((props: CalendarCellProps) => {
     >
       {day.label}
       {day.isToday && (
-        <span
-          aria-hidden="true"
-          className="absolute bottom-[3px] left-1/2 size-[3px] -translate-x-1/2 rounded-full bg-blue-600/80 dark:bg-blue-300/80"
-        />
+        <span aria-hidden="true" className="absolute bottom-[3px] left-1/2 size-[3px] -translate-x-1/2 rounded-full bg-primary/80" />
       )}
     </span>
   );

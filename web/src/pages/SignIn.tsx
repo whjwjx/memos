@@ -53,7 +53,7 @@ const SignIn = () => {
           title={t("auth.signin-unavailable-title")}
           description={t("auth.signin-unavailable-description")}
         >
-          <Link to={ROUTES.AUTH_ADMIN} className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline" viewTransition>
+          <Link to={ROUTES.AUTH_ADMIN} className="mt-3 inline-flex items-center gap-1 text-sm text-link hover:underline" viewTransition>
             {t("auth.admin-sign-in")}
             <ArrowRightIcon className="h-3.5 w-3.5 rtl:rotate-180" />
           </Link>

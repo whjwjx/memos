@@ -88,7 +88,7 @@ const HowToUseDisclosure = () => {
             <ApiUsageExample />
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
               <a
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-link hover:underline"
                 href="https://usememos.com/docs/security/access-tokens"
                 target="_blank"
                 rel="noreferrer"
@@ -97,7 +97,7 @@ const HowToUseDisclosure = () => {
                 <ExternalLinkIcon className="size-3" />
               </a>
               <a
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-link hover:underline"
                 href={WEB_CLIPPER_URL}
                 target="_blank"
                 rel="noreferrer"

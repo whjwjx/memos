@@ -13,6 +13,7 @@
   /* Primary - readable blue for selected items, links, and focused controls */
   --primary: oklch(0.66 0.11 250);
   --primary-foreground: oklch(0.24 0.008 255);
+  --link: var(--primary);
 
   /* Secondary - elevated surface for secondary buttons */
   --secondary: oklch(0.33 0.011 255);
