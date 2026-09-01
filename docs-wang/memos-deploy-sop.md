@@ -303,3 +303,14 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 校验：容器内 / 公网 / 构建输出三方前端资产均为 `index-ByUaSSQ5.js`；API 正常；日志无异常。
 - **词典专项验证**：容器内 `ls /var/opt/memos/dictionaries/ecdict.db` 可见，文件头 `SQLite format 3`，`stardict` 表，`right` 词条数据完整；未登录调 `GET /api/v1/dictionary/entries/right` 返回 `authentication required`（设计预期，登录后可用）。浏览器强刷后 Translation 页输入单词显示词典信息、输入句子不触发 —— **功能生效确认**。
 - 备注：词典接口要求登录（JWT，token 不存库），服务端无法直连测，需浏览器验证；词典文件缺失时接口返回 `configured:false` 降级，不影响其他功能。后续重部署因文件在数据卷不丢；更新词典版本才需重传。
+
+### 8.8 部署记录（2026-09-01）
+
+> 完整重新部署：纳入 schedule web-push notifications（`076849b5` merge `b82325f7`）、natural schedule detection（`0efa78e9`）、review session resume（`3e0bdbcf`）。纯代码部署，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `b82325f7`（merge schedule-web-push-notifications）。
+- 构建：`pnpm release`（资产 `index-DV-bR2IL.js`，5129 modules）→ `go build`（linux/amd64，103MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260901/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `3301aa93`），容器 recreate 时间 `2026-09-01T07:20:05Z`（北京时间 9-01 15:20）。
+- 校验：公网前端资产 `index-DV-bR2IL.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB，词典功能持续生效）。
+- 备注：本次 C 盘 49GB 充足，无需 `go clean -cache`。容器内 `wget | grep` 资产校验因 gzip 编码差异返回空（工具问题，非部署问题），公网侧已确认资产与构建一致，故判定通过。
