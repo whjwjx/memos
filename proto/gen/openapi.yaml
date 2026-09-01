@@ -2255,6 +2255,147 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/users/{user}/pushNotificationConfig:
+        get:
+            tags:
+                - UserService
+            description: GetUserPushNotificationConfig returns the Web Push public key for browser notifications.
+            operationId: UserService_GetUserPushNotificationConfig
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UserPushNotificationConfig'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/users/{user}/pushSubscriptions:
+        get:
+            tags:
+                - UserService
+            description: ListUserPushSubscriptions lists browser push subscriptions for a user.
+            operationId: UserService_ListUserPushSubscriptions
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListUserPushSubscriptionsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - UserService
+            description: CreateUserPushSubscription creates or refreshes a browser push subscription.
+            operationId: UserService_CreateUserPushSubscription
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UserPushSubscription'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UserPushSubscription'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/users/{user}/pushSubscriptions/{pushSubscription}:
+        delete:
+            tags:
+                - UserService
+            description: DeleteUserPushSubscription deletes a browser push subscription.
+            operationId: UserService_DeleteUserPushSubscription
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pushSubscription
+                  in: path
+                  description: The pushSubscription id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/users/{user}/pushSubscriptions:test:
+        post:
+            tags:
+                - UserService
+            description: TestUserPushNotification sends a test notification to the user's active browser subscriptions.
+            operationId: UserService_TestUserPushNotification
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TestUserPushNotificationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/users/{user}/settings:
         get:
             tags:
@@ -3582,6 +3723,8 @@ components:
             properties:
                 email:
                     $ref: '#/components/schemas/NotificationSetting_EmailSetting'
+                webPush:
+                    $ref: '#/components/schemas/NotificationSetting_WebPushSetting'
             description: Notification transport configuration.
         InstanceSetting_Storage:
             type: object
@@ -3961,6 +4104,13 @@ components:
                         $ref: '#/components/schemas/UserNotification'
                 nextPageToken:
                     type: string
+        ListUserPushSubscriptionsResponse:
+            type: object
+            properties:
+                subscriptions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/UserPushSubscription'
         ListUserSettingsResponse:
             type: object
             properties:
@@ -4431,6 +4581,19 @@ components:
                 useSsl:
                     type: boolean
             description: Email delivery configuration for notifications.
+        NotificationSetting_WebPushSetting:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                vapidPublicKey:
+                    type: string
+                vapidPrivateKey:
+                    writeOnly: true
+                    type: string
+                subject:
+                    type: string
+            description: Web Push delivery configuration for browser notifications.
         OAuth2Config:
             type: object
             properties:
@@ -4793,6 +4956,16 @@ components:
                     type: string
                     description: Optional. Recipient email address. If omitted, the current user's email address is used.
             description: Request message for TestInstanceEmailSetting method.
+        TestUserPushNotificationRequest:
+            required:
+                - parent
+            type: object
+            properties:
+                parent:
+                    type: string
+                    description: |-
+                        The parent user resource.
+                         Format: users/{user}
         ToolApproval:
             type: object
             properties:
@@ -5052,6 +5225,7 @@ components:
                         - TYPE_UNSPECIFIED
                         - MEMO_COMMENT
                         - MEMO_MENTION
+                        - SCHEDULE_REMINDER
                     type: string
                     description: The type of the notification.
                     format: enum
@@ -5063,6 +5237,10 @@ components:
                     readOnly: true
                     allOf:
                         - $ref: '#/components/schemas/UserNotification_MemoMentionPayload'
+                scheduleReminder:
+                    readOnly: true
+                    allOf:
+                        - $ref: '#/components/schemas/UserNotification_ScheduleReminderPayload'
         UserNotification_MemoCommentPayload:
             type: object
             properties:
@@ -5101,6 +5279,61 @@ components:
                 relatedMemoSnippet:
                     type: string
                     description: Preview text of the related parent memo.
+        UserNotification_ScheduleReminderPayload:
+            type: object
+            properties:
+                memo:
+                    type: string
+                    description: |-
+                        The scheduled memo.
+                         Format: memos/{memo}
+                memoSnippet:
+                    type: string
+                    description: Preview text of the scheduled memo.
+                occurrenceTime:
+                    type: string
+                    description: The scheduled occurrence time that triggered this reminder.
+                    format: date-time
+                reminderOffset:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: How long before occurrence_time this reminder was sent.
+        UserPushNotificationConfig:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                vapidPublicKey:
+                    type: string
+        UserPushSubscription:
+            required:
+                - endpoint
+                - p256dh
+                - auth
+            type: object
+            properties:
+                name:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The resource name of the push subscription.
+                         Format: users/{user}/pushSubscriptions/{push_subscription}
+                endpoint:
+                    type: string
+                p256dh:
+                    type: string
+                auth:
+                    type: string
+                userAgent:
+                    type: string
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                updateTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
         UserSetting:
             type: object
             properties:

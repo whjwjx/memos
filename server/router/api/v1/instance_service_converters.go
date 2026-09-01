@@ -334,6 +334,13 @@ func convertInstanceNotificationSettingFromStore(setting *storepb.InstanceNotifi
 			UseSsl:    setting.Email.UseSsl,
 		}
 	}
+	if setting.WebPush != nil {
+		notificationSetting.WebPush = &v1pb.InstanceSetting_NotificationSetting_WebPushSetting{
+			Enabled:        setting.WebPush.Enabled,
+			VapidPublicKey: setting.WebPush.VapidPublicKey,
+			Subject:        setting.WebPush.Subject,
+		}
+	}
 	return notificationSetting
 }
 
@@ -355,6 +362,14 @@ func convertInstanceNotificationSettingToStore(setting *v1pb.InstanceSetting_Not
 			ReplyTo:      setting.Email.ReplyTo,
 			UseTls:       setting.Email.UseTls,
 			UseSsl:       setting.Email.UseSsl,
+		}
+	}
+	if setting.WebPush != nil {
+		notificationSetting.WebPush = &storepb.InstanceNotificationSetting_WebPushSetting{
+			Enabled:         setting.WebPush.Enabled,
+			VapidPublicKey:  setting.WebPush.VapidPublicKey,
+			VapidPrivateKey: setting.WebPush.VapidPrivateKey,
+			Subject:         setting.WebPush.Subject,
 		}
 	}
 	return notificationSetting

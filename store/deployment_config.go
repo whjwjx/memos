@@ -280,6 +280,11 @@ func validateAndNormalizeDeploymentInstanceSetting(setting *storepb.InstanceSett
 				return errors.New("notification email cannot enable both useTls and useSsl")
 			}
 		}
+		if webPush := notification.WebPush; webPush != nil && webPush.Enabled {
+			if strings.TrimSpace(webPush.VapidPublicKey) == "" || strings.TrimSpace(webPush.VapidPrivateKey) == "" {
+				return errors.New("enabled notification webPush requires vapidPublicKey and vapidPrivateKey")
+			}
+		}
 	case storepb.InstanceSettingKey_AI:
 		if setting.GetAiSetting() == nil {
 			return errors.New("aiSetting must be populated for key AI")

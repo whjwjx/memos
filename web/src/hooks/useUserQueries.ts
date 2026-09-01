@@ -9,6 +9,8 @@ import {
   type ListAllUserStatsRequest,
   ListAllUserStatsRequestSchema,
   User,
+  type UserPushSubscription,
+  UserPushSubscriptionSchema,
   UserSetting,
   UserSetting_GeneralSetting,
   UserSetting_Key,
@@ -31,6 +33,8 @@ export const userKeys = {
   currentUser: () => [...userKeys.all, "current"] as const,
   memoViews: (parent?: string) => [...userKeys.all, "memoViews", parent] as const,
   notifications: () => [...userKeys.all, "notifications"] as const,
+  pushNotificationConfig: (parent?: string) => [...userKeys.all, "pushNotificationConfig", parent] as const,
+  pushSubscriptions: (parent?: string) => [...userKeys.all, "pushSubscriptions", parent] as const,
   byNames: (names: string[]) => [...userKeys.all, "byNames", ...[...names].sort()] as const,
   byUsernames: (usernames: string[]) => [...userKeys.all, "byUsernames", ...[...usernames].sort()] as const,
 };
@@ -100,6 +104,78 @@ export function useNotifications() {
     },
     enabled: !!currentUser?.name,
     staleTime: 1000 * 30, // 30 seconds - notifications should update frequently
+    refetchInterval: 1000 * 15,
+  });
+}
+
+export function usePushNotificationConfig(parent?: string) {
+  return useQuery({
+    queryKey: userKeys.pushNotificationConfig(parent),
+    queryFn: () => {
+      if (!parent) {
+        throw new Error("No current user");
+      }
+      return userServiceClient.getUserPushNotificationConfig({ parent });
+    },
+    enabled: !!parent,
+  });
+}
+
+export function usePushSubscriptions(parent?: string) {
+  return useQuery({
+    queryKey: userKeys.pushSubscriptions(parent),
+    queryFn: async () => {
+      if (!parent) {
+        return [];
+      }
+      const { subscriptions } = await userServiceClient.listUserPushSubscriptions({ parent });
+      return subscriptions;
+    },
+    enabled: !!parent,
+  });
+}
+
+export function useCreatePushSubscription(parent?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (subscription: Pick<UserPushSubscription, "endpoint" | "p256dh" | "auth" | "userAgent">) => {
+      if (!parent) {
+        throw new Error("No current user");
+      }
+      return userServiceClient.createUserPushSubscription({
+        parent,
+        subscription: create(UserPushSubscriptionSchema, subscription),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.pushSubscriptions(parent) });
+    },
+  });
+}
+
+export function useDeletePushSubscription(parent?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (name: string) => {
+      await userServiceClient.deleteUserPushSubscription({ name });
+      return name;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.pushSubscriptions(parent) });
+    },
+  });
+}
+
+export function useTestPushNotification(parent?: string) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!parent) {
+        throw new Error("No current user");
+      }
+      await userServiceClient.testUserPushNotification({ parent });
+    },
   });
 }
 

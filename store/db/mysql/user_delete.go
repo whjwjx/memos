@@ -87,6 +87,12 @@ func collectDeleteUserTargets(ctx context.Context, tx *sql.Tx, userID int32) (*d
 func deleteUserTargetsTx(ctx context.Context, tx *sql.Tx, userID int32, targets *deleteUserTargetSet) error {
 	memoIDs := targets.memoIDs
 
+	if err := deleteMemoScheduleReminderDeliveriesTx(ctx, tx, userID, memoIDs); err != nil {
+		return err
+	}
+	if err := deleteUserPushSubscriptionsTx(ctx, tx, userID); err != nil {
+		return err
+	}
 	// Delete the memo rows before their reactions: a concurrent UpsertReaction
 	// then blocks on the uncommitted parent delete instead of inserting a row
 	// behind the reaction sweep. Do not reorder these two.
@@ -121,6 +127,30 @@ func deleteUserTargetsTx(ctx context.Context, tx *sql.Tx, userID int32, targets 
 		return err
 	}
 	return nil
+}
+
+func deleteMemoScheduleReminderDeliveriesTx(ctx context.Context, tx *sql.Tx, userID int32, memoIDs []int32) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memo_schedule_reminder_delivery WHERE user_id = `+deleteUserPlaceholder(1), userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM memo_schedule_reminder_inbox_delivery WHERE user_id = `+deleteUserPlaceholder(1), userID); err != nil {
+		return err
+	}
+	for _, batch := range deleteUserBatches(memoIDs, deleteUserBatchSize) {
+		clause, args := deleteUserInClause(1, batch)
+		if _, err := tx.ExecContext(ctx, `DELETE FROM memo_schedule_reminder_delivery WHERE memo_id IN `+clause, args...); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM memo_schedule_reminder_inbox_delivery WHERE memo_id IN `+clause, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteUserPushSubscriptionsTx(ctx context.Context, tx *sql.Tx, userID int32) error {
+	_, err := tx.ExecContext(ctx, `DELETE FROM user_push_subscription WHERE user_id = `+deleteUserPlaceholder(1), userID)
+	return err
 }
 
 func listDeleteUserMemoTree(ctx context.Context, tx *sql.Tx, userID int32) ([]int32, error) {

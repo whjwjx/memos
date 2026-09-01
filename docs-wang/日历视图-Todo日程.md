@@ -178,6 +178,155 @@ has_incomplete_tasks == true && scheduled_time != null
 | P2 前端 | 日历视图页 + 拖拽 CRUD + 时段 resize | 周视图可用 |
 | P3 增强 | 冲突检测、提醒、重复日程 | 体验对齐滴答 |
 
+## 六补、提前提醒方案（后续，不纳入当前 MVP）
+
+> 决策状态：先记录方案，暂不实现。
+> 当前 MVP：只做“到点提醒”，即 `reminder_offset_seconds = 0`。
+
+### 6.1 用户目标
+
+生日、纪念日、会议等日程不只需要到点提醒，也需要提前提醒。例如：
+
+- 生日：提前 7 天、提前 3 天、提前 1 天、当天提醒。
+- 纪念日：提前 7 天、提前 1 天、当天提醒。
+- 会议：提前 10 分钟、提前 1 小时、到点提醒。
+
+核心诉求是：一个 memo 仍然只保存一条日程，不因为多次提醒而创建多条 memo。
+
+### 6.2 数据模型建议
+
+在 `Memo` 的日程字段旁新增提醒提前量配置：
+
+```proto
+// Optional. Reminder offsets before each scheduled occurrence, in seconds.
+// 0 means remind at the scheduled time.
+repeated int32 scheduled_reminder_offsets = 22 [(google.api.field_behavior) = OPTIONAL];
+```
+
+语义：
+
+```
+reminder_time = occurrence_time - scheduled_reminder_offset
+```
+
+示例：
+
+| 日程发生时间 | 提醒配置 | 实际提醒时间 |
+| --- | --- | --- |
+| 2026-09-10 09:00 | 7 天前 | 2026-09-03 09:00 |
+| 2026-09-10 09:00 | 3 天前 | 2026-09-07 09:00 |
+| 2026-09-10 09:00 | 1 天前 | 2026-09-09 09:00 |
+| 2026-09-10 09:00 | 到点 | 2026-09-10 09:00 |
+
+### 6.3 默认策略建议
+
+不同日程类型默认值应不同，避免日常习惯产生过多提醒。
+
+| 类型 | 推荐默认提醒 |
+| --- | --- |
+| 普通日程 | 到点 |
+| 会议 / 预约 | 提前 10 分钟 + 到点 |
+| 生日 / 纪念日 | 提前 7 天 + 提前 1 天 + 到点 |
+| 每日习惯 | 到点 |
+| 工作日/周末循环 todo | 到点 |
+
+前端可先提供快捷多选：
+
+- 到点
+- 提前 10 分钟
+- 提前 1 小时
+- 提前 1 天
+- 提前 3 天
+- 提前 7 天
+
+### 6.4 后端处理逻辑
+
+当前到点提醒只有一个隐含配置：
+
+```
+offset = 0
+```
+
+后续扩展为遍历每个 memo 的 `scheduled_reminder_offsets`：
+
+```
+for occurrence in occurrences:
+  for offset in scheduled_reminder_offsets:
+    reminder_time = occurrence_time - offset
+    if reminder_time in scan_window:
+      claim_delivery(user_id, memo_id, occurrence_time, offset)
+      create_inbox_notification(...)
+      send_web_push_best_effort(...)
+```
+
+其中：
+
+- inbox 是可靠提醒：到点或提前提醒都先写入 inbox。
+- Web Push 是额外提醒：浏览器、FCM、代理不可用时不影响 inbox。
+- `reminder_offset_seconds` 必须进入去重键，保证“提前 7 天”和“提前 1 天”是两次不同提醒。
+
+### 6.5 去重设计
+
+建议后续 inbox 提醒单独建去重表：
+
+```
+memo_schedule_reminder_inbox_delivery
+- id
+- user_id
+- memo_id
+- occurrence_time
+- reminder_offset_seconds
+- created_ts
+
+unique(user_id, memo_id, occurrence_time, reminder_offset_seconds)
+```
+
+Web Push 可以继续按设备维度去重：
+
+```
+unique(user_id, memo_id, occurrence_time, reminder_offset_seconds, subscription_id)
+```
+
+这样同一个提醒点：
+
+- inbox 只出现一次；
+- 用户有多台设备时，每台设备可各发一次系统通知；
+- worker 重启或重复扫描不会产生重复提醒。
+
+### 6.6 前端交互建议
+
+`ScheduleSelector` 中增加“提醒”区域，和重复规则放在同一个弹层内。
+
+交互建议：
+
+- 用户设了 `scheduled_time` 后，默认选中“到点”。
+- 对 yearly 日程，如果自然语言识别出“生日 / 纪念日”，可提示推荐提醒组合。
+- 用户可以多选快捷项，也可以暂不支持自定义输入。
+- memo 卡片上只展示简洁摘要，例如：`9月10日 09:00 · 每年 · 提前7天/1天/到点提醒`。
+
+### 6.7 自然语言识别后续增强
+
+MVP 先不解析提前提醒。后续可支持：
+
+| 输入 | 识别结果 |
+| --- | --- |
+| `9月10日生日提前7天提醒` | yearly + 7 天前 |
+| `下周二下午2点会议提前1小时提醒` | once + 1 小时前 |
+| `纪念日提前7天和1天提醒` | yearly + 7 天前 + 1 天前 |
+
+如果用户没有写“提前”，则使用类型默认值；如果类型无法判断，则只用到点提醒。
+
+### 6.8 不做的事
+
+当前阶段不建议做：
+
+- 为每个提前提醒创建一条新 memo。
+- 为每个重复日程提前生成未来所有提醒记录。
+- 做复杂的自定义提醒规则编辑器。
+- 自动归档已经过期的 inbox 提醒。
+
+原因：这些都会增加数据冗余或交互复杂度。先保持“memo 是源，occurrence 和 reminder 都是运行时展开”的模型。
+
 ## 七、已确认事项（2026-08-23）
 
 ### 7.1 入口位置

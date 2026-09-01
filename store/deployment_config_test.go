@@ -268,6 +268,11 @@ func TestLoadDeploymentConfigurationRejectsInvalidSettingResources(t *testing.T)
 		{name: "mismatched oneof", content: `{"key":"GENERAL","storageSetting":{}}`, errorString: "generalSetting must be populated"},
 		{name: "invalid week start", content: `{"key":"GENERAL","generalSetting":{"weekStartDayOffset":-2}}`, errorString: "must be between -1 and 6"},
 		{name: "unknown field", content: `{"key":"GENERAL","generalSetting":{},"typo":true}`, errorString: `unknown field "typo"`},
+		{
+			name:        "enabled web push missing keys",
+			content:     `{"key":"NOTIFICATION","notificationSetting":{"webPush":{"enabled":true,"vapidPublicKey":"","vapidPrivateKey":"private-key"}}}`,
+			errorString: "enabled notification webPush requires vapidPublicKey and vapidPrivateKey",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

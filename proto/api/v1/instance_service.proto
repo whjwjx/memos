@@ -279,6 +279,7 @@ message InstanceSetting {
   // Notification transport configuration.
   message NotificationSetting {
     EmailSetting email = 1;
+    WebPushSetting web_push = 2;
 
     // Email delivery configuration for notifications.
     message EmailSetting {
@@ -292,6 +293,14 @@ message InstanceSetting {
       string reply_to = 8;
       bool use_tls = 9;
       bool use_ssl = 10;
+    }
+
+    // Web Push delivery configuration for browser notifications.
+    message WebPushSetting {
+      bool enabled = 1;
+      string vapid_public_key = 2;
+      string vapid_private_key = 3 [(google.api.field_behavior) = INPUT_ONLY];
+      string subject = 4;
     }
   }
 

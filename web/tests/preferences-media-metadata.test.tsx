@@ -20,6 +20,11 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 vi.mock("@/hooks/useUserQueries", () => ({
+  useCreatePushSubscription: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeletePushSubscription: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  usePushNotificationConfig: () => ({ data: { enabled: false, vapidPublicKey: "" } }),
+  usePushSubscriptions: () => ({ data: [] }),
+  useTestPushNotification: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateUserGeneralSetting: () => ({ mutate: mocks.mutate, isPending: false }),
 }));
 
