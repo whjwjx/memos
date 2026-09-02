@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BotIcon, SendIcon, UserIcon } from "lucide-react";
+import { BotIcon, MessageSquareTextIcon, SendIcon, UserIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChatMarkdown } from "@/components/ChatMarkdown";
@@ -11,9 +11,49 @@ import { memoDetailQueryOptions } from "@/hooks/useMemoQueries";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/router/routes";
 import { type ConversationMessage } from "@/types/proto/api/v1/ai_chat_service_pb";
+import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
 const AWAITING_PLACEHOLDER = "awaiting user confirmation";
+const MEMO_CONTEXT_MAX_CHARS = 3000;
+const MEMO_CONTEXT_START = "[Selected memo context]";
+const MEMO_CONTEXT_END = "[/Selected memo context]";
+const MEMO_CONTEXT_QUESTION_PREFIX = "User question:";
+
+const truncateText = (value: string, maxChars: number): string => {
+  if (value.length <= maxChars) {
+    return value;
+  }
+  return `${value.slice(0, maxChars).trimEnd()}\n...[truncated]`;
+};
+
+const compactText = (value: string, maxChars: number): string => {
+  const compacted = value.trim().replace(/\s+/g, " ");
+  return compacted.length > maxChars ? `${compacted.slice(0, maxChars).trimEnd()}...` : compacted;
+};
+
+const buildMemoContextMessage = (memo: Memo, question: string): string => {
+  return `${MEMO_CONTEXT_START}
+Memo: ${memo.name}
+Content excerpt:
+${truncateText(memo.content.trim(), MEMO_CONTEXT_MAX_CHARS)}
+${MEMO_CONTEXT_END}
+
+${MEMO_CONTEXT_QUESTION_PREFIX}
+${question}`;
+};
+
+const stripMemoContextEnvelope = (content: string): string => {
+  if (!content.startsWith(MEMO_CONTEXT_START)) {
+    return content;
+  }
+  const marker = `${MEMO_CONTEXT_END}\n\n${MEMO_CONTEXT_QUESTION_PREFIX}\n`;
+  const markerIndex = content.indexOf(marker);
+  if (markerIndex < 0) {
+    return content;
+  }
+  return content.slice(markerIndex + marker.length).trimStart();
+};
 
 // stripFakeToolCalls hides pseudo tool-call XML that some models emit as plain
 // text (e.g. <tool_calls><invoke name="...">...</invoke></tool_calls>) instead
@@ -54,7 +94,7 @@ const MessageBubble = ({ msg }: { msg: ConversationMessage }) => {
         }`}
       >
         {isUser ? (
-          <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+          <span className="whitespace-pre-wrap break-words">{stripMemoContextEnvelope(msg.content)}</span>
         ) : (
           <ChatMarkdown content={stripFakeToolCalls(msg.content)} />
         )}
@@ -242,11 +282,16 @@ const ConfirmationCard = ({
 const AIChat = () => {
   const t = useTranslate();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const conversationId = searchParams.get("conversation") ?? undefined;
+  const memoName = searchParams.get("memo") ?? undefined;
 
   const { data: conversationData } = useConversation(conversationId);
   const { data: conversations = [] } = useConversations();
+  const { data: contextMemo, isLoading: isMemoContextLoading } = useQuery({
+    ...memoDetailQueryOptions(memoName ?? ""),
+    enabled: Boolean(memoName),
+  });
   const createConversation = useCreateConversation();
   const { requiresConfirmation, toolCalls, send, resolveToolCall, isPending, error } = useSendMessage(conversationId);
 
@@ -260,9 +305,13 @@ const AIChat = () => {
   // conversations at all do we fall back to the "start a conversation" screen.
   useEffect(() => {
     if (!conversationId && conversations.length > 0) {
-      navigate(`${ROUTES.AI_CHAT}?conversation=${conversations[0].id}`, { replace: true });
+      const params = new URLSearchParams({ conversation: conversations[0].id });
+      if (memoName) {
+        params.set("memo", memoName);
+      }
+      navigate(`${ROUTES.AI_CHAT}?${params.toString()}`, { replace: true });
     }
-  }, [conversationId, conversations, navigate]);
+  }, [conversationId, conversations, memoName, navigate]);
 
   // Smoothly scroll to the newest message when content changes.
   useEffect(() => {
@@ -278,17 +327,32 @@ const AIChat = () => {
 
   const handleCreate = useCallback(async () => {
     const res = await createConversation.mutateAsync({});
-    navigate(`${ROUTES.AI_CHAT}?conversation=${res.id}`);
-  }, [createConversation, navigate]);
+    const params = new URLSearchParams({ conversation: res.id });
+    if (memoName) {
+      params.set("memo", memoName);
+    }
+    navigate(`${ROUTES.AI_CHAT}?${params.toString()}`);
+  }, [createConversation, memoName, navigate]);
 
   const handleSend = useCallback(
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || !conversationId) return;
-      send({ content: trimmed });
+      send({ content: contextMemo ? buildMemoContextMessage(contextMemo, trimmed) : trimmed });
     },
-    [send, conversationId],
+    [contextMemo, send, conversationId],
   );
+
+  const handleCloseMemoContext = useCallback(() => {
+    setSearchParams(
+      (params) => {
+        const next = new URLSearchParams(params);
+        next.delete("memo");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
 
   // Decide a single tool call (approve/reject). Decisions accumulate in the
   // hook: nothing is submitted until every pending card in the current round
@@ -334,6 +398,36 @@ const AIChat = () => {
 
   return (
     <section className="mx-auto flex h-[calc(100dvh-3rem)] w-full max-w-3xl flex-col md:h-[100dvh]">
+      {memoName && (
+        <div className="border-b border-border bg-muted/30 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <MessageSquareTextIcon className="size-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-foreground">{t("aiChat.memo-context-label")}</div>
+              <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                {isMemoContextLoading
+                  ? t("aiChat.memo-context-loading")
+                  : contextMemo
+                    ? compactText(contextMemo.content, 160) || contextMemo.name
+                    : t("aiChat.memo-context-unavailable")}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+              onClick={handleCloseMemoContext}
+              aria-label={t("aiChat.memo-context-close")}
+            >
+              <XIcon className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-4 overscroll-contain">
         {history.length === 0 && (
@@ -369,12 +463,17 @@ const AIChat = () => {
             ref={textareaRef}
             rows={1}
             placeholder={t("aiChat.input-placeholder")}
-            disabled={isPending}
+            disabled={isPending || (Boolean(memoName) && isMemoContextLoading)}
             onKeyDown={handleKeyDown}
             onFocus={scrollToBottom}
             className="max-h-40 min-h-[2.5rem] flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0"
           />
-          <Button type="submit" size="icon" disabled={isPending} className="shrink-0 rounded-xl">
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isPending || (Boolean(memoName) && isMemoContextLoading)}
+            className="shrink-0 rounded-xl"
+          >
             <SendIcon className="h-4 w-auto" />
           </Button>
         </div>

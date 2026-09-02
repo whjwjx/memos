@@ -4,6 +4,7 @@ import {
   ArchiveRestoreIcon,
   BookmarkMinusIcon,
   BookmarkPlusIcon,
+  BotMessageSquareIcon,
   CheckCheckIcon,
   CopyIcon,
   Edit3Icon,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +32,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { memoServiceClient } from "@/connect";
 import { useInstance } from "@/contexts/InstanceContext";
+import { useCreateConversation } from "@/hooks/useAIChat";
+import useCurrentUser from "@/hooks/useCurrentUser";
+import { ROUTES } from "@/router/routes";
 import { State } from "@/types/proto/api/v1/common_pb";
 import { AutoTagMemoRequestSchema } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
@@ -40,6 +45,9 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
   const { memo, readonly } = props;
   const t = useTranslate();
   const { aiSetting } = useInstance();
+  const navigate = useNavigate();
+  const currentUser = useCurrentUser();
+  const createConversation = useCreateConversation();
 
   // Dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -51,11 +59,28 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
   const hasOpenTasks = Boolean(memo.property?.hasIncompleteTasks);
   // The AI auto-tagging action is shown only when at least one tagger is enabled.
   const hasEnabledTagger = aiSetting.taggers.some((tagger) => tagger.enabled && tagger.providerId);
+  const canAskAI = Boolean(currentUser);
 
   const handleAutoTag = async () => {
     try {
       await memoServiceClient.autoTagMemo(create(AutoTagMemoRequestSchema, { name: memo.name }));
       toast.success(t("memo.ai-tag-queued"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleAskAI = async () => {
+    try {
+      const title = memo.content.trim().replace(/\s+/g, " ").slice(0, 24) || t("common.memo");
+      const conversation = await createConversation.mutateAsync({
+        title: t("aiChat.memo-context-conversation-title", { title }),
+      });
+      const params = new URLSearchParams({
+        conversation: conversation.id,
+        memo: memo.name,
+      });
+      navigate(`${ROUTES.AI_CHAT}?${params.toString()}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
@@ -104,6 +129,12 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
               </DropdownMenuItem>
             )}
           </>
+        )}
+        {canAskAI && (
+          <DropdownMenuItem onClick={handleAskAI} disabled={createConversation.isPending}>
+            <BotMessageSquareIcon className="w-4 h-auto" />
+            {t("memo.ask-ai")}
+          </DropdownMenuItem>
         )}
 
         {/* Copy submenu (non-archived) */}

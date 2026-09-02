@@ -404,6 +404,7 @@
     "comments-count": "{{count}} comments",
     "copy-content": "Copy Content",
     "copy-link": "Copy Link",
+    "ask-ai": "Ask AI",
     "ai-tag": "AI tags",
     "ai-tag-queued": "AI tagging queued. Tags will be applied shortly.",
     "count-memos-in-date": "{{count}} {{memos}} in {{date}}",
@@ -1307,6 +1308,11 @@
     "confirm": "Approve & continue",
     "no-conversations": "No conversations yet",
     "delete-confirm": "Delete this conversation? This cannot be undone and the chat history will be permanently removed.",
-    "delete-success": "Conversation deleted"
+    "delete-success": "Conversation deleted",
+    "memo-context-close": "Remove memo context",
+    "memo-context-conversation-title": "Ask AI: {{title}}",
+    "memo-context-label": "Discussing this memo",
+    "memo-context-loading": "Loading memo...",
+    "memo-context-unavailable": "This memo is unavailable or you do not have access."
   }
 }
