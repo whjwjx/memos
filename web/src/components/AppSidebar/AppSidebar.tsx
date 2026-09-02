@@ -49,6 +49,7 @@ import { useGlobalMemoEditor } from "@/contexts/GlobalMemoEditorContext";
 import { useInstance } from "@/contexts/InstanceContext";
 import { stringifyFilters, useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { useConversations, useCreateConversation, useDeleteConversation } from "@/hooks/useAIChat";
+import { useAIChatAgents } from "@/hooks/useAIChatAgents";
 import { useAttachmentLibraryStats } from "@/hooks/useAttachmentLibrary";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { type MemoStatsContext, useFilteredMemoStats } from "@/hooks/useFilteredMemoStats";
@@ -414,6 +415,7 @@ const AIChatSidebarContent = () => {
   const { data: conversations = [] } = useConversations();
   const createConversation = useCreateConversation();
   const deleteConversation = useDeleteConversation();
+  const { agentNameById, defaultAgent } = useAIChatAgents();
   const [deleteTarget, setDeleteTarget] = useState<string>();
   const [renamingId, setRenamingId] = useState<string>();
   const [renameValue, setRenameValue] = useState("");
@@ -454,6 +456,13 @@ const AIChatSidebarContent = () => {
 
   const cancelRename = () => setRenamingId(undefined);
 
+  const getConversationAgentLabel = (agentId: string) => {
+    if (agentId) {
+      return agentNameById.get(agentId) ?? agentId;
+    }
+    return defaultAgent?.name ? t("aiChat.default-agent-label", { name: defaultAgent.name }) : undefined;
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     const id = deleteTarget;
@@ -493,6 +502,7 @@ const AIChatSidebarContent = () => {
         conversations.map((conv) => {
           const active = activeConversationId === conv.id;
           const isRenaming = renamingId === conv.id;
+          const agentLabel = getConversationAgentLabel(conv.agentId);
           return (
             <div key={conv.id} className={cn(SIDEBAR_ROW_CLASSES, "group/conv", sidebarRowStateClasses(active))}>
               {isRenaming ? (
@@ -523,6 +533,11 @@ const AIChatSidebarContent = () => {
                 >
                   <BotIcon className={SIDEBAR_ROW_ICON_CLASSES} strokeWidth={1.8} />
                   <span className="min-w-0 flex-1 truncate">{conv.title || conv.id}</span>
+                  {agentLabel && (
+                    <span className="max-w-20 shrink-0 truncate rounded bg-background/60 px-1.5 py-0.5 text-[10px] font-normal leading-4 text-muted-foreground">
+                      {agentLabel}
+                    </span>
+                  )}
                 </button>
               )}
               {!isRenaming && (
