@@ -58,6 +58,8 @@ func NewRegistry() *Registry {
 		&QueryDBTool{},
 		&GetLogsTool{},
 		&ManageMemoryTool{},
+		&QueryQueueTool{},
+		&ProjectStatusTool{},
 	} {
 		r.tools[t.Spec().Name] = t
 	}

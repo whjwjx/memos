@@ -872,7 +872,9 @@
       "tool-delete-memo": "Permanently delete a memo (needs confirmation).",
       "tool-get-logs": "Read recent server log lines (admin only).",
       "tool-query-db": "Query the database; write operations need the user's explicit confirmation (admin only).",
-      "tool-manage-memory": "Read and maintain the shared memory bank (admin only)."
+      "tool-manage-memory": "Read and maintain the shared memory bank (admin only).",
+      "tool-query-queue": "Inspect AI queue status and recent tasks (admin only).",
+      "tool-project-status": "Summarize instance health, database counts, queues and logs (admin only)."
     },
     "instance": {
       "access-description": "Control sign-up, authentication, profile editing, and calendar defaults for this instance.",

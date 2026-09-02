@@ -120,6 +120,8 @@ func TestApplyToolConfigScopeIsolation(t *testing.T) {
 		// Admin-only tools are removed entirely for non-admin users.
 		require.Nil(t, registry.Get("get_logs"))
 		require.Nil(t, registry.Get("query_db"))
+		require.Nil(t, registry.Get("query_queue"))
+		require.Nil(t, registry.Get("project_status"))
 		// Disabled tools are removed entirely too.
 		require.Nil(t, registry.Get("search_memos"))
 		// Explicitly configured confirmation is honored.
@@ -136,6 +138,8 @@ func TestApplyToolConfigScopeIsolation(t *testing.T) {
 
 		require.NotNil(t, registry.Get("get_logs"))
 		require.NotNil(t, registry.Get("query_db"))
+		require.NotNil(t, registry.Get("query_queue"))
+		require.NotNil(t, registry.Get("project_status"))
 		require.Nil(t, registry.Get("search_memos"))
 		require.False(t, registry.Get("delete_memo").RequiresConfirmation(""))
 	})
@@ -151,6 +155,8 @@ func TestApplyToolConfigScopeIsolation(t *testing.T) {
 		// Non-admin still loses admin-only tools...
 		require.Nil(t, registry.Get("get_logs"))
 		require.Nil(t, registry.Get("query_db"))
+		require.Nil(t, registry.Get("query_queue"))
+		require.Nil(t, registry.Get("project_status"))
 		// ...but all non-admin tools are enabled with built-in confirmation.
 		require.NotNil(t, registry.Get("search_memos"))
 		require.NotNil(t, registry.Get("create_memo"))

@@ -769,7 +769,9 @@
       "tool-delete-memo": "永久删除一条 memo（需确认）。",
       "tool-get-logs": "读取最近的服务器日志（仅管理员）。",
       "tool-query-db": "查询数据库，写操作需用户二次确认（仅管理员）。",
-      "tool-manage-memory": "查看与维护共享记忆库（仅管理员）。"
+      "tool-manage-memory": "查看与维护共享记忆库（仅管理员）。",
+      "tool-query-queue": "查看 AI 队列状态和最近任务（仅管理员）。",
+      "tool-project-status": "汇总实例健康、数据库数量、队列和日志状态（仅管理员）。"
     },
     "preference": {
       "appearance-description": "选择当前账号使用的界面语言和外观主题。",

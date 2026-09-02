@@ -30,6 +30,8 @@ func TestRegistryContainsAllStage1Tools(t *testing.T) {
 		"query_db",
 		"get_logs",
 		"manage_memory",
+		"query_queue",
+		"project_status",
 	} {
 		require.Truef(t, got[name], "registry missing tool %q", name)
 	}

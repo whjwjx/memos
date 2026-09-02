@@ -212,9 +212,9 @@ const toTaggerConfig = (tagger: LocalTagger) =>
 // NewRegistry). Only tools present here can be toggled. All tools default to
 // enabled, and mutating ones (create_memo, update_memo, tag_memo,
 // batch_update_memos, delete_memo, auto_tag, agent_reply, manage_settings,
-// query_db) default to requiring confirmation, while
-// read-only/query tools (search_memos, get_memo, get_comments, get_logs) never require
-// it.
+// query_db) default to requiring confirmation, while read-only/query tools
+// (search_memos, get_memo, get_comments, get_logs, query_queue,
+// project_status) never require it.
 // confirmEditable=false marks tools whose confirmation is fixed: read-only
 // tools never require confirmation, so the toggle is disabled in the UI.
 const toolRegistry: {
@@ -262,6 +262,20 @@ const toolRegistry: {
   },
   { name: "query_db", descriptionKey: "setting.ai.tool-query-db", adminOnly: true, defaultRequiresConfirmation: true },
   { name: "manage_memory", descriptionKey: "setting.ai.tool-manage-memory", adminOnly: true, defaultRequiresConfirmation: true },
+  {
+    name: "query_queue",
+    descriptionKey: "setting.ai.tool-query-queue",
+    adminOnly: true,
+    defaultRequiresConfirmation: false,
+    confirmEditable: false,
+  },
+  {
+    name: "project_status",
+    descriptionKey: "setting.ai.tool-project-status",
+    adminOnly: true,
+    defaultRequiresConfirmation: false,
+    confirmEditable: false,
+  },
 ];
 
 type LocalChatAgent = {
