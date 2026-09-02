@@ -326,6 +326,17 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 校验：公网前端资产 `index-CAj7IgwY.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB，词典功能持续生效）。
 - 备注：本次 C 盘 48.8GB 充足，无需 `go clean -cache`。注意：网关 SSH 对 `$(date)`/`%`/`*` 特殊字符做了处理（见 9.4），备份改用本地日期串 + 显式文件名。
 
+### 8.10 部署记录（2026-09-02）
+
+> 完整重新部署：纳入 AI Chat 系列（`cd50a8b2` admin status tools、`5bc72cd5` memo ask ai entry、`37847f73` ai chat agent picker、`4427979c` hide agent labels，`abf7de9c` merge）。纯代码部署，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `0123749e`（docs: add ai chat stage 2 plan）。
+- 构建：`pnpm release`（资产 `index-BFy8sQp8.js`，5129 modules）→ `go build`（linux/amd64，103348927 字节 / ≈98.6MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260902_1630/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `d2103f4a`），容器 recreate 时间 `2026-09-02T16:32:38+08:00`（北京时间 9-02 16:32）。
+- 校验：公网前端资产 `index-BFy8sQp8.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB，词典功能持续生效）。
+- 备注：本次 C 盘 47.6GB 充足，无需 `go clean -cache`。沿用 9.4 网关特殊字符处理方案（本地日期串 + 显式文件名备份），**本次无新增踩坑**。
+
 ---
 
 ## 9. 部署踩坑与注意事项
