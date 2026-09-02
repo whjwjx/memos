@@ -1294,7 +1294,6 @@
     "memo-context-label": "正在讨论这条 memo",
     "memo-context-loading": "正在加载 memo…",
     "memo-context-unavailable": "这条 memo 不可用，或你没有访问权限。",
-    "agent-fallback-label": "AI 助手",
-    "default-agent-label": "默认：{{name}}"
+    "agent-fallback-label": "AI 助手"
   }
 }

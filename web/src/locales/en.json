@@ -1314,7 +1314,6 @@
     "memo-context-label": "Discussing this memo",
     "memo-context-loading": "Loading memo...",
     "memo-context-unavailable": "This memo is unavailable or you do not have access.",
-    "agent-fallback-label": "Assistant",
-    "default-agent-label": "Default: {{name}}"
+    "agent-fallback-label": "Assistant"
   }
 }
