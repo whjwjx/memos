@@ -404,6 +404,7 @@
     "comments-count": "{{count}} comments",
     "copy-content": "Copy Content",
     "copy-link": "Copy Link",
+    "ask-ai": "Ask AI",
     "ai-tag": "AI tags",
     "ai-tag-queued": "AI tagging queued. Tags will be applied shortly.",
     "count-memos-in-date": "{{count}} {{memos}} in {{date}}",
@@ -872,7 +873,9 @@
       "tool-delete-memo": "Permanently delete a memo (needs confirmation).",
       "tool-get-logs": "Read recent server log lines (admin only).",
       "tool-query-db": "Query the database; write operations need the user's explicit confirmation (admin only).",
-      "tool-manage-memory": "Read and maintain the shared memory bank (admin only)."
+      "tool-manage-memory": "Read and maintain the shared memory bank (admin only).",
+      "tool-query-queue": "Inspect AI queue status and recent tasks (admin only).",
+      "tool-project-status": "Summarize instance health, database counts, queues and logs (admin only)."
     },
     "instance": {
       "access-description": "Control sign-up, authentication, profile editing, and calendar defaults for this instance.",
@@ -1305,6 +1308,12 @@
     "confirm": "Approve & continue",
     "no-conversations": "No conversations yet",
     "delete-confirm": "Delete this conversation? This cannot be undone and the chat history will be permanently removed.",
-    "delete-success": "Conversation deleted"
+    "delete-success": "Conversation deleted",
+    "memo-context-close": "Remove memo context",
+    "memo-context-conversation-title": "Ask AI: {{title}}",
+    "memo-context-label": "Discussing this memo",
+    "memo-context-loading": "Loading memo...",
+    "memo-context-unavailable": "This memo is unavailable or you do not have access.",
+    "agent-fallback-label": "Assistant"
   }
 }

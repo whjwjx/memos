@@ -462,10 +462,12 @@ func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string) 
 // require confirmation and are exempt from the admin's confirmation toggle.
 // Keep in sync with the confirmEditable=false entries in the settings UI.
 var readOnlyTools = map[string]bool{
-	"search_memos": true,
-	"get_memo":     true,
-	"get_comments": true,
-	"get_logs":     true,
+	"search_memos":   true,
+	"get_memo":       true,
+	"get_comments":   true,
+	"get_logs":       true,
+	"query_queue":    true,
+	"project_status": true,
 }
 
 // adminOnlyTools are exposed only to admin accounts: their data (database rows,
@@ -473,9 +475,11 @@ var readOnlyTools = map[string]bool{
 // the model's tool list. Keep in sync with the adminOnly entries in the
 // settings UI.
 var adminOnlyTools = map[string]bool{
-	"get_logs":      true,
-	"query_db":      true,
-	"manage_memory": true,
+	"get_logs":       true,
+	"query_db":       true,
+	"manage_memory":  true,
+	"query_queue":    true,
+	"project_status": true,
 }
 
 // applyToolConfig applies the admin's per-tool toggles from instance settings

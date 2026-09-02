@@ -329,6 +329,7 @@
     },
     "copy-content": "复制内容",
     "copy-link": "复制链接",
+    "ask-ai": "问 AI",
     "ai-tag": "AI 标签",
     "ai-tag-queued": "已加入 AI 打标签队列，稍后将自动打上标签。",
     "count-memos-in-date": "{{date}} 有 {{count}} 条 {{memos}}",
@@ -769,7 +770,9 @@
       "tool-delete-memo": "永久删除一条 memo（需确认）。",
       "tool-get-logs": "读取最近的服务器日志（仅管理员）。",
       "tool-query-db": "查询数据库，写操作需用户二次确认（仅管理员）。",
-      "tool-manage-memory": "查看与维护共享记忆库（仅管理员）。"
+      "tool-manage-memory": "查看与维护共享记忆库（仅管理员）。",
+      "tool-query-queue": "查看 AI 队列状态和最近任务（仅管理员）。",
+      "tool-project-status": "汇总实例健康、数据库数量、队列和日志状态（仅管理员）。"
     },
     "preference": {
       "appearance-description": "选择当前账号使用的界面语言和外观主题。",
@@ -1285,6 +1288,12 @@
     "confirm": "确认并继续",
     "no-conversations": "暂无对话",
     "delete-confirm": "确定删除这段对话吗？此操作不可撤销，对话历史将被永久清除。",
-    "delete-success": "对话已删除"
+    "delete-success": "对话已删除",
+    "memo-context-close": "移除 memo 上下文",
+    "memo-context-conversation-title": "问 AI：{{title}}",
+    "memo-context-label": "正在讨论这条 memo",
+    "memo-context-loading": "正在加载 memo…",
+    "memo-context-unavailable": "这条 memo 不可用，或你没有访问权限。",
+    "agent-fallback-label": "AI 助手"
   }
 }
