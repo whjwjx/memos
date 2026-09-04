@@ -22,6 +22,7 @@ const (
 	maxTranscriptionConfigPromptLength   = 4096
 	maxTranslationConfigModelLength      = 256
 	maxTranslationConfigMaxTextLength    = 100000
+	maxLLMConfigModelLength              = 256
 	maxBatchGetInstanceSettings          = 100
 )
 

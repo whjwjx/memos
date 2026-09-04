@@ -441,21 +441,33 @@ func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string) 
 	if agent == nil {
 		return providerBundle{}, "", status.Errorf(codes.FailedPrecondition, "no enabled chat agent configured")
 	}
-	provider := findProviderByID(setting.GetProviders(), agent.GetProviderId())
-	if provider == nil || provider.GetApiKey() == "" {
-		return providerBundle{}, "", status.Errorf(codes.FailedPrecondition, "chat agent provider %q is not configured", agent.GetProviderId())
+	var provider ai.ProviderConfig
+	var modelName string
+	if agent.GetLlmId() != "" {
+		provider, modelName, err = s.resolveConfiguredLLM(setting, agent.GetLlmId())
+		if err != nil {
+			return providerBundle{}, "", err
+		}
+	} else {
+		providerConfig := findProviderByID(setting.GetProviders(), agent.GetProviderId())
+		if providerConfig == nil || providerConfig.GetApiKey() == "" {
+			return providerBundle{}, "", status.Errorf(codes.FailedPrecondition, "chat agent provider %q is not configured", agent.GetProviderId())
+		}
+		provider = convertAIProviderConfigFromStore(providerConfig)
+		modelName = strings.TrimSpace(agent.GetModel())
+		if modelName == "" {
+			modelName, err = defaultChatModelForProvider(provider)
+			if err != nil {
+				return providerBundle{}, "", err
+			}
+		}
 	}
 
-	model, err := agentpkg.NewChatModel(ai.ProviderConfig{
-		ID:       provider.GetId(),
-		Type:     convertAIProviderTypeFromStore(provider.GetType()),
-		Endpoint: provider.GetEndpoint(),
-		APIKey:   provider.GetApiKey(),
-	}, chat.ApplyOptions(nil))
+	model, err := agentpkg.NewChatModel(provider, chat.ApplyOptions(nil))
 	if err != nil {
 		return providerBundle{}, "", status.Errorf(codes.Internal, "failed to build chat model: %v", err)
 	}
-	return providerBundle{model: model, modelName: agent.GetModel()}, agent.GetSystemPrompt(), nil
+	return providerBundle{model: model, modelName: modelName}, agent.GetSystemPrompt(), nil
 }
 
 // readOnlyTools are pure-query tools that have no side effects, so they never

@@ -25,7 +25,7 @@ export const useAIChatAgents = () => {
     () => aiSetting.chatAgents.filter((agent) => agent.id && agent.name),
     [aiSetting.chatAgents],
   ) as InstanceSetting_ChatAgentConfig[];
-  const enabledChatAgents = useMemo(() => chatAgents.filter((agent) => agent.enabled && agent.providerId), [chatAgents]);
+  const enabledChatAgents = useMemo(() => chatAgents.filter((agent) => agent.enabled && (agent.llmId || agent.providerId)), [chatAgents]);
   const agentNameById = useMemo(() => new Map(chatAgents.map((agent) => [agent.id, agent.name])), [chatAgents]);
 
   return {

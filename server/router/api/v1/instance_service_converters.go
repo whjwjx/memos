@@ -389,6 +389,7 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 		Tools:         make(map[string]*v1pb.InstanceSetting_ToolConfig, len(setting.GetTools())),
 		Memory:        convertMemoryConfigFromStore(setting.GetMemory()),
 		Translation:   convertTranslationConfigFromStore(setting.GetTranslation()),
+		Llms:          make([]*v1pb.InstanceSetting_LLMConfig, 0, len(setting.GetLlms())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -446,6 +447,19 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 			Model:        chatAgent.GetModel(),
 			SystemPrompt: chatAgent.GetSystemPrompt(),
 			Enabled:      chatAgent.GetEnabled(),
+			LlmId:        chatAgent.GetLlmId(),
+		})
+	}
+	for _, llm := range setting.GetLlms() {
+		if llm == nil {
+			continue
+		}
+		aiSetting.Llms = append(aiSetting.Llms, &v1pb.InstanceSetting_LLMConfig{
+			Id:         llm.GetId(),
+			Title:      llm.GetTitle(),
+			ProviderId: llm.GetProviderId(),
+			Model:      llm.GetModel(),
+			Enabled:    llm.GetEnabled(),
 		})
 	}
 	for name, tool := range setting.GetTools() {
@@ -474,6 +488,7 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 		Tools:         make(map[string]*storepb.ToolConfig, len(setting.GetTools())),
 		Memory:        convertMemoryConfigToStore(setting.GetMemory()),
 		Translation:   convertTranslationConfigToStore(setting.GetTranslation()),
+		Llms:          make([]*storepb.LLMConfig, 0, len(setting.GetLlms())),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -529,6 +544,19 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 			Model:        chatAgent.GetModel(),
 			SystemPrompt: chatAgent.GetSystemPrompt(),
 			Enabled:      chatAgent.GetEnabled(),
+			LlmId:        chatAgent.GetLlmId(),
+		})
+	}
+	for _, llm := range setting.GetLlms() {
+		if llm == nil {
+			continue
+		}
+		aiSetting.Llms = append(aiSetting.Llms, &storepb.LLMConfig{
+			Id:         llm.GetId(),
+			Title:      llm.GetTitle(),
+			ProviderId: llm.GetProviderId(),
+			Model:      llm.GetModel(),
+			Enabled:    llm.GetEnabled(),
 		})
 	}
 	for name, tool := range setting.GetTools() {
@@ -622,6 +650,7 @@ func convertTranslationConfigFromStore(setting *storepb.TranslationConfig) *v1pb
 		ProviderId:    setting.GetProviderId(),
 		Model:         setting.GetModel(),
 		MaxTextLength: setting.GetMaxTextLength(),
+		LlmId:         setting.GetLlmId(),
 	}
 }
 
@@ -634,5 +663,6 @@ func convertTranslationConfigToStore(setting *v1pb.InstanceSetting_TranslationCo
 		ProviderId:    setting.GetProviderId(),
 		Model:         setting.GetModel(),
 		MaxTextLength: setting.GetMaxTextLength(),
+		LlmId:         setting.GetLlmId(),
 	}
 }

@@ -40,7 +40,7 @@ type Registry struct {
 	tools map[string]Tool
 }
 
-// NewRegistry builds a registry pre-populated with the stage-1 tool set.
+// NewRegistry builds a registry pre-populated with the conversational tool set.
 func NewRegistry() *Registry {
 	r := &Registry{tools: make(map[string]Tool)}
 	for _, t := range []Tool{
@@ -53,8 +53,6 @@ func NewRegistry() *Registry {
 		&BatchUpdateMemosTool{},
 		&DeleteMemoTool{},
 		&ManageSettingsTool{},
-		&AgentReplyTool{},
-		&AutoTagTool{},
 		&QueryDBTool{},
 		&GetLogsTool{},
 		&ManageMemoryTool{},

@@ -367,23 +367,32 @@ func (s *APIV1Service) resolveTranslationProvider(ctx context.Context) (ai.Provi
 	if config == nil || !config.GetEnabled() {
 		return ai.ProviderConfig{}, "", 0, status.Errorf(codes.FailedPrecondition, "translation is not configured")
 	}
-	if strings.TrimSpace(config.GetProviderId()) == "" {
-		return ai.ProviderConfig{}, "", 0, status.Errorf(codes.FailedPrecondition, "translation provider is not configured")
-	}
-
-	provider, err := s.resolveAIProvider(aiSetting, config.GetProviderId())
-	if err != nil {
-		return ai.ProviderConfig{}, "", 0, status.Errorf(codes.FailedPrecondition, "translation provider is not configured")
-	}
-	if provider.APIKey == "" {
-		return ai.ProviderConfig{}, "", 0, status.Errorf(codes.FailedPrecondition, "translation provider %q has no API key configured", config.GetProviderId())
-	}
-
-	model := strings.TrimSpace(config.GetModel())
-	if model == "" {
-		model, err = ai.DefaultChatModel(provider.Type)
+	var provider ai.ProviderConfig
+	var model string
+	if config.GetLlmId() != "" {
+		provider, model, err = s.resolveConfiguredLLM(aiSetting, config.GetLlmId())
 		if err != nil {
-			return ai.ProviderConfig{}, "", 0, status.Errorf(codes.InvalidArgument, "%v", err)
+			return ai.ProviderConfig{}, "", 0, err
+		}
+	} else {
+		if strings.TrimSpace(config.GetProviderId()) == "" {
+			return ai.ProviderConfig{}, "", 0, status.Errorf(codes.FailedPrecondition, "translation provider is not configured")
+		}
+
+		provider, err = s.resolveAIProvider(aiSetting, config.GetProviderId())
+		if err != nil {
+			return ai.ProviderConfig{}, "", 0, status.Errorf(codes.FailedPrecondition, "translation provider is not configured")
+		}
+		if provider.APIKey == "" {
+			return ai.ProviderConfig{}, "", 0, status.Errorf(codes.FailedPrecondition, "translation provider %q has no API key configured", config.GetProviderId())
+		}
+
+		model = strings.TrimSpace(config.GetModel())
+		if model == "" {
+			model, err = defaultChatModelForProvider(provider)
+			if err != nil {
+				return ai.ProviderConfig{}, "", 0, err
+			}
 		}
 	}
 

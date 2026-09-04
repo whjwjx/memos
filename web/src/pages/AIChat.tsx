@@ -176,10 +176,6 @@ const summarizeToolCall = (name: string, argsJSON: string): string => {
       return `修改设置：${String(args.key ?? "")} = ${preview(args.value)}`;
     case "create_memo":
       return `新建 memo：${preview(args.content)}`;
-    case "auto_tag":
-      return `自动打标签：${String(args.memoUid ?? "")}`;
-    case "agent_reply":
-      return `回复用户：${preview(args.content)}`;
     case "get_comments":
       return `查看评论：${String(args.memoUid ?? "")}`;
     case "search_memos":
@@ -252,7 +248,7 @@ const ToolCallCard = ({
         )}
       </div>
       <div className="mt-1 text-sm text-foreground">{summarizeToolCall(tc.name, tc.arguments)}</div>
-      {["delete_memo", "auto_tag", "get_comments"].includes(tc.name) && memo && (
+      {["delete_memo", "get_comments"].includes(tc.name) && memo && (
         <div className="mt-2 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
           <span className="mb-1 block font-medium text-foreground/70">目标 memo 内容：</span>
           <div className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{memo.content}</div>

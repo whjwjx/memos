@@ -44,6 +44,7 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 	}
 
 	seenIDs := map[string]bool{}
+	providersByID := map[string]*storepb.AIProviderConfig{}
 	for _, provider := range setting.Providers {
 		if provider == nil {
 			return errors.New("provider cannot be nil")
@@ -82,8 +83,13 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 		if provider.ApiKey == "" {
 			return errors.Errorf("provider %q API key is required", provider.Id)
 		}
+		providersByID[provider.Id] = provider
 	}
 
+	llmsByID, err := preparePersistedLLMConfigs(setting, providersByID)
+	if err != nil {
+		return err
+	}
 	if err := preparePersistedTranscriptionConfig(setting, existing); err != nil {
 		return err
 	}
@@ -93,19 +99,66 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 	if err := preparePersistedTaggerConfigs(setting, existingProviders); err != nil {
 		return err
 	}
-	if err := preparePersistedChatAgentConfigs(setting, existingProviders); err != nil {
+	if err := preparePersistedChatAgentConfigs(setting, providersByID, llmsByID); err != nil {
 		return err
 	}
 	if err := preparePersistedToolConfigs(setting); err != nil {
 		return err
 	}
-	if err := preparePersistedTranslationConfig(setting, existing); err != nil {
+	if err := preparePersistedTranslationConfig(setting, existing, providersByID, llmsByID); err != nil {
 		return err
 	}
 	return nil
 }
 
-func preparePersistedTranslationConfig(setting *storepb.InstanceAISetting, existing *storepb.InstanceAISetting) error {
+func preparePersistedLLMConfigs(
+	setting *storepb.InstanceAISetting,
+	providersByID map[string]*storepb.AIProviderConfig,
+) (map[string]*storepb.LLMConfig, error) {
+	llmsByID := map[string]*storepb.LLMConfig{}
+	for _, llm := range setting.GetLlms() {
+		if llm == nil {
+			return nil, errors.New("LLM cannot be nil")
+		}
+
+		llm.Id = strings.TrimSpace(llm.Id)
+		if llm.Id == "" {
+			llm.Id = shortuuid.New()
+		}
+		if _, ok := llmsByID[llm.Id]; ok {
+			return nil, errors.Errorf("duplicate LLM ID %q", llm.Id)
+		}
+
+		llm.Title = strings.TrimSpace(llm.Title)
+		if llm.Title == "" {
+			return nil, errors.New("LLM title is required")
+		}
+		llm.ProviderId = strings.TrimSpace(llm.ProviderId)
+		if llm.ProviderId == "" {
+			return nil, errors.Errorf("LLM %q provider_id is required", llm.Id)
+		}
+		if _, ok := providersByID[llm.ProviderId]; !ok {
+			return nil, errors.Errorf("LLM %q references unknown provider_id %q", llm.Id, llm.ProviderId)
+		}
+
+		llm.Model = strings.TrimSpace(llm.Model)
+		if llm.Model == "" {
+			return nil, errors.Errorf("LLM %q model is required", llm.Id)
+		}
+		if len(llm.Model) > maxLLMConfigModelLength {
+			return nil, errors.Errorf("LLM %q model is too long; maximum length is %d characters", llm.Id, maxLLMConfigModelLength)
+		}
+		llmsByID[llm.Id] = llm
+	}
+	return llmsByID, nil
+}
+
+func preparePersistedTranslationConfig(
+	setting *storepb.InstanceAISetting,
+	existing *storepb.InstanceAISetting,
+	providersByID map[string]*storepb.AIProviderConfig,
+	llmsByID map[string]*storepb.LLMConfig,
+) error {
 	// Preserve existing translation config when older clients omit it during an
 	// AI setting update, matching transcription and credential preservation.
 	if setting.Translation == nil && existing != nil {
@@ -116,21 +169,24 @@ func preparePersistedTranslationConfig(setting *storepb.InstanceAISetting, exist
 	}
 
 	cfg := setting.Translation
+	cfg.LlmId = strings.TrimSpace(cfg.LlmId)
 	cfg.ProviderId = strings.TrimSpace(cfg.ProviderId)
 	cfg.Model = strings.TrimSpace(cfg.Model)
 
-	if cfg.Enabled && cfg.ProviderId == "" {
-		return errors.New("translation provider_id is required when translation is enabled")
+	if cfg.Enabled && cfg.LlmId == "" && cfg.ProviderId == "" {
+		return errors.New("translation llm_id is required when translation is enabled")
+	}
+	if cfg.LlmId != "" {
+		llm, ok := llmsByID[cfg.LlmId]
+		if !ok {
+			return errors.Errorf("translation llm_id %q does not reference any configured LLM", cfg.LlmId)
+		}
+		if cfg.Enabled && !llm.GetEnabled() {
+			return errors.Errorf("translation llm_id %q references a disabled LLM", cfg.LlmId)
+		}
 	}
 	if cfg.ProviderId != "" {
-		referenced := false
-		for _, provider := range setting.Providers {
-			if provider != nil && provider.Id == cfg.ProviderId {
-				referenced = true
-				break
-			}
-		}
-		if !referenced {
+		if _, ok := providersByID[cfg.ProviderId]; !ok {
 			return errors.Errorf("translation provider_id %q does not reference any configured provider", cfg.ProviderId)
 		}
 	}
@@ -181,7 +237,11 @@ func preparePersistedTaggerConfigs(setting *storepb.InstanceAISetting, existingP
 	return nil
 }
 
-func preparePersistedChatAgentConfigs(setting *storepb.InstanceAISetting, existingProviders map[string]*storepb.AIProviderConfig) error {
+func preparePersistedChatAgentConfigs(
+	setting *storepb.InstanceAISetting,
+	providersByID map[string]*storepb.AIProviderConfig,
+	llmsByID map[string]*storepb.LLMConfig,
+) error {
 	chatAgentIDs := map[string]bool{}
 	for _, chatAgent := range setting.GetChatAgents() {
 		if chatAgent == nil {
@@ -202,9 +262,22 @@ func preparePersistedChatAgentConfigs(setting *storepb.InstanceAISetting, existi
 			return errors.New("chat agent name is required")
 		}
 
+		chatAgent.LlmId = strings.TrimSpace(chatAgent.LlmId)
 		chatAgent.ProviderId = strings.TrimSpace(chatAgent.ProviderId)
+		if chatAgent.Enabled && chatAgent.LlmId == "" && chatAgent.ProviderId == "" {
+			return errors.Errorf("chat agent %q requires llm_id when enabled", chatAgent.Id)
+		}
+		if chatAgent.LlmId != "" {
+			llm, ok := llmsByID[chatAgent.LlmId]
+			if !ok {
+				return errors.Errorf("chat agent %q references unknown llm_id %q", chatAgent.Id, chatAgent.LlmId)
+			}
+			if chatAgent.Enabled && !llm.GetEnabled() {
+				return errors.Errorf("chat agent %q references disabled llm_id %q", chatAgent.Id, chatAgent.LlmId)
+			}
+		}
 		if chatAgent.ProviderId != "" {
-			if _, ok := existingProviders[chatAgent.ProviderId]; !ok {
+			if _, ok := providersByID[chatAgent.ProviderId]; !ok {
 				return errors.Errorf("chat agent %q references unknown provider_id %q", chatAgent.Id, chatAgent.ProviderId)
 			}
 		}
