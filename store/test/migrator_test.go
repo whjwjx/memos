@@ -149,6 +149,17 @@ func TestMigrationAddsMemoScheduleOccurrenceCompletedTs(t *testing.T) {
 			FOREIGN KEY (memo_id) REFERENCES memo(id) ON DELETE CASCADE
 		);
 		CREATE INDEX idx_memo_schedule_occurrence_memo_time ON memo_schedule_occurrence(memo_id, occurrence_time);
+		CREATE TABLE conversation (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uid TEXT NOT NULL UNIQUE,
+			user_id INTEGER NOT NULL,
+			title TEXT NOT NULL DEFAULT '',
+			agent_id TEXT NOT NULL DEFAULT '',
+			created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+		);
+		CREATE INDEX idx_conversation_user_updated ON conversation(user_id, updated_ts);
 	`)
 	require.NoError(t, err)
 	basicSettingBytes, err := protojson.Marshal(&storepb.InstanceBasicSetting{SchemaVersion: "0.36.1"})
@@ -171,7 +182,7 @@ func TestMigrationAddsMemoScheduleOccurrenceCompletedTs(t *testing.T) {
 
 	setting, err := ts.GetInstanceBasicSetting(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "0.37.2", setting.SchemaVersion)
+	require.Equal(t, "0.38.1", setting.SchemaVersion)
 }
 
 func TestMigrationAddsScheduleReminderInboxDelivery(t *testing.T) {
@@ -224,6 +235,17 @@ func TestMigrationAddsScheduleReminderInboxDelivery(t *testing.T) {
 			FOREIGN KEY (memo_id) REFERENCES memo(id) ON DELETE CASCADE,
 			FOREIGN KEY (subscription_id) REFERENCES user_push_subscription(id) ON DELETE CASCADE
 		);
+		CREATE TABLE conversation (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uid TEXT NOT NULL UNIQUE,
+			user_id INTEGER NOT NULL,
+			title TEXT NOT NULL DEFAULT '',
+			agent_id TEXT NOT NULL DEFAULT '',
+			created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+			FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+		);
+		CREATE INDEX idx_conversation_user_updated ON conversation(user_id, updated_ts);
 	`)
 	require.NoError(t, err)
 	basicSettingBytes, err := protojson.Marshal(&storepb.InstanceBasicSetting{SchemaVersion: "0.37.1"})
@@ -245,7 +267,7 @@ func TestMigrationAddsScheduleReminderInboxDelivery(t *testing.T) {
 
 	setting, err := ts.GetInstanceBasicSetting(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "0.37.2", setting.SchemaVersion)
+	require.Equal(t, "0.38.1", setting.SchemaVersion)
 }
 
 // TestMigrationStorageSetting verifies that the legacy singleton storage

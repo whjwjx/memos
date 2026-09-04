@@ -34,6 +34,8 @@ type Conversation struct {
 	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	// Optional. The chat agent preset id this conversation is bound to.
 	AgentId string `protobuf:"bytes,4,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	// Optional. The configured LLM id used for subsequent assistant replies.
+	LlmId string `protobuf:"bytes,7,opt,name=llm_id,json=llmId,proto3" json:"llm_id,omitempty"`
 	// Output only. Unix timestamp of creation.
 	CreateTime int64 `protobuf:"varint,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. Unix timestamp of the last update.
@@ -96,6 +98,13 @@ func (x *Conversation) GetTitle() string {
 func (x *Conversation) GetAgentId() string {
 	if x != nil {
 		return x.AgentId
+	}
+	return ""
+}
+
+func (x *Conversation) GetLlmId() string {
+	if x != nil {
+		return x.LlmId
 	}
 	return ""
 }
@@ -293,7 +302,9 @@ type CreateConversationRequest struct {
 	// Optional. Agent preset id to bind. Empty uses the default agent.
 	AgentId string `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	// Optional. Initial title.
-	Title         string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Title string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	// Optional. Configured LLM id to bind. Empty uses the agent/default LLM.
+	LlmId         string `protobuf:"bytes,3,opt,name=llm_id,json=llmId,proto3" json:"llm_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -338,6 +349,13 @@ func (x *CreateConversationRequest) GetAgentId() string {
 func (x *CreateConversationRequest) GetTitle() string {
 	if x != nil {
 		return x.Title
+	}
+	return ""
+}
+
+func (x *CreateConversationRequest) GetLlmId() string {
+	if x != nil {
+		return x.LlmId
 	}
 	return ""
 }
@@ -631,7 +649,7 @@ type UpdateConversationRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The conversation to update, identified by id (or name).
 	Conversation *Conversation `protobuf:"bytes,1,opt,name=conversation,proto3" json:"conversation,omitempty"`
-	// Fields to update (currently only title is honored).
+	// Fields to update. Supported paths: title, agent_id, llm_id.
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -698,6 +716,8 @@ type SendMessageRequest struct {
 	// "yes" for query_db update/delete). The assistant injects the keyword into
 	// the tool arguments before executing them.
 	ToolApprovals []*ToolApproval `protobuf:"bytes,4,rep,name=tool_approvals,json=toolApprovals,proto3" json:"tool_approvals,omitempty"`
+	// Optional. Configured LLM id to use for this and subsequent turns.
+	LlmId         string `protobuf:"bytes,6,opt,name=llm_id,json=llmId,proto3" json:"llm_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -765,6 +785,13 @@ func (x *SendMessageRequest) GetToolApprovals() []*ToolApproval {
 		return x.ToolApprovals
 	}
 	return nil
+}
+
+func (x *SendMessageRequest) GetLlmId() string {
+	if x != nil {
+		return x.LlmId
+	}
+	return ""
 }
 
 // ToolApproval carries the user's explicit confirmation for a sensitive tool
@@ -900,12 +927,13 @@ var File_api_v1_ai_chat_service_proto protoreflect.FileDescriptor
 
 const file_api_v1_ai_chat_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1capi/v1/ai_chat_service.proto\x12\fmemos.api.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\"\xb9\x01\n" +
+	"\x1capi/v1/ai_chat_service.proto\x12\fmemos.api.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\"\xd0\x01\n" +
 	"\fConversation\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tB\x03\xe0A\x03R\x04name\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x19\n" +
-	"\bagent_id\x18\x04 \x01(\tR\aagentId\x12$\n" +
+	"\bagent_id\x18\x04 \x01(\tR\aagentId\x12\x15\n" +
+	"\x06llm_id\x18\a \x01(\tR\x05llmId\x12$\n" +
 	"\vcreate_time\x18\x05 \x01(\x03B\x03\xe0A\x03R\n" +
 	"createTime\x12$\n" +
 	"\vupdate_time\x18\x06 \x01(\x03B\x03\xe0A\x03R\n" +
@@ -924,10 +952,11 @@ const file_api_v1_ai_chat_service_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
 	"\targuments\x18\x03 \x01(\tR\targuments\x12\x16\n" +
 	"\x06result\x18\x04 \x01(\tR\x06result\x123\n" +
-	"\x15requires_confirmation\x18\x05 \x01(\bR\x14requiresConfirmation\"V\n" +
+	"\x15requires_confirmation\x18\x05 \x01(\bR\x14requiresConfirmation\"r\n" +
 	"\x19CreateConversationRequest\x12\x1e\n" +
 	"\bagent_id\x18\x01 \x01(\tB\x03\xe0A\x01R\aagentId\x12\x19\n" +
-	"\x05title\x18\x02 \x01(\tB\x03\xe0A\x01R\x05title\"V\n" +
+	"\x05title\x18\x02 \x01(\tB\x03\xe0A\x01R\x05title\x12\x1a\n" +
+	"\x06llm_id\x18\x03 \x01(\tB\x03\xe0A\x01R\x05llmId\"V\n" +
 	"\x18ListConversationsRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -946,13 +975,14 @@ const file_api_v1_ai_chat_service_proto_rawDesc = "" +
 	"\x19UpdateConversationRequest\x12C\n" +
 	"\fconversation\x18\x01 \x01(\v2\x1a.memos.api.v1.ConversationB\x03\xe0A\x02R\fconversation\x12;\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
-	"updateMask\"\x9d\x02\n" +
+	"updateMask\"\xb9\x02\n" +
 	"\x12SendMessageRequest\x12,\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x0econversationId\x12\x1d\n" +
 	"\acontent\x18\x02 \x01(\tB\x03\xe0A\x02R\acontent\x128\n" +
 	"\x16approved_tool_call_ids\x18\x03 \x03(\tB\x03\xe0A\x01R\x13approvedToolCallIds\x128\n" +
 	"\x16rejected_tool_call_ids\x18\x05 \x03(\tB\x03\xe0A\x01R\x13rejectedToolCallIds\x12F\n" +
-	"\x0etool_approvals\x18\x04 \x03(\v2\x1a.memos.api.v1.ToolApprovalB\x03\xe0A\x01R\rtoolApprovals\"Y\n" +
+	"\x0etool_approvals\x18\x04 \x03(\v2\x1a.memos.api.v1.ToolApprovalB\x03\xe0A\x01R\rtoolApprovals\x12\x1a\n" +
+	"\x06llm_id\x18\x06 \x01(\tB\x03\xe0A\x01R\x05llmId\"Y\n" +
 	"\fToolApproval\x12 \n" +
 	"\ftool_call_id\x18\x01 \x01(\tR\n" +
 	"toolCallId\x12'\n" +
@@ -962,9 +992,9 @@ const file_api_v1_ai_chat_service_proto_rawDesc = "" +
 	"\n" +
 	"tool_calls\x18\x02 \x03(\v2\x16.memos.api.v1.ToolCallR\ttoolCalls\x123\n" +
 	"\x15requires_confirmation\x18\x03 \x01(\bR\x14requiresConfirmation\x12=\n" +
-	"\bmessages\x18\x04 \x03(\v2!.memos.api.v1.ConversationMessageR\bmessages2\xea\x06\n" +
-	"\rAIChatService\x12\x81\x01\n" +
-	"\x12CreateConversation\x12'.memos.api.v1.CreateConversationRequest\x1a\x1a.memos.api.v1.Conversation\"&\xdaA\bagent_id\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/ai/chats\x12~\n" +
+	"\bmessages\x18\x04 \x03(\v2!.memos.api.v1.ConversationMessageR\bmessages2\xf1\x06\n" +
+	"\rAIChatService\x12\x88\x01\n" +
+	"\x12CreateConversation\x12'.memos.api.v1.CreateConversationRequest\x1a\x1a.memos.api.v1.Conversation\"-\xdaA\x0fagent_id,llm_id\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/ai/chats\x12~\n" +
 	"\x11ListConversations\x12&.memos.api.v1.ListConversationsRequest\x1a'.memos.api.v1.ListConversationsResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/ai/chats\x12\x82\x01\n" +
 	"\x0fGetConversation\x12$.memos.api.v1.GetConversationRequest\x1a%.memos.api.v1.GetConversationResponse\"\"\xdaA\x02id\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/ai/chats/{id}\x12\x8b\x01\n" +
 	"\x12DeleteConversation\x12'.memos.api.v1.DeleteConversationRequest\x1a(.memos.api.v1.DeleteConversationResponse\"\"\xdaA\x02id\x82\xd3\xe4\x93\x02\x17*\x15/api/v1/ai/chats/{id}\x12\x97\x01\n" +

@@ -13,21 +13,22 @@ import (
 func (d *DB) CreateConversation(ctx context.Context, create *store.CreateConversation) (*store.Conversation, error) {
 	stmt := `
 		INSERT INTO conversation (
-			uid, user_id, title, agent_id
+			uid, user_id, title, agent_id, llm_id
 		)
-		VALUES ($1, $2, $3, $4)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING
-			id, uid, user_id, title, agent_id, created_ts, updated_ts
+			id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 	`
 	conv := &store.Conversation{}
 	if err := d.db.QueryRowContext(ctx, stmt,
-		create.UID, create.UserID, create.Title, create.AgentID,
+		create.UID, create.UserID, create.Title, create.AgentID, create.LLMID,
 	).Scan(
 		&conv.ID,
 		&conv.UID,
 		&conv.UserID,
 		&conv.Title,
 		&conv.AgentID,
+		&conv.LLMID,
 		&conv.CreatedTs,
 		&conv.UpdatedTs,
 	); err != nil {
@@ -52,7 +53,7 @@ func (d *DB) ListConversations(ctx context.Context, find *store.FindConversation
 	}
 	query := `
 		SELECT
-			id, uid, user_id, title, agent_id, created_ts, updated_ts
+			id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 		FROM conversation
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY updated_ts DESC
@@ -74,7 +75,7 @@ func (d *DB) ListConversations(ctx context.Context, find *store.FindConversation
 	for rows.Next() {
 		conv := &store.Conversation{}
 		if err := rows.Scan(
-			&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.CreatedTs, &conv.UpdatedTs,
+			&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.LLMID, &conv.CreatedTs, &conv.UpdatedTs,
 		); err != nil {
 			return nil, err
 		}
@@ -92,6 +93,14 @@ func (d *DB) UpdateConversation(ctx context.Context, update *store.UpdateConvers
 		args = append(args, *update.Title)
 		set = append(set, fmt.Sprintf("title = $%d", len(args)))
 	}
+	if update.AgentID != nil {
+		args = append(args, *update.AgentID)
+		set = append(set, fmt.Sprintf("agent_id = $%d", len(args)))
+	}
+	if update.LLMID != nil {
+		args = append(args, *update.LLMID)
+		set = append(set, fmt.Sprintf("llm_id = $%d", len(args)))
+	}
 	if len(set) == 0 {
 		return nil, errors.New("no fields to update in UpdateConversation")
 	}
@@ -102,11 +111,11 @@ func (d *DB) UpdateConversation(ctx context.Context, update *store.UpdateConvers
 		UPDATE conversation
 		SET ` + strings.Join(set, ", ") + `
 		WHERE id = $` + fmt.Sprintf("%d", len(args)) + `
-		RETURNING id, uid, user_id, title, agent_id, created_ts, updated_ts
+		RETURNING id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 	`
 	conv := &store.Conversation{}
 	if err := d.db.QueryRowContext(ctx, stmt, args...).Scan(
-		&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.CreatedTs, &conv.UpdatedTs,
+		&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.LLMID, &conv.CreatedTs, &conv.UpdatedTs,
 	); err != nil {
 		return nil, err
 	}

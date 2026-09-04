@@ -13,21 +13,22 @@ import (
 func (d *DB) CreateConversation(ctx context.Context, create *store.CreateConversation) (*store.Conversation, error) {
 	stmt := `
 		INSERT INTO conversation (
-			uid, user_id, title, agent_id
+			uid, user_id, title, agent_id, llm_id
 		)
-		VALUES (?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?)
 		RETURNING
-			id, uid, user_id, title, agent_id, created_ts, updated_ts
+			id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 	`
 	conv := &store.Conversation{}
 	if err := d.db.QueryRowContext(ctx, stmt,
-		create.UID, create.UserID, create.Title, create.AgentID,
+		create.UID, create.UserID, create.Title, create.AgentID, create.LLMID,
 	).Scan(
 		&conv.ID,
 		&conv.UID,
 		&conv.UserID,
 		&conv.Title,
 		&conv.AgentID,
+		&conv.LLMID,
 		&conv.CreatedTs,
 		&conv.UpdatedTs,
 	); err != nil {
@@ -49,7 +50,7 @@ func (d *DB) ListConversations(ctx context.Context, find *store.FindConversation
 	}
 	query := `
 		SELECT
-			id, uid, user_id, title, agent_id, created_ts, updated_ts
+			id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 		FROM conversation
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY updated_ts DESC
@@ -71,7 +72,7 @@ func (d *DB) ListConversations(ctx context.Context, find *store.FindConversation
 	for rows.Next() {
 		conv := &store.Conversation{}
 		if err := rows.Scan(
-			&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.CreatedTs, &conv.UpdatedTs,
+			&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.LLMID, &conv.CreatedTs, &conv.UpdatedTs,
 		); err != nil {
 			return nil, err
 		}
@@ -88,6 +89,12 @@ func (d *DB) UpdateConversation(ctx context.Context, update *store.UpdateConvers
 	if update.Title != nil {
 		set, args = append(set, "title = ?"), append(args, *update.Title)
 	}
+	if update.AgentID != nil {
+		set, args = append(set, "agent_id = ?"), append(args, *update.AgentID)
+	}
+	if update.LLMID != nil {
+		set, args = append(set, "llm_id = ?"), append(args, *update.LLMID)
+	}
 	if len(set) == 0 {
 		return nil, errors.New("no fields to update in UpdateConversation")
 	}
@@ -98,11 +105,11 @@ func (d *DB) UpdateConversation(ctx context.Context, update *store.UpdateConvers
 		UPDATE conversation
 		SET ` + strings.Join(set, ", ") + `
 		WHERE id = ?
-		RETURNING id, uid, user_id, title, agent_id, created_ts, updated_ts
+		RETURNING id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 	`
 	conv := &store.Conversation{}
 	if err := d.db.QueryRowContext(ctx, stmt, args...).Scan(
-		&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.CreatedTs, &conv.UpdatedTs,
+		&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.LLMID, &conv.CreatedTs, &conv.UpdatedTs,
 	); err != nil {
 		return nil, err
 	}

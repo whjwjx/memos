@@ -72,12 +72,16 @@ func (s *APIV1Service) CreateConversation(ctx context.Context, request *connect.
 	if user == nil {
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
+	if err := s.validateChatLLM(ctx, req.LlmId); err != nil {
+		return nil, err
+	}
 	uid := newResourceUID()
 	conv, err := s.Store.CreateConversation(ctx, &store.CreateConversation{
 		UID:     uid,
 		UserID:  user.ID,
 		Title:   req.Title,
 		AgentID: req.AgentId,
+		LLMID:   req.LlmId,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create conversation: %v", err)
@@ -161,6 +165,20 @@ func (s *APIV1Service) UpdateConversation(ctx context.Context, request *connect.
 		title := req.Conversation.Title
 		update.Title = &title
 	}
+	if req.UpdateMask != nil && containsPath(req.UpdateMask.Paths, "agent_id") {
+		agentID := req.Conversation.AgentId
+		if err := s.validateChatAgent(ctx, agentID); err != nil {
+			return nil, err
+		}
+		update.AgentID = &agentID
+	}
+	if req.UpdateMask != nil && containsPath(req.UpdateMask.Paths, "llm_id") {
+		llmID := req.Conversation.LlmId
+		if err := s.validateChatLLM(ctx, llmID); err != nil {
+			return nil, err
+		}
+		update.LLMID = &llmID
+	}
 	updated, err := s.Store.UpdateConversation(ctx, update)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update conversation: %v", err)
@@ -189,6 +207,17 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 	if strings.TrimSpace(req.Content) == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "content is required")
 	}
+	if req.LlmId != "" && req.LlmId != conv.LLMID {
+		llmID := req.LlmId
+		updated, err := s.Store.UpdateConversation(ctx, &store.UpdateConversation{
+			ID:    conv.ID,
+			LLMID: &llmID,
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to update conversation LLM: %v", err)
+		}
+		conv = updated
+	}
 
 	// Persist the incoming user message.
 	userMsg, err := s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
@@ -206,8 +235,9 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 		return nil, err
 	}
 
-	// Build the provider config from the instance AI setting's enabled agent.
-	providerCfg, systemPrompt, err := s.resolveChatProvider(ctx, conv.AgentID)
+	// Build the provider config from the selected LLM, falling back to the
+	// conversation's agent/default chat configuration for older sessions.
+	providerCfg, systemPrompt, err := s.resolveChatProvider(ctx, conv.AgentID, conv.LLMID)
 	if err != nil {
 		return nil, err
 	}
@@ -416,9 +446,9 @@ func (s *APIV1Service) loadChatHistory(ctx context.Context, conversationID int32
 	return out, nil
 }
 
-// resolveChatProvider picks the provider bound to the conversation's agent (or the
-// first enabled chat agent) and returns a ready chat model plus its system prompt.
-func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string) (providerBundle, string, error) {
+// resolveChatProvider picks the conversation's selected LLM when present, then
+// falls back to the agent's LLM/provider so older conversations remain usable.
+func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string, llmID string) (providerBundle, string, error) {
 	setting, err := s.Store.GetInstanceAISetting(ctx)
 	if err != nil {
 		return providerBundle{}, "", status.Errorf(codes.Internal, "failed to load AI setting: %v", err)
@@ -443,8 +473,12 @@ func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string) 
 	}
 	var provider ai.ProviderConfig
 	var modelName string
-	if agent.GetLlmId() != "" {
-		provider, modelName, err = s.resolveConfiguredLLM(setting, agent.GetLlmId())
+	selectedLLMID := strings.TrimSpace(llmID)
+	if selectedLLMID == "" {
+		selectedLLMID = agent.GetLlmId()
+	}
+	if selectedLLMID != "" {
+		provider, modelName, err = s.resolveConfiguredLLM(setting, selectedLLMID)
 		if err != nil {
 			return providerBundle{}, "", err
 		}
@@ -468,6 +502,43 @@ func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string) 
 		return providerBundle{}, "", status.Errorf(codes.Internal, "failed to build chat model: %v", err)
 	}
 	return providerBundle{model: model, modelName: modelName}, agent.GetSystemPrompt(), nil
+}
+
+func (s *APIV1Service) validateChatAgent(ctx context.Context, agentID string) error {
+	if strings.TrimSpace(agentID) == "" {
+		return nil
+	}
+	setting, err := s.Store.GetInstanceAISetting(ctx)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to load AI setting: %v", err)
+	}
+	if setting == nil {
+		return status.Errorf(codes.FailedPrecondition, "AI is not configured")
+	}
+	for _, agent := range setting.GetChatAgents() {
+		if agent.GetId() == agentID {
+			if !agent.GetEnabled() {
+				return status.Errorf(codes.FailedPrecondition, "chat agent %q is disabled", agentID)
+			}
+			return nil
+		}
+	}
+	return status.Errorf(codes.FailedPrecondition, "chat agent %q is not configured", agentID)
+}
+
+func (s *APIV1Service) validateChatLLM(ctx context.Context, llmID string) error {
+	if strings.TrimSpace(llmID) == "" {
+		return nil
+	}
+	setting, err := s.Store.GetInstanceAISetting(ctx)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to load AI setting: %v", err)
+	}
+	if setting == nil {
+		return status.Errorf(codes.FailedPrecondition, "AI is not configured")
+	}
+	_, _, err = s.resolveConfiguredLLM(setting, llmID)
+	return err
 }
 
 // readOnlyTools are pure-query tools that have no side effects, so they never
@@ -546,6 +617,7 @@ func convertConversationFromStore(conv *store.Conversation) *v1pb.Conversation {
 		Name:       "conversations/" + conv.UID,
 		Title:      conv.Title,
 		AgentId:    conv.AgentID,
+		LlmId:      conv.LLMID,
 		CreateTime: conv.CreatedTs,
 		UpdateTime: conv.UpdatedTs,
 	}

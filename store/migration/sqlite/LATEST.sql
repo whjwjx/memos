@@ -230,6 +230,7 @@ CREATE TABLE conversation (
   user_id INTEGER NOT NULL,
   title TEXT NOT NULL DEFAULT '',
   agent_id TEXT NOT NULL DEFAULT '',
+  llm_id TEXT NOT NULL DEFAULT '',
   created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
   updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
   FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE

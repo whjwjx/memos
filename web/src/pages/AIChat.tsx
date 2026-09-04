@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BotIcon, CheckIcon, ChevronDownIcon, MessageSquareTextIcon, SendIcon, UserIcon, XIcon } from "lucide-react";
+import { BotIcon, BrainCircuitIcon, CheckIcon, ChevronDownIcon, MessageSquareTextIcon, SendIcon, UserIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChatMarkdown } from "@/components/ChatMarkdown";
@@ -7,13 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { useConversation, useConversations, useCreateConversation, useSendMessage } from "@/hooks/useAIChat";
+import {
+  useConversation,
+  useConversations,
+  useCreateConversation,
+  useSendMessage,
+  useUpdateConversationAgent,
+  useUpdateConversationLLM,
+} from "@/hooks/useAIChat";
 import { useAIChatAgents } from "@/hooks/useAIChatAgents";
 import { memoDetailQueryOptions } from "@/hooks/useMemoQueries";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/router/routes";
 import { type ConversationMessage } from "@/types/proto/api/v1/ai_chat_service_pb";
-import type { InstanceSetting_ChatAgentConfig } from "@/types/proto/api/v1/instance_service_pb";
+import type { InstanceSetting_ChatAgentConfig, InstanceSetting_LLMConfig } from "@/types/proto/api/v1/instance_service_pb";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
@@ -109,6 +116,55 @@ const AgentPill = ({
             <DropdownMenuItem key={agent.id} onClick={() => onSelect(agent.id)}>
               <BotIcon className="size-4" strokeWidth={1.8} />
               <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+              {active && <CheckIcon className="size-4 text-primary" strokeWidth={1.8} />}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+const LLMPill = ({
+  disabled,
+  llmLabel,
+  llms,
+  selectedLLMId,
+  onSelect,
+}: {
+  disabled: boolean;
+  llmLabel: string;
+  llms: InstanceSetting_LLMConfig[];
+  selectedLLMId: string;
+  onSelect: (llmId: string) => void;
+}) => {
+  const canSelect = llms.length > 1;
+  const buttonClassName =
+    "h-7 max-w-[12rem] justify-start gap-1.5 rounded-md bg-muted/70 px-2 text-xs font-medium text-muted-foreground hover:text-foreground";
+
+  if (!canSelect) {
+    return (
+      <Button type="button" variant="ghost" size="sm" className={buttonClassName} aria-disabled="true">
+        <BrainCircuitIcon className="size-3.5" strokeWidth={1.8} />
+        <span className="truncate">{llmLabel}</span>
+      </Button>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className={buttonClassName} disabled={disabled} />}>
+        <BrainCircuitIcon className="size-3.5" strokeWidth={1.8} />
+        <span className="truncate">{llmLabel}</span>
+        <ChevronDownIcon className="size-3.5 opacity-65" strokeWidth={1.8} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top" sideOffset={6} className="w-56">
+        {llms.map((llm) => {
+          const active = llm.id === selectedLLMId;
+          return (
+            <DropdownMenuItem key={llm.id} onClick={() => onSelect(llm.id)}>
+              <BrainCircuitIcon className="size-4" strokeWidth={1.8} />
+              <span className="min-w-0 flex-1 truncate">{llm.title || llm.model}</span>
               {active && <CheckIcon className="size-4 text-primary" strokeWidth={1.8} />}
             </DropdownMenuItem>
           );
@@ -341,23 +397,35 @@ const AIChat = () => {
     enabled: Boolean(memoName),
   });
   const createConversation = useCreateConversation();
-  const { agentNameById, defaultAgent, enabledChatAgents, shouldShowAgentSelector } = useAIChatAgents();
+  const { agentNameById, defaultAgent, defaultLLM, enabledChatAgents, enabledLLMs, llmNameById } = useAIChatAgents();
+  const updateConversationAgent = useUpdateConversationAgent(conversationId);
+  const updateConversationLLM = useUpdateConversationLLM(conversationId);
   const { requiresConfirmation, toolCalls, send, resolveToolCall, isPending, error } = useSendMessage(conversationId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [selectedAgentId, setSelectedAgentId] = useState("");
+  const [selectedLLMId, setSelectedLLMId] = useState("");
   const [pendingInitialMessage, setPendingInitialMessage] = useState("");
 
   const history = conversationData?.messages ?? [];
   const conversationAgentId = conversationData?.conversation?.agentId ?? "";
+  const conversationLLMId = conversationData?.conversation?.llmId ?? "";
   const selectedAgentValue = selectedAgentId || defaultAgent?.id || "";
+  const selectedLLMValue = selectedLLMId || defaultLLM?.id || "";
   const activeAgentId = conversationId ? conversationAgentId || defaultAgent?.id || "" : selectedAgentValue;
+  const activeLLMId = conversationId ? conversationLLMId || selectedLLMValue : selectedLLMValue;
   const activeAgentLabel = activeAgentId ? (agentNameById.get(activeAgentId) ?? activeAgentId) : t("aiChat.agent-fallback-label");
-  const composerDisabled = isPending || createConversation.isPending || (Boolean(memoName) && isMemoContextLoading);
+  const activeLLMLabel = activeLLMId ? (llmNameById.get(activeLLMId) ?? activeLLMId) : "LLM";
+  const composerDisabled =
+    isPending ||
+    createConversation.isPending ||
+    updateConversationAgent.isPending ||
+    updateConversationLLM.isPending ||
+    (Boolean(memoName) && isMemoContextLoading);
 
   useEffect(() => {
-    if (!shouldShowAgentSelector) {
+    if (enabledChatAgents.length === 0) {
       if (selectedAgentId) {
         setSelectedAgentId("");
       }
@@ -366,15 +434,27 @@ const AIChat = () => {
     if (!enabledChatAgents.some((agent) => agent.id === selectedAgentId)) {
       setSelectedAgentId(defaultAgent?.id ?? "");
     }
-  }, [defaultAgent?.id, enabledChatAgents, selectedAgentId, shouldShowAgentSelector]);
+  }, [defaultAgent?.id, enabledChatAgents, selectedAgentId]);
+
+  useEffect(() => {
+    if (enabledLLMs.length === 0) {
+      if (selectedLLMId) {
+        setSelectedLLMId("");
+      }
+      return;
+    }
+    if (!enabledLLMs.some((llm) => llm.id === selectedLLMId)) {
+      setSelectedLLMId(defaultLLM?.id ?? "");
+    }
+  }, [defaultLLM?.id, enabledLLMs, selectedLLMId]);
 
   useEffect(() => {
     if (!conversationId || !pendingInitialMessage) {
       return;
     }
-    send({ content: pendingInitialMessage });
+    send({ content: pendingInitialMessage, llmId: activeLLMId });
     setPendingInitialMessage("");
-  }, [conversationId, pendingInitialMessage, send]);
+  }, [activeLLMId, conversationId, pendingInitialMessage, send]);
 
   // When no conversation is selected (e.g. first open), automatically open the
   // most recent one instead of showing the empty hint. Only when there are no
@@ -408,17 +488,27 @@ const AIChat = () => {
         return;
       }
       try {
-        const res = await createConversation.mutateAsync({ agentId });
-        const params = new URLSearchParams({ conversation: res.id });
-        if (memoName) {
-          params.set("memo", memoName);
-        }
-        navigate(`${ROUTES.AI_CHAT}?${params.toString()}`);
+        await updateConversationAgent.mutateAsync(agentId);
       } catch {
         // The mutation exposes the error below the composer.
       }
     },
-    [activeAgentId, conversationId, createConversation, memoName, navigate],
+    [activeAgentId, conversationId, updateConversationAgent],
+  );
+
+  const handleSelectLLM = useCallback(
+    async (llmId: string) => {
+      setSelectedLLMId(llmId);
+      if (!conversationId || llmId === activeLLMId) {
+        return;
+      }
+      try {
+        await updateConversationLLM.mutateAsync(llmId);
+      } catch {
+        // The mutation exposes the error below the composer.
+      }
+    },
+    [activeLLMId, conversationId, updateConversationLLM],
   );
 
   const handleSend = useCallback(
@@ -427,9 +517,10 @@ const AIChat = () => {
       if (!trimmed || composerDisabled) return false;
       const content = contextMemo ? buildMemoContextMessage(contextMemo, trimmed) : trimmed;
       if (!conversationId) {
-        const agentId = shouldShowAgentSelector ? selectedAgentValue : undefined;
+        const agentId = selectedAgentValue || undefined;
+        const llmId = selectedLLMValue || undefined;
         try {
-          const res = await createConversation.mutateAsync({ agentId });
+          const res = await createConversation.mutateAsync({ agentId, llmId });
           const params = new URLSearchParams({ conversation: res.id });
           if (memoName) {
             params.set("memo", memoName);
@@ -441,7 +532,7 @@ const AIChat = () => {
           return false;
         }
       }
-      send({ content });
+      send({ content, llmId: activeLLMId });
       return true;
     },
     [
@@ -451,9 +542,10 @@ const AIChat = () => {
       createConversation,
       memoName,
       navigate,
+      activeLLMId,
       selectedAgentValue,
+      selectedLLMValue,
       send,
-      shouldShowAgentSelector,
     ],
   );
 
@@ -516,15 +608,30 @@ const AIChat = () => {
           className="max-h-40 min-h-12 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0"
         />
         <div className="flex items-center justify-between gap-2">
-          <AgentPill
-            agentLabel={activeAgentLabel}
-            agents={enabledChatAgents}
-            disabled={composerDisabled}
-            selectedAgentId={activeAgentId}
-            onSelect={(agentId) => {
-              void handleSelectAgent(agentId);
-            }}
-          />
+          <div className="flex min-w-0 items-center gap-1.5">
+            {enabledChatAgents.length > 0 && (
+              <AgentPill
+                agentLabel={activeAgentLabel}
+                agents={enabledChatAgents}
+                disabled={composerDisabled}
+                selectedAgentId={activeAgentId}
+                onSelect={(agentId) => {
+                  void handleSelectAgent(agentId);
+                }}
+              />
+            )}
+            {enabledLLMs.length > 0 && (
+              <LLMPill
+                llmLabel={activeLLMLabel}
+                llms={enabledLLMs}
+                disabled={composerDisabled}
+                selectedLLMId={activeLLMId}
+                onSelect={(llmId) => {
+                  void handleSelectLLM(llmId);
+                }}
+              />
+            )}
+          </div>
           <Button type="submit" size="icon" disabled={composerDisabled} className="shrink-0 rounded-xl">
             <SendIcon className="h-4 w-auto" />
           </Button>
@@ -609,8 +716,10 @@ const AIChat = () => {
       {/* Composer */}
       {composer}
 
-      {(error || createConversation.error) && (
-        <div className="px-4 pb-2 text-xs text-destructive">{String(error || createConversation.error)}</div>
+      {(error || createConversation.error || updateConversationAgent.error || updateConversationLLM.error) && (
+        <div className="px-4 pb-2 text-xs text-destructive">
+          {String(error || createConversation.error || updateConversationAgent.error || updateConversationLLM.error)}
+        </div>
       )}
     </section>
   );

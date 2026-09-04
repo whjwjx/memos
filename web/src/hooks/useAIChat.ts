@@ -1,3 +1,5 @@
+import { create } from "@bufbuild/protobuf";
+import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,9 +19,10 @@ export const useConversations = () => {
 export const useCreateConversation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { agentId?: string; title?: string }) => {
+    mutationFn: async (input: { agentId?: string; llmId?: string; title?: string }) => {
       const response = await aiChatServiceClient.createConversation({
         agentId: input.agentId ?? "",
+        llmId: input.llmId ?? "",
         title: input.title ?? "",
       });
       return response;
@@ -62,10 +65,63 @@ export const useUpdateConversationTitle = (conversationId: string | undefined) =
       if (!conversationId) return undefined;
       return aiChatServiceClient.updateConversation({
         conversation: { id: conversationId, title },
+        updateMask: create(FieldMaskSchema, { paths: ["title"] }),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversations"] });
+    },
+  });
+};
+
+export const useUpdateConversationLLM = (conversationId: string | undefined) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (llmId: string) => {
+      if (!conversationId) return undefined;
+      return aiChatServiceClient.updateConversation({
+        conversation: { id: conversationId, llmId },
+        updateMask: create(FieldMaskSchema, { paths: ["llm_id"] }),
+      });
+    },
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversations"] });
+      if (conversation && conversationId) {
+        queryClient.setQueryData(
+          ["ai-chat", "conversation", conversationId],
+          (prev?: { conversation?: Conversation; messages?: ConversationMessage[] }) => ({
+            ...prev,
+            conversation,
+            messages: prev?.messages ?? [],
+          }),
+        );
+      }
+    },
+  });
+};
+
+export const useUpdateConversationAgent = (conversationId: string | undefined) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (agentId: string) => {
+      if (!conversationId) return undefined;
+      return aiChatServiceClient.updateConversation({
+        conversation: { id: conversationId, agentId },
+        updateMask: create(FieldMaskSchema, { paths: ["agent_id"] }),
+      });
+    },
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversations"] });
+      if (conversation && conversationId) {
+        queryClient.setQueryData(
+          ["ai-chat", "conversation", conversationId],
+          (prev?: { conversation?: Conversation; messages?: ConversationMessage[] }) => ({
+            ...prev,
+            conversation,
+            messages: prev?.messages ?? [],
+          }),
+        );
+      }
     },
   });
 };
@@ -103,6 +159,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
       approvedToolCallIds?: string[];
       rejectedToolCallIds?: string[];
       toolApprovals?: { toolCallId: string; confirmKeyword: string }[];
+      llmId?: string;
     }) => {
       if (!conversationId) {
         throw new Error("conversation not created yet");
@@ -113,6 +170,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
         approvedToolCallIds: input.approvedToolCallIds ?? [],
         rejectedToolCallIds: input.rejectedToolCallIds ?? [],
         toolApprovals: input.toolApprovals ?? [],
+        llmId: input.llmId ?? "",
       });
       return response;
     },

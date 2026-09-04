@@ -20,22 +20,29 @@ func TestConversationCRUD(t *testing.T) {
 		UserID:  101,
 		Title:   "First chat",
 		AgentID: "default",
+		LLMID:   "llm-default",
 	})
 	require.NoError(t, err)
 	require.NotZero(t, conv.ID)
 	require.Equal(t, int32(101), conv.UserID)
+	require.Equal(t, "llm-default", conv.LLMID)
 
 	// List by user.
 	userID := int32(101)
 	list, err := s.ListConversations(ctx, &store.FindConversation{UserID: &userID})
 	require.NoError(t, err)
 	require.Len(t, list, 1)
+	require.Equal(t, "llm-default", list[0].LLMID)
 
-	// Update title.
+	// Update title and LLM selection.
 	title := "Renamed"
-	updated, err := s.UpdateConversation(ctx, &store.UpdateConversation{ID: conv.ID, Title: &title})
+	agentID := "research"
+	llmID := "llm-fast"
+	updated, err := s.UpdateConversation(ctx, &store.UpdateConversation{ID: conv.ID, Title: &title, AgentID: &agentID, LLMID: &llmID})
 	require.NoError(t, err)
 	require.Equal(t, "Renamed", updated.Title)
+	require.Equal(t, "research", updated.AgentID)
+	require.Equal(t, "llm-fast", updated.LLMID)
 
 	// Append messages.
 	userMsg, err := s.CreateConversationMessage(ctx, &store.CreateConversationMessage{

@@ -19,7 +19,7 @@ service AIChatService {
       post: "/api/v1/ai/chats"
       body: "*"
     };
-    option (google.api.method_signature) = "agent_id";
+    option (google.api.method_signature) = "agent_id,llm_id";
   }
 
   // ListConversations lists the current user's chat sessions, newest first.
@@ -45,8 +45,8 @@ service AIChatService {
     option (google.api.method_signature) = "id";
   }
 
-  // UpdateConversation patches mutable fields (currently the title) of a chat
-  // session. Used to set a human-readable title from the first user message.
+  // UpdateConversation patches mutable fields of a chat session, such as the
+  // title, selected agent, and selected LLM.
   rpc UpdateConversation(UpdateConversationRequest) returns (Conversation) {
     option (google.api.http) = {
       patch: "/api/v1/ai/chats/{conversation.id}"
@@ -81,6 +81,9 @@ message Conversation {
 
   // Optional. The chat agent preset id this conversation is bound to.
   string agent_id = 4;
+
+  // Optional. The configured LLM id used for subsequent assistant replies.
+  string llm_id = 7;
 
   // Output only. Unix timestamp of creation.
   int64 create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -135,6 +138,9 @@ message CreateConversationRequest {
 
   // Optional. Initial title.
   string title = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Configured LLM id to bind. Empty uses the agent/default LLM.
+  string llm_id = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message ListConversationsRequest {
@@ -173,7 +179,7 @@ message UpdateConversationRequest {
   // Required. The conversation to update, identified by id (or name).
   Conversation conversation = 1 [(google.api.field_behavior) = REQUIRED];
 
-  // Fields to update (currently only title is honored).
+  // Fields to update. Supported paths: title, agent_id, llm_id.
   google.protobuf.FieldMask update_mask = 2;
 }
 
@@ -197,6 +203,9 @@ message SendMessageRequest {
   // "yes" for query_db update/delete). The assistant injects the keyword into
   // the tool arguments before executing them.
   repeated ToolApproval tool_approvals = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Configured LLM id to use for this and subsequent turns.
+  string llm_id = 6 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // ToolApproval carries the user's explicit confirmation for a sensitive tool

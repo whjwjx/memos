@@ -43,8 +43,8 @@ type AIChatServiceClient interface {
 	GetConversation(ctx context.Context, in *GetConversationRequest, opts ...grpc.CallOption) (*GetConversationResponse, error)
 	// DeleteConversation removes a chat session and its messages.
 	DeleteConversation(ctx context.Context, in *DeleteConversationRequest, opts ...grpc.CallOption) (*DeleteConversationResponse, error)
-	// UpdateConversation patches mutable fields (currently the title) of a chat
-	// session. Used to set a human-readable title from the first user message.
+	// UpdateConversation patches mutable fields of a chat session, such as the
+	// title, selected agent, and selected LLM.
 	UpdateConversation(ctx context.Context, in *UpdateConversationRequest, opts ...grpc.CallOption) (*Conversation, error)
 	// SendMessage appends a user turn and runs the assistant. The assistant may
 	// return tool calls (and mark sensitive ones for confirmation) or a final
@@ -137,8 +137,8 @@ type AIChatServiceServer interface {
 	GetConversation(context.Context, *GetConversationRequest) (*GetConversationResponse, error)
 	// DeleteConversation removes a chat session and its messages.
 	DeleteConversation(context.Context, *DeleteConversationRequest) (*DeleteConversationResponse, error)
-	// UpdateConversation patches mutable fields (currently the title) of a chat
-	// session. Used to set a human-readable title from the first user message.
+	// UpdateConversation patches mutable fields of a chat session, such as the
+	// title, selected agent, and selected LLM.
 	UpdateConversation(context.Context, *UpdateConversationRequest) (*Conversation, error)
 	// SendMessage appends a user turn and runs the assistant. The assistant may
 	// return tool calls (and mark sensitive ones for confirmation) or a final

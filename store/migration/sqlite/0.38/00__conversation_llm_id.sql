@@ -1,0 +1,1 @@
+ALTER TABLE conversation ADD COLUMN llm_id TEXT NOT NULL DEFAULT '';

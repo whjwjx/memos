@@ -63,8 +63,8 @@ type AIChatServiceClient interface {
 	GetConversation(context.Context, *connect.Request[v1.GetConversationRequest]) (*connect.Response[v1.GetConversationResponse], error)
 	// DeleteConversation removes a chat session and its messages.
 	DeleteConversation(context.Context, *connect.Request[v1.DeleteConversationRequest]) (*connect.Response[v1.DeleteConversationResponse], error)
-	// UpdateConversation patches mutable fields (currently the title) of a chat
-	// session. Used to set a human-readable title from the first user message.
+	// UpdateConversation patches mutable fields of a chat session, such as the
+	// title, selected agent, and selected LLM.
 	UpdateConversation(context.Context, *connect.Request[v1.UpdateConversationRequest]) (*connect.Response[v1.Conversation], error)
 	// SendMessage appends a user turn and runs the assistant. The assistant may
 	// return tool calls (and mark sensitive ones for confirmation) or a final
@@ -173,8 +173,8 @@ type AIChatServiceHandler interface {
 	GetConversation(context.Context, *connect.Request[v1.GetConversationRequest]) (*connect.Response[v1.GetConversationResponse], error)
 	// DeleteConversation removes a chat session and its messages.
 	DeleteConversation(context.Context, *connect.Request[v1.DeleteConversationRequest]) (*connect.Response[v1.DeleteConversationResponse], error)
-	// UpdateConversation patches mutable fields (currently the title) of a chat
-	// session. Used to set a human-readable title from the first user message.
+	// UpdateConversation patches mutable fields of a chat session, such as the
+	// title, selected agent, and selected LLM.
 	UpdateConversation(context.Context, *connect.Request[v1.UpdateConversationRequest]) (*connect.Response[v1.Conversation], error)
 	// SendMessage appends a user turn and runs the assistant. The assistant may
 	// return tool calls (and mark sensitive ones for confirmation) or a final

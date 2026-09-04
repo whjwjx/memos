@@ -230,6 +230,7 @@ CREATE TABLE `conversation` (
   `user_id` INT NOT NULL,
   `title` VARCHAR(512) NOT NULL DEFAULT '',
   `agent_id` VARCHAR(256) NOT NULL DEFAULT '',
+  `llm_id` VARCHAR(256) NOT NULL DEFAULT '',
   `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
   `updated_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
   UNIQUE (`uid`),
