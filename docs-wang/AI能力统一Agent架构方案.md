@@ -1650,12 +1650,13 @@ web/src/components/Settings/
     TranslationPanel.tsx
     MemoryPanel.tsx
     aiSettingMapper.ts
-    hooks.ts
+    aiSettingFactories.ts
+    saveAISettingPatch.ts
     dialogs/
       ProviderDialog.tsx
       LLMDialog.tsx
-      AgentDialog.tsx
-      MemoryEntryDialog.tsx
+      ChatAgentDialog.tsx
+    hooks.ts
 ```
 
 当前拆分进度：
@@ -1671,14 +1672,19 @@ ai-settings/AgentsPanel.tsx
 ai-settings/ChatToolsPanel.tsx
 ai-settings/TranslationPanel.tsx
 ai-settings/MemoryPanel.tsx
+ai-settings/aiSettingMapper.ts
+ai-settings/aiSettingFactories.ts
+ai-settings/saveAISettingPatch.ts
+ai-settings/dialogs/ProviderDialog.tsx
+ai-settings/dialogs/LLMDialog.tsx
+ai-settings/dialogs/ChatAgentDialog.tsx
 
 待拆：
-dialogs/*
-aiSettingMapper.ts
 hooks.ts
+legacy dialogs/forms
 ```
 
-目标不是一次性搬完，而是按低风险顺序把静态配置、纯展示 panel、dialog、mapper/save helper 逐步移出。
+当前已经完成静态配置、纯展示 panel、mapper/factory、save helper 和可见 dialogs 的拆分。下一步不是必须项，只有当 `AISection.tsx` 继续增长时，再考虑抽 `hooks.ts`；隐藏 legacy dialogs/forms 先不拆。
 
 历史参考结构：
 
@@ -1715,16 +1721,14 @@ AI Settings
 保存逻辑必须改成 patch helper：
 
 ```ts
-saveAISettingPatch({
-  providers?: nextProviders,
-  translation?: nextTranslation,
-  chatAgents?: nextChatAgents,
-  tools?: nextTools,
-  memory?: nextMemory,
-})
+savePatch({ providers: nextProviders }, "Update AI provider")
+savePatch({ translation: nextTranslation }, "Update translation")
+savePatch({ chatAgents: nextChatAgents }, "Update chat agent")
+savePatch({ tools: nextTools }, "Toggle chat tool")
+savePatch({ memory: nextMemory }, "Update memory")
 ```
 
-helper 内部合并原始完整 `aiSetting`：
+helper 内部合并原始完整 `aiSetting`。未传字段使用已保存的 `originalSetting`，避免保存某个 panel 时把其他 panel 的未保存草稿也写入；保存 Chat Tools 时会覆盖当前可见工具，同时保留已隐藏旧工具的 persisted config：
 
 ```text
 next.aiSetting.providers = patch.providers ?? original.providers

@@ -3,7 +3,6 @@ import { isEqual } from "lodash-es";
 import { MoreVerticalIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
-import { v4 as uuidv4 } from "uuid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,415 +14,53 @@ import { Textarea } from "@/components/ui/textarea";
 import { aiServiceClient } from "@/connect";
 import { useInstance } from "@/contexts/InstanceContext";
 import { TestAIProviderRequestSchema } from "@/types/proto/api/v1/ai_service_pb";
-import {
-  InstanceSetting_AgentConfig,
-  InstanceSetting_AgentConfigSchema,
-  InstanceSetting_AIProviderConfig,
-  InstanceSetting_AIProviderConfigSchema,
-  InstanceSetting_AIProviderType,
-  InstanceSetting_AISettingSchema,
-  InstanceSetting_ChatAgentConfig,
-  InstanceSetting_ChatAgentConfigSchema,
-  InstanceSetting_Key,
-  InstanceSetting_LLMConfig,
-  InstanceSetting_LLMConfigSchema,
-  InstanceSetting_MemoryConfig,
-  InstanceSetting_MemoryConfigSchema,
-  InstanceSetting_MemoryEntry,
-  InstanceSetting_MemoryEntrySchema,
-  InstanceSetting_TaggerConfig,
-  InstanceSetting_TaggerConfigSchema,
-  InstanceSetting_ToolConfig,
-  InstanceSetting_ToolConfigSchema,
-  InstanceSetting_TranscriptionConfig,
-  InstanceSetting_TranscriptionConfigSchema,
-  InstanceSetting_TranslationConfig,
-  InstanceSetting_TranslationConfigSchema,
-  InstanceSettingSchema,
-} from "@/types/proto/api/v1/instance_service_pb";
+import { InstanceSetting_AIProviderType } from "@/types/proto/api/v1/instance_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import { AgentsPanel } from "./ai-settings/AgentsPanel";
 import { AISettingsOverviewPanel } from "./ai-settings/AISettingsOverviewPanel";
 import { AISettingsTabs, type AISettingsVisiblePanel } from "./ai-settings/AISettingsTabs";
+import { newAgent, newChatAgent, newLLM, newMemoryEntry, newProvider, newTagger } from "./ai-settings/aiSettingFactories";
+import {
+  createEmptyTranscriptionConfig,
+  createEmptyTranslationConfig,
+  deriveLLMsFromLegacy,
+  toLocalAgent,
+  toLocalChatAgent,
+  toLocalMemory,
+  toLocalProvider,
+  toLocalTagger,
+  toLocalTool,
+  toLocalTranscription,
+  toLocalTranslation,
+  toTranscriptionConfig,
+  toTranslationConfig,
+} from "./ai-settings/aiSettingMapper";
 import { ChatToolsPanel } from "./ai-settings/ChatToolsPanel";
+import { ChatAgentDialog } from "./ai-settings/dialogs/ChatAgentDialog";
+import { LLMDialog } from "./ai-settings/dialogs/LLMDialog";
+import { ProviderDialog } from "./ai-settings/dialogs/ProviderDialog";
 import { LLMsPanel } from "./ai-settings/LLMsPanel";
 import { MemoryPanel } from "./ai-settings/MemoryPanel";
+import { type AISettingPatch, saveAISettingPatch } from "./ai-settings/saveAISettingPatch";
 import { TranslationPanel } from "./ai-settings/TranslationPanel";
 import { toolRegistry } from "./ai-settings/toolRegistry";
 import type {
   AISettingsPanel,
   ChatAgentTemplate,
+  LocalAgent,
   LocalAIProvider,
   LocalChatAgent,
   LocalLLM,
   LocalMemory,
-  LocalMemoryEntry,
+  LocalTagger,
+  LocalTool,
+  LocalTranscription,
   LocalTranslation,
 } from "./ai-settings/types";
 import SettingGroup from "./SettingGroup";
 import SettingSection from "./SettingSection";
 import SettingTable from "./SettingTable";
-import useInstanceSettingUpdater, { buildInstanceSettingName } from "./useInstanceSettingUpdater";
-
-type LocalTranscription = {
-  providerId: string;
-  model: string;
-  language: string;
-  prompt: string;
-};
-
-const providerTypeOptions = [InstanceSetting_AIProviderType.OPENAI, InstanceSetting_AIProviderType.GEMINI];
-
-const getProviderTypeLabel = (type: InstanceSetting_AIProviderType) => {
-  return InstanceSetting_AIProviderType[type] ?? "UNKNOWN";
-};
-
-const providerTypeSelectOptions = providerTypeOptions.map((type) => ({ value: String(type), label: getProviderTypeLabel(type) }));
-
-const toLocalProvider = (provider: InstanceSetting_AIProviderConfig): LocalAIProvider => ({
-  id: provider.id,
-  title: provider.title,
-  type: provider.type,
-  endpoint: provider.endpoint,
-  apiKey: "",
-  apiKeySet: provider.apiKeySet,
-  apiKeyHint: provider.apiKeyHint,
-});
-
-const defaultChatModelForProvider = (provider: LocalAIProvider | undefined): string => {
-  if (!provider) return "";
-  return provider.type === InstanceSetting_AIProviderType.GEMINI ? "gemini-2.5-flash" : "gpt-4o-mini";
-};
-
-const toLocalLLM = (llm: InstanceSetting_LLMConfig): LocalLLM => ({
-  id: llm.id,
-  title: llm.title,
-  providerId: llm.providerId,
-  model: llm.model,
-  enabled: llm.enabled,
-});
-
-const legacyLLMKey = (providerId: string, model: string) => `${providerId}:${model}`;
-
-const deriveLLMsFromLegacy = (
-  llms: InstanceSetting_LLMConfig[],
-  providers: LocalAIProvider[],
-  chatAgents: InstanceSetting_ChatAgentConfig[],
-  translation: InstanceSetting_TranslationConfig | undefined,
-): LocalLLM[] => {
-  if (llms.length > 0) {
-    return llms.map(toLocalLLM);
-  }
-
-  const providersByID = new Map(providers.map((provider) => [provider.id, provider]));
-  const derived = new Map<string, LocalLLM>();
-  const addLegacyLLM = (providerId: string, model: string) => {
-    const provider = providersByID.get(providerId);
-    if (!provider) return;
-    const normalizedModel = model.trim() || defaultChatModelForProvider(provider);
-    if (!normalizedModel) return;
-    const key = legacyLLMKey(providerId, normalizedModel);
-    if (derived.has(key)) return;
-    derived.set(key, {
-      id: key,
-      title: normalizedModel,
-      providerId,
-      model: normalizedModel,
-      enabled: true,
-    });
-  };
-
-  for (const agent of chatAgents) {
-    addLegacyLLM(agent.providerId, agent.model);
-  }
-  if (translation) {
-    addLegacyLLM(translation.providerId, translation.model);
-  }
-  return Array.from(derived.values());
-};
-
-const newLLM = (providers: LocalAIProvider[]): LocalLLM => {
-  const provider = providers[0];
-  const model = defaultChatModelForProvider(provider);
-  return {
-    id: uuidv4(),
-    title: model || "",
-    providerId: provider?.id ?? "",
-    model,
-    enabled: true,
-  };
-};
-
-const resolveLLMId = (
-  llmId: string,
-  providerId: string,
-  model: string,
-  llms: LocalLLM[] = [],
-  providers: LocalAIProvider[] = [],
-): string => {
-  if (llmId) return llmId;
-  const provider = providers.find((item) => item.id === providerId);
-  const normalizedModel = model.trim() || defaultChatModelForProvider(provider);
-  if (!providerId || !normalizedModel) return "";
-  return llms.find((llm) => llm.providerId === providerId && llm.model === normalizedModel)?.id || "";
-};
-
-const toLocalTranscription = (config: InstanceSetting_TranscriptionConfig | undefined): LocalTranscription => ({
-  providerId: config?.providerId ?? "",
-  model: config?.model ?? "",
-  language: config?.language ?? "",
-  prompt: config?.prompt ?? "",
-});
-
-const toLocalTranslation = (
-  config: InstanceSetting_TranslationConfig | undefined,
-  llms: LocalLLM[] = [],
-  providers: LocalAIProvider[] = [],
-): LocalTranslation => {
-  const providerId = config?.providerId ?? "";
-  const model = config?.model ?? "";
-
-  return {
-    enabled: config?.enabled ?? false,
-    llmId: resolveLLMId(config?.llmId ?? "", providerId, model, llms, providers),
-    providerId,
-    model,
-    maxTextLength: config?.maxTextLength && config.maxTextLength > 0 ? config.maxTextLength : 5000,
-  };
-};
-
-const newProvider = (): LocalAIProvider => ({
-  id: uuidv4(),
-  title: "",
-  type: InstanceSetting_AIProviderType.OPENAI,
-  endpoint: "",
-  apiKey: "",
-  apiKeySet: false,
-  apiKeyHint: "",
-});
-
-type LocalAgent = {
-  id: string;
-  name: string;
-  providerId: string;
-  model: string;
-  personaPrompt: string;
-  systemPrompt: string;
-  enabled: boolean;
-  delayMinutes: number;
-  maxLength: number;
-};
-
-const toLocalAgent = (agent: InstanceSetting_AgentConfig): LocalAgent => ({
-  id: agent.id,
-  name: agent.name,
-  providerId: agent.providerId,
-  model: agent.model,
-  personaPrompt: agent.personaPrompt,
-  systemPrompt: agent.systemPrompt,
-  enabled: agent.enabled,
-  delayMinutes: agent.delayMinutes,
-  maxLength: agent.maxLength,
-});
-
-const newAgent = (): LocalAgent => ({
-  id: uuidv4(),
-  name: "",
-  providerId: "",
-  model: "",
-  personaPrompt: "",
-  systemPrompt: "",
-  enabled: false,
-  delayMinutes: 5,
-  maxLength: 0,
-});
-
-const toAgentConfig = (agent: LocalAgent) =>
-  create(InstanceSetting_AgentConfigSchema, {
-    id: agent.id,
-    name: agent.name.trim(),
-    providerId: agent.providerId,
-    model: agent.model.trim(),
-    personaPrompt: agent.personaPrompt,
-    systemPrompt: agent.systemPrompt,
-    enabled: agent.enabled,
-    delayMinutes: agent.delayMinutes,
-    maxLength: agent.maxLength,
-  });
-
-type LocalTagger = {
-  id: string;
-  name: string;
-  providerId: string;
-  model: string;
-  prompt: string;
-  enabled: boolean;
-  maxTags: number;
-};
-
-const toLocalTagger = (tagger: InstanceSetting_TaggerConfig): LocalTagger => ({
-  id: tagger.id,
-  name: tagger.name,
-  providerId: tagger.providerId,
-  model: tagger.model,
-  prompt: tagger.prompt,
-  enabled: tagger.enabled,
-  maxTags: tagger.maxTags,
-});
-
-const newTagger = (): LocalTagger => ({
-  id: uuidv4(),
-  name: "",
-  providerId: "",
-  model: "",
-  prompt: "",
-  enabled: false,
-  maxTags: 3,
-});
-
-const toTaggerConfig = (tagger: LocalTagger) =>
-  create(InstanceSetting_TaggerConfigSchema, {
-    id: tagger.id,
-    name: tagger.name.trim(),
-    providerId: tagger.providerId,
-    model: tagger.model.trim(),
-    prompt: tagger.prompt,
-    enabled: tagger.enabled,
-    maxTags: tagger.maxTags,
-  });
-
-const toLocalChatAgent = (
-  agent: InstanceSetting_ChatAgentConfig,
-  llms: LocalLLM[] = [],
-  providers: LocalAIProvider[] = [],
-): LocalChatAgent => ({
-  id: agent.id,
-  name: agent.name,
-  builtin: agent.builtin,
-  llmId: resolveLLMId(agent.llmId, agent.providerId, agent.model, llms, providers),
-  providerId: agent.providerId,
-  model: agent.model,
-  systemPrompt: agent.systemPrompt,
-  enabled: agent.enabled,
-});
-
-const newChatAgent = (): LocalChatAgent => ({
-  id: uuidv4(),
-  name: "",
-  builtin: false,
-  llmId: "",
-  providerId: "",
-  model: "",
-  systemPrompt: "",
-  enabled: false,
-});
-
-const toChatAgentConfig = (agent: LocalChatAgent) =>
-  create(InstanceSetting_ChatAgentConfigSchema, {
-    id: agent.id,
-    name: agent.name.trim(),
-    builtin: agent.builtin,
-    llmId: agent.llmId,
-    providerId: agent.providerId,
-    model: agent.model.trim(),
-    systemPrompt: agent.systemPrompt,
-    enabled: agent.enabled,
-  });
-
-type LocalTool = {
-  name: string;
-  enabled: boolean;
-  requiresConfirmation: boolean;
-};
-
-const toLocalTool = (name: string, tool: InstanceSetting_ToolConfig | undefined): LocalTool => {
-  const def = toolRegistry.find((t) => t.name === name);
-  return {
-    name,
-    // Tools without a persisted config are enabled by default, matching the
-    // backend (applyToolConfig only overrides persisted entries).
-    enabled: tool?.enabled ?? true,
-    // Read-only tools never require confirmation; the toggle is locked off.
-    requiresConfirmation:
-      def?.confirmEditable === false ? false : (tool?.requiresConfirmation ?? def?.defaultRequiresConfirmation ?? false),
-  };
-};
-
-const toToolConfig = (tool: LocalTool) =>
-  create(InstanceSetting_ToolConfigSchema, {
-    enabled: tool.enabled,
-    requiresConfirmation: tool.requiresConfirmation,
-  });
-
-const toLocalMemoryEntry = (entry: InstanceSetting_MemoryEntry): LocalMemoryEntry => ({
-  id: entry.id,
-  content: entry.content,
-  createdBy: entry.createdBy,
-  createdTs: entry.createdTs,
-  updatedTs: entry.updatedTs,
-});
-
-const toLocalMemory = (memory: InstanceSetting_MemoryConfig | undefined): LocalMemory => ({
-  enabled: memory?.enabled ?? false,
-  entries: (memory?.entries ?? []).map(toLocalMemoryEntry),
-});
-
-const newMemoryEntry = (): LocalMemoryEntry => ({
-  id: uuidv4(),
-  content: "",
-  createdBy: "",
-  createdTs: 0n,
-  updatedTs: 0n,
-});
-
-const toMemoryConfig = (memory: LocalMemory) =>
-  create(InstanceSetting_MemoryConfigSchema, {
-    enabled: memory.enabled,
-    entries: memory.entries.map((entry) =>
-      create(InstanceSetting_MemoryEntrySchema, {
-        id: entry.id,
-        content: entry.content.trim(),
-        createdBy: entry.createdBy,
-        createdTs: entry.createdTs,
-        updatedTs: entry.updatedTs,
-      }),
-    ),
-  });
-
-const toProviderConfig = (provider: LocalAIProvider) =>
-  create(InstanceSetting_AIProviderConfigSchema, {
-    id: provider.id,
-    title: provider.title.trim(),
-    type: provider.type,
-    endpoint: provider.endpoint.trim(),
-    apiKey: provider.apiKey,
-  });
-
-const toLLMConfig = (llm: LocalLLM) =>
-  create(InstanceSetting_LLMConfigSchema, {
-    id: llm.id,
-    title: llm.title.trim(),
-    providerId: llm.providerId,
-    model: llm.model.trim(),
-    enabled: llm.enabled,
-  });
-
-const toTranscriptionConfig = (transcription: LocalTranscription) =>
-  create(InstanceSetting_TranscriptionConfigSchema, {
-    providerId: transcription.providerId,
-    model: transcription.model.trim(),
-    language: transcription.language.trim(),
-    prompt: transcription.prompt,
-  });
-
-const toTranslationConfig = (translation: LocalTranslation) =>
-  create(InstanceSetting_TranslationConfigSchema, {
-    enabled: translation.enabled,
-    llmId: translation.llmId,
-    providerId: translation.providerId,
-    model: translation.model.trim(),
-    maxTextLength: translation.maxTextLength,
-  });
+import useInstanceSettingUpdater from "./useInstanceSettingUpdater";
 
 const AISection = () => {
   const t = useTranslate();
@@ -572,48 +209,13 @@ const AISection = () => {
   };
   const translationLLMRef = useMemo(() => llms.find((llm) => llm.id === translation.llmId), [llms, translation.llmId]);
 
-  // Persists the AI setting using a specific providers list, transcription
-  // value, agents list, taggers list, chat agents list, and tools map.
-  // Provider/transcription/agent operations pass the current chat agents and
-  // tools so an in-progress draft is never accidentally committed.
-  const persistAISetting = async (
-    nextProviders: LocalAIProvider[],
-    nextTranscription: InstanceSetting_TranscriptionConfig | undefined,
-    nextAgents: LocalAgent[],
-    nextTaggers: LocalTagger[],
-    nextChatAgents: LocalChatAgent[],
-    nextTools: LocalTool[],
-    errorContext: string,
-    nextMemory: LocalMemory = memory,
-    nextTranslation: InstanceSetting_TranslationConfig | undefined = originalSetting.translation,
-    nextLLMs: LocalLLM[] = llms,
-  ) => {
-    const nextToolMap: Record<string, InstanceSetting_ToolConfig> = {};
-    for (const tool of nextTools) {
-      nextToolMap[tool.name] = toToolConfig(tool);
-    }
-    return saveInstanceSetting({
-      key: InstanceSetting_Key.AI,
-      setting: create(InstanceSettingSchema, {
-        name: buildInstanceSettingName(InstanceSetting_Key.AI),
-        value: {
-          case: "aiSetting",
-          value: create(InstanceSetting_AISettingSchema, {
-            providers: nextProviders.map(toProviderConfig),
-            transcription: nextTranscription,
-            agents: nextAgents.map(toAgentConfig),
-            taggers: nextTaggers.map(toTaggerConfig),
-            chatAgents: nextChatAgents.map(toChatAgentConfig),
-            tools: nextToolMap,
-            memory: toMemoryConfig(nextMemory),
-            translation: nextTranslation,
-            llms: nextLLMs.map(toLLMConfig),
-          }),
-        },
-      }),
+  const savePatch = (patch: AISettingPatch, errorContext: string) =>
+    saveAISettingPatch({
       errorContext,
+      originalSetting,
+      patch,
+      saveInstanceSetting,
     });
-  };
 
   const handleCreateProvider = () => {
     setEditingProvider(newProvider());
@@ -642,15 +244,7 @@ const AISection = () => {
       ? providers.map((item) => (item.id === normalizedProvider.id ? normalizedProvider : item))
       : [...providers, normalizedProvider];
 
-    const ok = await persistAISetting(
-      nextProviders,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      chatAgents,
-      tools,
-      "Update AI provider",
-    );
+    const ok = await savePatch({ providers: nextProviders }, "Update AI provider");
     if (!ok) return;
     setProviders(nextProviders);
     setEditingProvider(undefined);
@@ -673,26 +267,22 @@ const AISection = () => {
     // provider). Send a cleared transcription in that case.
     const persistedTranscription = originalSetting.transcription;
     const nextTranscription =
-      persistedTranscription && persistedTranscription.providerId === target.id
-        ? create(InstanceSetting_TranscriptionConfigSchema, {})
-        : persistedTranscription;
+      persistedTranscription && persistedTranscription.providerId === target.id ? createEmptyTranscriptionConfig() : persistedTranscription;
     const persistedTranslation = originalSetting.translation;
     const nextTranslation =
       persistedTranslation && (persistedTranslation.providerId === target.id || removedLLMIds.has(persistedTranslation.llmId))
-        ? create(InstanceSetting_TranslationConfigSchema, {})
+        ? createEmptyTranslationConfig()
         : persistedTranslation;
 
-    const ok = await persistAISetting(
-      nextProviders,
-      nextTranscription,
-      agents,
-      taggers,
-      nextChatAgents,
-      tools,
+    const ok = await savePatch(
+      {
+        providers: nextProviders,
+        transcription: nextTranscription,
+        chatAgents: nextChatAgents,
+        translation: nextTranslation,
+        llms: nextLLMs,
+      },
       "Delete AI provider",
-      memory,
-      nextTranslation,
-      nextLLMs,
     );
     if (!ok) return;
     setProviders(nextProviders);
@@ -739,18 +329,7 @@ const AISection = () => {
     const exists = llms.some((item) => item.id === normalizedLLM.id);
     const nextLLMs = exists ? llms.map((item) => (item.id === normalizedLLM.id ? normalizedLLM : item)) : [...llms, normalizedLLM];
 
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      chatAgents,
-      tools,
-      "Update LLM",
-      memory,
-      originalSetting.translation,
-      nextLLMs,
-    );
+    const ok = await savePatch({ llms: nextLLMs }, "Update LLM");
     if (!ok) return;
     setLlms(nextLLMs);
     setEditingLLM(undefined);
@@ -766,18 +345,7 @@ const AISection = () => {
     }
 
     const nextLLMs = llms.map((item) => (item.id === llm.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      chatAgents,
-      tools,
-      "Toggle LLM",
-      memory,
-      originalSetting.translation,
-      nextLLMs,
-    );
+    const ok = await savePatch({ llms: nextLLMs }, "Toggle LLM");
     if (!ok) return;
     setLlms(nextLLMs);
   };
@@ -789,27 +357,15 @@ const AISection = () => {
     const nextChatAgents = chatAgents.map((agent) =>
       agent.llmId === target.id ? { ...agent, enabled: false, llmId: "", providerId: "", model: "" } : agent,
     );
+    const persistedTranslation = originalSetting.translation;
     const nextTranslation =
-      translation.llmId === target.id
-        ? create(InstanceSetting_TranslationConfigSchema, {})
-        : toTranslationConfig({
-            ...translation,
-            providerId: translationLLMRef?.providerId ?? translation.providerId,
-            model: translationLLMRef?.model ?? translation.model,
-          });
+      persistedTranslation &&
+      (persistedTranslation.llmId === target.id ||
+        (persistedTranslation.providerId === target.providerId && persistedTranslation.model === target.model))
+        ? createEmptyTranslationConfig()
+        : persistedTranslation;
 
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      nextChatAgents,
-      tools,
-      "Delete LLM",
-      memory,
-      nextTranslation,
-      nextLLMs,
-    );
+    const ok = await savePatch({ chatAgents: nextChatAgents, translation: nextTranslation, llms: nextLLMs }, "Delete LLM");
     if (!ok) return;
     setLlms(nextLLMs);
     setChatAgents(nextChatAgents);
@@ -824,7 +380,7 @@ const AISection = () => {
       toast.error(t("setting.ai.transcription-empty-providers"));
       return;
     }
-    await persistAISetting(providers, toTranscriptionConfig(transcription), agents, taggers, chatAgents, tools, "Update transcription");
+    await savePatch({ transcription: toTranscriptionConfig(transcription) }, "Update transcription");
   };
 
   const handleSaveTranslation = async () => {
@@ -846,17 +402,7 @@ const AISection = () => {
       model: translationLLMRef?.model ?? "",
       maxTextLength: Math.min(100000, Math.max(1, Math.trunc(translation.maxTextLength || 5000))),
     };
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      chatAgents,
-      tools,
-      "Update translation",
-      memory,
-      toTranslationConfig(normalized),
-    );
+    const ok = await savePatch({ translation: toTranslationConfig(normalized) }, "Update translation");
     if (!ok) return;
     setTranslation(normalized);
     lastSyncedTranslation.current = normalized;
@@ -889,7 +435,7 @@ const AISection = () => {
       ? agents.map((item) => (item.id === normalizedAgent.id ? normalizedAgent : item))
       : [...agents, normalizedAgent];
 
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, chatAgents, tools, "Update AI agent");
+    const ok = await savePatch({ agents: nextAgents }, "Update AI agent");
     if (!ok) return;
     setAgents(nextAgents);
     setEditingAgent(undefined);
@@ -897,7 +443,7 @@ const AISection = () => {
 
   const handleToggleAgent = async (agent: LocalAgent) => {
     const nextAgents = agents.map((item) => (item.id === agent.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, chatAgents, tools, "Toggle AI agent");
+    const ok = await savePatch({ agents: nextAgents }, "Toggle AI agent");
     if (!ok) return;
     setAgents(nextAgents);
   };
@@ -906,7 +452,7 @@ const AISection = () => {
     if (!deleteAgentTarget) return;
     const target = deleteAgentTarget;
     const nextAgents = agents.filter((agent) => agent.id !== target.id);
-    const ok = await persistAISetting(providers, originalSetting.transcription, nextAgents, taggers, chatAgents, tools, "Delete AI agent");
+    const ok = await savePatch({ agents: nextAgents }, "Delete AI agent");
     if (!ok) return;
     setAgents(nextAgents);
     setDeleteAgentTarget(undefined);
@@ -939,7 +485,7 @@ const AISection = () => {
       ? taggers.map((item) => (item.id === normalizedTagger.id ? normalizedTagger : item))
       : [...taggers, normalizedTagger];
 
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, chatAgents, tools, "Update AI tagger");
+    const ok = await savePatch({ taggers: nextTaggers }, "Update AI tagger");
     if (!ok) return;
     setTaggers(nextTaggers);
     setEditingTagger(undefined);
@@ -947,7 +493,7 @@ const AISection = () => {
 
   const handleToggleTagger = async (tagger: LocalTagger) => {
     const nextTaggers = taggers.map((item) => (item.id === tagger.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, chatAgents, tools, "Toggle AI tagger");
+    const ok = await savePatch({ taggers: nextTaggers }, "Toggle AI tagger");
     if (!ok) return;
     setTaggers(nextTaggers);
   };
@@ -956,7 +502,7 @@ const AISection = () => {
     if (!deleteTaggerTarget) return;
     const target = deleteTaggerTarget;
     const nextTaggers = taggers.filter((tagger) => tagger.id !== target.id);
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, nextTaggers, chatAgents, tools, "Delete AI tagger");
+    const ok = await savePatch({ taggers: nextTaggers }, "Delete AI tagger");
     if (!ok) return;
     setTaggers(nextTaggers);
     setDeleteTaggerTarget(undefined);
@@ -1018,15 +564,7 @@ const AISection = () => {
       ? chatAgents.map((item) => (item.id === normalizedAgent.id ? normalizedAgent : item))
       : [...chatAgents, normalizedAgent];
 
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      nextChatAgents,
-      tools,
-      "Update chat agent",
-    );
+    const ok = await savePatch({ chatAgents: nextChatAgents }, "Update chat agent");
     if (!ok) return;
     setChatAgents(nextChatAgents);
     setEditingChatAgent(undefined);
@@ -1042,15 +580,7 @@ const AISection = () => {
       return;
     }
     const nextChatAgents = chatAgents.map((item) => (item.id === agent.id ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      nextChatAgents,
-      tools,
-      "Toggle chat agent",
-    );
+    const ok = await savePatch({ chatAgents: nextChatAgents }, "Toggle chat agent");
     if (!ok) return;
     setChatAgents(nextChatAgents);
   };
@@ -1059,15 +589,7 @@ const AISection = () => {
     if (!deleteChatAgentTarget) return;
     const target = deleteChatAgentTarget;
     const nextChatAgents = chatAgents.filter((agent) => agent.id !== target.id);
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      nextChatAgents,
-      tools,
-      "Delete chat agent",
-    );
+    const ok = await savePatch({ chatAgents: nextChatAgents }, "Delete chat agent");
     if (!ok) return;
     setChatAgents(nextChatAgents);
     setDeleteChatAgentTarget(undefined);
@@ -1075,22 +597,14 @@ const AISection = () => {
 
   const handleToggleTool = async (tool: LocalTool) => {
     const nextTools = tools.map((item) => (item.name === tool.name ? { ...item, enabled: !item.enabled } : item));
-    const ok = await persistAISetting(providers, originalSetting.transcription, agents, taggers, chatAgents, nextTools, "Toggle chat tool");
+    const ok = await savePatch({ tools: nextTools }, "Toggle chat tool");
     if (!ok) return;
     setTools(nextTools);
   };
 
   const handleToggleToolConfirmation = async (tool: LocalTool) => {
     const nextTools = tools.map((item) => (item.name === tool.name ? { ...item, requiresConfirmation: !item.requiresConfirmation } : item));
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      chatAgents,
-      nextTools,
-      "Toggle chat tool confirmation",
-    );
+    const ok = await savePatch({ tools: nextTools }, "Toggle chat tool confirmation");
     if (!ok) return;
     setTools(nextTools);
   };
@@ -1115,16 +629,7 @@ const AISection = () => {
   };
 
   const handleSaveMemory = async () => {
-    const ok = await persistAISetting(
-      providers,
-      originalSetting.transcription,
-      agents,
-      taggers,
-      chatAgents,
-      tools,
-      "Update memory",
-      memory,
-    );
+    const ok = await savePatch({ memory }, "Update memory");
     if (!ok) return;
     lastSyncedMemory.current = memory;
   };
@@ -1375,13 +880,20 @@ const AISection = () => {
         />
       )}
 
-      <AIProviderDialog
+      <ProviderDialog
         provider={editingProvider}
+        mode={editingProvider && providers.some((provider) => provider.id === editingProvider.id) ? "edit" : "create"}
         onOpenChange={(open) => !open && setEditingProvider(undefined)}
         onSave={handleSaveProvider}
       />
 
-      <LLMDialog llm={editingLLM} providers={providers} onOpenChange={(open) => !open && setEditingLLM(undefined)} onSave={handleSaveLLM} />
+      <LLMDialog
+        llm={editingLLM}
+        mode={editingLLM && llms.some((llm) => llm.id === editingLLM.id) ? "edit" : "create"}
+        providers={providers}
+        onOpenChange={(open) => !open && setEditingLLM(undefined)}
+        onSave={handleSaveLLM}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -1439,6 +951,7 @@ const AISection = () => {
 
       <ChatAgentDialog
         agent={editingChatAgent}
+        mode={editingChatAgent && chatAgents.some((agent) => agent.id === editingChatAgent.id) ? "edit" : "create"}
         llms={llms}
         providers={providers}
         onOpenChange={(open) => !open && setEditingChatAgent(undefined)}
@@ -1552,234 +1065,6 @@ const TranscriptionForm = ({ providers, transcription, referencedProvider, onCha
         <p className="text-xs text-muted-foreground">{t("setting.ai.transcription-prompt-help")}</p>
       </div>
     </div>
-  );
-};
-
-interface AIProviderDialogProps {
-  provider?: LocalAIProvider;
-  onOpenChange: (open: boolean) => void;
-  onSave: (provider: LocalAIProvider) => void;
-}
-
-const AIProviderDialog = ({ provider, onOpenChange, onSave }: AIProviderDialogProps) => {
-  const t = useTranslate();
-  const [draft, setDraft] = useState<LocalAIProvider>(() => provider ?? newProvider());
-
-  useEffect(() => {
-    const next = provider ?? newProvider();
-    setDraft(next);
-  }, [provider]);
-
-  const updateDraft = (partial: Partial<LocalAIProvider>) => {
-    setDraft((prev) => ({ ...prev, ...partial }));
-  };
-
-  const handleSave = () => {
-    onSave(draft);
-  };
-
-  return (
-    <Dialog open={!!provider} onOpenChange={onOpenChange}>
-      <DialogContent size="2xl">
-        <DialogHeader>
-          <DialogTitle>{provider?.apiKeySet ? t("setting.ai.edit-provider") : t("setting.ai.add-provider")}</DialogTitle>
-          <DialogDescription>{t("setting.ai.dialog-description")}</DialogDescription>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.provider-title")}</Label>
-            <Input value={draft.title} onChange={(e) => updateDraft({ title: e.target.value })} placeholder="OpenAI" />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.provider-type")}</Label>
-            <Select
-              value={String(draft.type)}
-              items={providerTypeSelectOptions}
-              onValueChange={(value) => updateDraft({ type: Number(value) as InstanceSetting_AIProviderType })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {providerTypeSelectOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label>{t("setting.ai.endpoint")}</Label>
-            <Input
-              value={draft.endpoint}
-              onChange={(e) => updateDraft({ endpoint: e.target.value })}
-              placeholder={getDefaultEndpointPlaceholder(draft.type)}
-            />
-            <p className="text-xs text-muted-foreground">{t("setting.ai.endpoint-hint")}</p>
-          </div>
-
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label>{t("setting.ai.api-key")}</Label>
-            <Input
-              type="password"
-              value={draft.apiKey}
-              onChange={(e) => updateDraft({ apiKey: e.target.value })}
-              placeholder={draft.apiKeySet ? t("setting.ai.keep-api-key") : ""}
-            />
-            {draft.apiKeySet && (
-              <p className="text-xs text-muted-foreground">{t("setting.ai.current-key", { key: draft.apiKeyHint || "-" })}</p>
-            )}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={handleSave}>{t("common.save")}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-interface LLMDialogProps {
-  llm?: LocalLLM;
-  providers: LocalAIProvider[];
-  onOpenChange: (open: boolean) => void;
-  onSave: (llm: LocalLLM) => void;
-}
-
-const LLMDialog = ({ llm, providers, onOpenChange, onSave }: LLMDialogProps) => {
-  const t = useTranslate();
-  const [draft, setDraft] = useState<LocalLLM>(() => llm ?? newLLM(providers));
-  const [testing, setTesting] = useState(false);
-
-  useEffect(() => {
-    setDraft(llm ?? newLLM(providers));
-  }, [llm, providers]);
-
-  const updateDraft = (partial: Partial<LocalLLM>) => {
-    setDraft((prev) => ({ ...prev, ...partial }));
-  };
-
-  const providerOptions = useMemo(
-    () => [
-      { value: "__none__", label: t("setting.ai.llm-no-provider") },
-      ...providers.map((provider) => ({ value: provider.id, label: provider.title || provider.id })),
-    ],
-    [providers, t],
-  );
-  const referencedProvider = providers.find((provider) => provider.id === draft.providerId);
-  const hasApiKey = !!referencedProvider && (referencedProvider.apiKeySet || referencedProvider.apiKey.trim() !== "");
-  const canTest = !!draft.providerId && draft.model.trim() !== "" && hasApiKey;
-
-  const handleTest = async () => {
-    if (!canTest) return;
-    setTesting(true);
-    try {
-      const response = await aiServiceClient.testAIProvider(
-        create(TestAIProviderRequestSchema, {
-          providerId: draft.providerId,
-          model: draft.model.trim(),
-        }),
-      );
-      if (response.ok) {
-        toast.success(t("setting.ai.test-provider-success", { reply: response.reply || "ok" }));
-      } else {
-        toast.error(t("setting.ai.test-provider-failed", { error: response.error || "unknown" }));
-      }
-    } catch (err) {
-      toast.error(t("setting.ai.test-provider-failed", { error: err instanceof Error ? err.message : String(err) }));
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleProviderChange = (value: string) => {
-    const providerId = value === "__none__" ? "" : value;
-    const provider = providers.find((item) => item.id === providerId);
-    updateDraft({ providerId, model: draft.model || defaultChatModelForProvider(provider) });
-  };
-
-  return (
-    <Dialog open={!!llm} onOpenChange={onOpenChange}>
-      <DialogContent size="2xl">
-        <DialogHeader>
-          <DialogTitle>{t("setting.ai.edit-llm")}</DialogTitle>
-          <DialogDescription>{t("setting.ai.llm-dialog-description")}</DialogDescription>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.llm-title")}</Label>
-            <Input value={draft.title} onChange={(e) => updateDraft({ title: e.target.value })} placeholder="gpt-4o-mini" />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.llm-provider")}</Label>
-            <Select
-              value={draft.providerId || "__none__"}
-              items={providerOptions}
-              onValueChange={handleProviderChange}
-              disabled={providers.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {providerOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {providers.length === 0 && <p className="text-xs text-muted-foreground">{t("setting.ai.llm-empty-providers")}</p>}
-          </div>
-
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label>{t("setting.ai.llm-model")}</Label>
-            <Input
-              value={draft.model}
-              onChange={(e) => updateDraft({ model: e.target.value })}
-              placeholder={defaultChatModelForProvider(referencedProvider)}
-              disabled={!draft.providerId}
-              maxLength={256}
-            />
-            <p className="text-xs text-muted-foreground">{t("setting.ai.llm-model-help")}</p>
-          </div>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={draft.enabled}
-              onChange={(e) => updateDraft({ enabled: e.target.checked })}
-            />
-            <span>{t("setting.ai.llm-enabled")}</span>
-          </label>
-
-          {referencedProvider && !hasApiKey && (
-            <p className="text-xs text-destructive sm:col-span-2">{t("setting.ai.llm-warning-no-key")}</p>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" disabled={!canTest || testing} onClick={handleTest}>
-            {testing ? t("setting.ai.test-provider-testing") : t("setting.ai.test-provider")}
-          </Button>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={() => onSave(draft)}>{t("common.save")}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 };
 
@@ -1972,17 +1257,6 @@ const AIAgentDialog = ({ agent, providers, onOpenChange, onSave }: AIAgentDialog
   );
 };
 
-const getDefaultEndpointPlaceholder = (type: InstanceSetting_AIProviderType) => {
-  switch (type) {
-    case InstanceSetting_AIProviderType.OPENAI:
-      return "https://api.openai.com/v1";
-    case InstanceSetting_AIProviderType.GEMINI:
-      return "https://generativelanguage.googleapis.com/v1beta";
-    default:
-      return "";
-  }
-};
-
 interface AITaggerDialogProps {
   tagger?: LocalTagger;
   providers: LocalAIProvider[];
@@ -2101,125 +1375,6 @@ const AITaggerDialog = ({ tagger, providers, onOpenChange, onSave }: AITaggerDia
               maxLength={4096}
             />
             <p className="text-xs text-muted-foreground">{t("setting.ai.tagger-prompt-help")}</p>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={handleSave}>{t("common.save")}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-interface ChatAgentDialogProps {
-  agent?: LocalChatAgent;
-  llms: LocalLLM[];
-  providers: LocalAIProvider[];
-  onOpenChange: (open: boolean) => void;
-  onSave: (agent: LocalChatAgent) => void;
-}
-
-const ChatAgentDialog = ({ agent, llms, providers, onOpenChange, onSave }: ChatAgentDialogProps) => {
-  const t = useTranslate();
-  const [draft, setDraft] = useState<LocalChatAgent>(() => agent ?? newChatAgent());
-
-  useEffect(() => {
-    setDraft(agent ?? newChatAgent());
-  }, [agent]);
-
-  const updateDraft = (partial: Partial<LocalChatAgent>) => {
-    setDraft((prev) => ({ ...prev, ...partial }));
-  };
-
-  const llmOptions = useMemo(
-    () => [
-      { value: "__none__", label: t("setting.ai.chat-agent-no-llm") },
-      ...llms.map((llm) => {
-        const provider = providers.find((item) => item.id === llm.providerId);
-        return { value: llm.id, label: `${llm.title || llm.model} · ${provider?.title || llm.providerId}` };
-      }),
-    ],
-    [llms, providers, t],
-  );
-
-  const handleSave = () => {
-    onSave(draft);
-  };
-
-  return (
-    <Dialog open={!!agent} onOpenChange={onOpenChange}>
-      <DialogContent size="2xl">
-        <DialogHeader>
-          <DialogTitle>{t("setting.ai.edit-chat-agent")}</DialogTitle>
-          <DialogDescription>{t("setting.ai.chat-agent-dialog-description")}</DialogDescription>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.chat-agent-name")}</Label>
-            <Input
-              value={draft.name}
-              onChange={(e) => updateDraft({ name: e.target.value })}
-              placeholder={t("setting.ai.chat-agent-name-placeholder")}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.chat-agent-llm")}</Label>
-            <Select
-              value={draft.llmId || "__none__"}
-              items={llmOptions}
-              onValueChange={(value) => {
-                const llm = llms.find((item) => item.id === value);
-                updateDraft({
-                  llmId: value === "__none__" ? "" : value,
-                  providerId: llm?.providerId ?? "",
-                  model: llm?.model ?? "",
-                });
-              }}
-              disabled={llms.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {llmOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {llms.length === 0 && <p className="text-xs text-muted-foreground">{t("setting.ai.chat-agent-empty-llms")}</p>}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.chat-agent-enabled")}</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={draft.enabled}
-                onChange={(e) => updateDraft({ enabled: e.target.checked })}
-              />
-              <span className="text-xs text-muted-foreground">{t("setting.ai.chat-agent-enabled-help")}</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label>{t("setting.ai.chat-agent-system")}</Label>
-            <Textarea
-              value={draft.systemPrompt}
-              onChange={(e) => updateDraft({ systemPrompt: e.target.value })}
-              placeholder={t("setting.ai.chat-agent-system-placeholder")}
-              rows={5}
-              maxLength={4096}
-            />
-            <p className="text-xs text-muted-foreground">{t("setting.ai.chat-agent-system-help")}</p>
           </div>
         </div>
 

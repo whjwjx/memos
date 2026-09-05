@@ -1,0 +1,80 @@
+import { create } from "@bufbuild/protobuf";
+import {
+  InstanceSetting,
+  InstanceSetting_AISetting,
+  InstanceSetting_AISettingSchema,
+  InstanceSetting_Key,
+  InstanceSetting_TranscriptionConfig,
+  InstanceSetting_TranslationConfig,
+  InstanceSettingSchema,
+} from "@/types/proto/api/v1/instance_service_pb";
+import { buildInstanceSettingName } from "../useInstanceSettingUpdater";
+import {
+  toAgentConfig,
+  toChatAgentConfig,
+  toLLMConfig,
+  toMemoryConfig,
+  toProviderConfig,
+  toTaggerConfig,
+  toToolConfig,
+} from "./aiSettingMapper";
+import type { LocalAgent, LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemory, LocalTagger, LocalTool } from "./types";
+
+type SaveInstanceSetting = (options: { key: InstanceSetting_Key; setting: InstanceSetting; errorContext: string }) => Promise<boolean>;
+
+export type AISettingPatch = {
+  providers?: LocalAIProvider[];
+  transcription?: InstanceSetting_TranscriptionConfig | undefined;
+  agents?: LocalAgent[];
+  taggers?: LocalTagger[];
+  chatAgents?: LocalChatAgent[];
+  tools?: LocalTool[];
+  memory?: LocalMemory;
+  translation?: InstanceSetting_TranslationConfig | undefined;
+  llms?: LocalLLM[];
+};
+
+export const saveAISettingPatch = ({
+  errorContext,
+  originalSetting,
+  patch,
+  saveInstanceSetting,
+}: {
+  errorContext: string;
+  originalSetting: InstanceSetting_AISetting;
+  patch: AISettingPatch;
+  saveInstanceSetting: SaveInstanceSetting;
+}) => {
+  const nextToolMap =
+    patch.tools === undefined
+      ? originalSetting.tools
+      : patch.tools.reduce<Record<string, ReturnType<typeof toToolConfig>>>(
+          (acc, tool) => {
+            acc[tool.name] = toToolConfig(tool);
+            return acc;
+          },
+          { ...originalSetting.tools },
+        );
+
+  return saveInstanceSetting({
+    key: InstanceSetting_Key.AI,
+    setting: create(InstanceSettingSchema, {
+      name: buildInstanceSettingName(InstanceSetting_Key.AI),
+      value: {
+        case: "aiSetting",
+        value: create(InstanceSetting_AISettingSchema, {
+          providers: patch.providers?.map(toProviderConfig) ?? originalSetting.providers,
+          transcription: patch.transcription ?? originalSetting.transcription,
+          agents: patch.agents?.map(toAgentConfig) ?? originalSetting.agents,
+          taggers: patch.taggers?.map(toTaggerConfig) ?? originalSetting.taggers,
+          chatAgents: patch.chatAgents?.map(toChatAgentConfig) ?? originalSetting.chatAgents,
+          tools: nextToolMap,
+          memory: patch.memory ? toMemoryConfig(patch.memory) : originalSetting.memory,
+          translation: patch.translation ?? originalSetting.translation,
+          llms: patch.llms?.map(toLLMConfig) ?? originalSetting.llms,
+        }),
+      },
+    }),
+    errorContext,
+  });
+};
