@@ -3,11 +3,11 @@
 > 状态：架构梳理与阶段方案
 > 日期：2026-09-04
 > 依据：当前 `dev` 代码核查结果
-> 目标：先收敛 memos 中分散的 AI 功能，只保留 AI Chat、Chatbot 工具、翻译和共享记忆；AI tags、AI comment、语音转文本先隐藏/冻结，后续再决定是否恢复。
+> 目标：收敛 memos 中分散的 AI 功能，只保留 AI Chat、Chatbot 工具、翻译和共享记忆；AI tags、AI comment、语音转文本已从当前产品范围移除。
 
 ## 2026-09-05 执行状态补充
 
-当前已经从“隐藏/冻结”推进到“功能级删除”：
+当前已经从“隐藏/冻结”推进到“功能级删除 + 不可达实现清理”：
 
 - Admin AI Settings 不再保留 legacy Transcription / 自动评论 Agent / Tagger UI。
 - AI 设置保存时会清空旧 `transcription / agents / taggers` 配置。
@@ -16,13 +16,16 @@
 - Chat 工具继续只保留当前 Chatbot 所需工具，`query_queue` 保留。
 - `project_status` 不再展示旧 Agent / Tagger / Transcription 作为当前 AI 能力。
 - 普通音频录制仍保留，只移除 AI 语音转文本能力。
+- 旧 `agent_reply_worker.go`、`memo_tag_worker.go` 已删除；后台调度器只保留当前还需要的周期任务。
+- AI STT / audio LLM / WebM 转码内部包已删除；`go mod tidy` 已移除转写专用依赖。
+- 旧 Chatbot 工具 `auto_tag` / `agent_reply` 后端实现文件已删除；`query_queue` 仍保留，可查看历史 `agent_reply_task` / `memo_tag_task` 表。
+- Admin AI Settings 前端 legacy Agent / Tagger / Transcription 本地类型、mapper、默认工厂已删除。
 
-本轮仍不做物理删除：
+本轮仍不做的物理删除：
 
 - 不删除 proto 字段。
 - 不删除 store 类型。
 - 不删除 `agent_reply_task` / `memo_tag_task` 表和历史迁移。
-- 不删除旧 worker/helper 文件，避免一次性扩大迁移和兼容风险。
 
 ## 0. 阅读顺序
 

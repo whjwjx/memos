@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { InstanceSetting_AIProviderType } from "@/types/proto/api/v1/instance_service_pb";
-import type { LocalAgent, LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemoryEntry, LocalTagger } from "./types";
+import type { LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemoryEntry } from "./types";
 
 export const providerTypeOptions = [InstanceSetting_AIProviderType.OPENAI, InstanceSetting_AIProviderType.GEMINI];
 
@@ -47,28 +47,6 @@ export const newLLM = (providers: LocalAIProvider[]): LocalLLM => {
     enabled: true,
   };
 };
-
-export const newAgent = (): LocalAgent => ({
-  id: uuidv4(),
-  name: "",
-  providerId: "",
-  model: "",
-  personaPrompt: "",
-  systemPrompt: "",
-  enabled: false,
-  delayMinutes: 5,
-  maxLength: 0,
-});
-
-export const newTagger = (): LocalTagger => ({
-  id: uuidv4(),
-  name: "",
-  providerId: "",
-  model: "",
-  prompt: "",
-  enabled: false,
-  maxTags: 3,
-});
 
 export const newChatAgent = (): LocalChatAgent => ({
   id: uuidv4(),

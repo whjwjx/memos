@@ -1,8 +1,7 @@
 // Package tools defines the function-calling tool abstraction used by the AI
-// chat assistant. Each tool wraps an existing store capability (memos,
-// comments, settings, agents, taggers) and exposes it to the model through a
-// provider-agnostic ToolSpec. The assistant package drives tool execution via
-// the Registry.
+// chat assistant. Each tool wraps an existing store capability and exposes it
+// to the model through a provider-agnostic ToolSpec. The assistant package
+// drives tool execution via the Registry.
 package tools
 
 import (

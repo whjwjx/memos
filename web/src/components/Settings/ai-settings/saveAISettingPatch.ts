@@ -4,18 +4,12 @@ import {
   InstanceSetting_AISetting,
   InstanceSetting_AISettingSchema,
   InstanceSetting_Key,
+  InstanceSetting_TranscriptionConfigSchema,
   InstanceSetting_TranslationConfig,
   InstanceSettingSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
 import { buildInstanceSettingName } from "../useInstanceSettingUpdater";
-import {
-  createEmptyTranscriptionConfig,
-  toChatAgentConfig,
-  toLLMConfig,
-  toMemoryConfig,
-  toProviderConfig,
-  toToolConfig,
-} from "./aiSettingMapper";
+import { toChatAgentConfig, toLLMConfig, toMemoryConfig, toProviderConfig, toToolConfig } from "./aiSettingMapper";
 import type { LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemory, LocalTool } from "./types";
 
 type SaveInstanceSetting = (options: { key: InstanceSetting_Key; setting: InstanceSetting; errorContext: string }) => Promise<boolean>;
@@ -59,7 +53,7 @@ export const saveAISettingPatch = ({
         case: "aiSetting",
         value: create(InstanceSetting_AISettingSchema, {
           providers: patch.providers?.map(toProviderConfig) ?? originalSetting.providers,
-          transcription: createEmptyTranscriptionConfig(),
+          transcription: create(InstanceSetting_TranscriptionConfigSchema, {}),
           agents: [],
           taggers: [],
           chatAgents: patch.chatAgents?.map(toChatAgentConfig) ?? originalSetting.chatAgents,

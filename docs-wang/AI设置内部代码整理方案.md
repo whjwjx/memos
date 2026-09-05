@@ -12,6 +12,7 @@
 2. 新开分支 `codex/remove-legacy-ai-features`。
 3. 删除旧 AI tags / AI comment / transcribe 的可触发面。
 4. 拆小 hook，不抽一个大而全的 `useAISettingsDraft.ts`。
+5. 删除已不可达的旧 AI comment / AI tags worker 与 AI 转写内部实现。
 
 已完成：
 
@@ -27,6 +28,9 @@
 - 后端不再在创建 memo 后调度旧自动评论和自动打标任务。
 - `AutoTagMemo` 和 `Transcribe` RPC 暂保留 proto 兼容，但服务端明确返回 `Unimplemented`。
 - `project_status` 不再把旧 Agent / Tagger / Transcription 当作当前 AI 能力展示。
+- 已删除旧 `agent_reply_worker.go`、`memo_tag_worker.go`、AI STT / audio LLM / WebM 转码内部包。
+- 已删除旧 Chatbot 工具 `auto_tag` / `agent_reply` 的后端实现文件；`query_queue` 仍保留历史队列表查询能力。
+- 已删除 Admin AI Settings 前端中 legacy Agent / Tagger / Transcription 的本地类型、mapper 和默认工厂。
 
 仍然刻意不做：
 
@@ -57,7 +61,7 @@
 - 不改页面信息架构。
 - 不改 proto。
 - 不改数据库。
-- 不物理删除旧 worker 文件、旧 service helper、旧 setting 字段和数据库表。
+- 不物理删除旧 setting 字段和数据库表。
 - 不恢复 AI tags、AI comment、语音转文本。
 
 ## 2. 当前代码实际状态

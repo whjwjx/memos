@@ -1,7 +1,5 @@
 import { create } from "@bufbuild/protobuf";
 import {
-  InstanceSetting_AgentConfig,
-  InstanceSetting_AgentConfigSchema,
   InstanceSetting_AIProviderConfig,
   InstanceSetting_AIProviderConfigSchema,
   InstanceSetting_ChatAgentConfig,
@@ -12,29 +10,14 @@ import {
   InstanceSetting_MemoryConfigSchema,
   InstanceSetting_MemoryEntry,
   InstanceSetting_MemoryEntrySchema,
-  InstanceSetting_TaggerConfig,
-  InstanceSetting_TaggerConfigSchema,
   InstanceSetting_ToolConfig,
   InstanceSetting_ToolConfigSchema,
-  InstanceSetting_TranscriptionConfig,
-  InstanceSetting_TranscriptionConfigSchema,
   InstanceSetting_TranslationConfig,
   InstanceSetting_TranslationConfigSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
 import { defaultChatModelForProvider } from "./aiSettingFactories";
 import { toolRegistry } from "./toolRegistry";
-import type {
-  LocalAgent,
-  LocalAIProvider,
-  LocalChatAgent,
-  LocalLLM,
-  LocalMemory,
-  LocalMemoryEntry,
-  LocalTagger,
-  LocalTool,
-  LocalTranscription,
-  LocalTranslation,
-} from "./types";
+import type { LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemory, LocalMemoryEntry, LocalTool, LocalTranslation } from "./types";
 
 export const toLocalProvider = (provider: InstanceSetting_AIProviderConfig): LocalAIProvider => ({
   id: provider.id,
@@ -125,23 +108,6 @@ export const resolveLLMId = (
   return llms.find((llm) => llm.providerId === providerId && llm.model === normalizedModel)?.id || "";
 };
 
-export const toLocalTranscription = (config: InstanceSetting_TranscriptionConfig | undefined): LocalTranscription => ({
-  providerId: config?.providerId ?? "",
-  model: config?.model ?? "",
-  language: config?.language ?? "",
-  prompt: config?.prompt ?? "",
-});
-
-export const toTranscriptionConfig = (transcription: LocalTranscription) =>
-  create(InstanceSetting_TranscriptionConfigSchema, {
-    providerId: transcription.providerId,
-    model: transcription.model.trim(),
-    language: transcription.language.trim(),
-    prompt: transcription.prompt,
-  });
-
-export const createEmptyTranscriptionConfig = () => create(InstanceSetting_TranscriptionConfigSchema, {});
-
 export const toLocalTranslation = (
   config: InstanceSetting_TranslationConfig | undefined,
   llms: LocalLLM[] = [],
@@ -169,52 +135,6 @@ export const toTranslationConfig = (translation: LocalTranslation) =>
   });
 
 export const createEmptyTranslationConfig = () => create(InstanceSetting_TranslationConfigSchema, {});
-
-export const toLocalAgent = (agent: InstanceSetting_AgentConfig): LocalAgent => ({
-  id: agent.id,
-  name: agent.name,
-  providerId: agent.providerId,
-  model: agent.model,
-  personaPrompt: agent.personaPrompt,
-  systemPrompt: agent.systemPrompt,
-  enabled: agent.enabled,
-  delayMinutes: agent.delayMinutes,
-  maxLength: agent.maxLength,
-});
-
-export const toAgentConfig = (agent: LocalAgent) =>
-  create(InstanceSetting_AgentConfigSchema, {
-    id: agent.id,
-    name: agent.name.trim(),
-    providerId: agent.providerId,
-    model: agent.model.trim(),
-    personaPrompt: agent.personaPrompt,
-    systemPrompt: agent.systemPrompt,
-    enabled: agent.enabled,
-    delayMinutes: agent.delayMinutes,
-    maxLength: agent.maxLength,
-  });
-
-export const toLocalTagger = (tagger: InstanceSetting_TaggerConfig): LocalTagger => ({
-  id: tagger.id,
-  name: tagger.name,
-  providerId: tagger.providerId,
-  model: tagger.model,
-  prompt: tagger.prompt,
-  enabled: tagger.enabled,
-  maxTags: tagger.maxTags,
-});
-
-export const toTaggerConfig = (tagger: LocalTagger) =>
-  create(InstanceSetting_TaggerConfigSchema, {
-    id: tagger.id,
-    name: tagger.name.trim(),
-    providerId: tagger.providerId,
-    model: tagger.model.trim(),
-    prompt: tagger.prompt,
-    enabled: tagger.enabled,
-    maxTags: tagger.maxTags,
-  });
 
 export const toLocalChatAgent = (
   agent: InstanceSetting_ChatAgentConfig,

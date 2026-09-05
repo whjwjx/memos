@@ -1,6 +1,6 @@
 import type { InstanceSetting_AIProviderType } from "@/types/proto/api/v1/instance_service_pb";
 
-export type AISettingsPanel = "overview" | "llms" | "agents" | "tools" | "translation" | "memory" | "legacy";
+export type AISettingsPanel = "overview" | "llms" | "agents" | "tools" | "translation" | "memory";
 
 export type LocalAIProvider = {
   id: string;
@@ -10,13 +10,6 @@ export type LocalAIProvider = {
   apiKey: string;
   apiKeySet: boolean;
   apiKeyHint: string;
-};
-
-export type LocalTranscription = {
-  providerId: string;
-  model: string;
-  language: string;
-  prompt: string;
 };
 
 export type LocalLLM = {
@@ -36,28 +29,6 @@ export type LocalChatAgent = {
   model: string;
   systemPrompt: string;
   enabled: boolean;
-};
-
-export type LocalAgent = {
-  id: string;
-  name: string;
-  providerId: string;
-  model: string;
-  personaPrompt: string;
-  systemPrompt: string;
-  enabled: boolean;
-  delayMinutes: number;
-  maxLength: number;
-};
-
-export type LocalTagger = {
-  id: string;
-  name: string;
-  providerId: string;
-  model: string;
-  prompt: string;
-  enabled: boolean;
-  maxTags: number;
 };
 
 export type LocalTool = {

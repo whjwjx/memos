@@ -5,7 +5,7 @@ import { useInstance } from "@/contexts/InstanceContext";
 import { useTranslate } from "@/utils/i18n";
 import { AgentsPanel } from "./ai-settings/AgentsPanel";
 import { AISettingsOverviewPanel } from "./ai-settings/AISettingsOverviewPanel";
-import { AISettingsTabs, type AISettingsVisiblePanel } from "./ai-settings/AISettingsTabs";
+import { AISettingsTabs } from "./ai-settings/AISettingsTabs";
 import { newLLM, newProvider } from "./ai-settings/aiSettingFactories";
 import { createEmptyTranslationConfig, deriveLLMsFromLegacy, toLocalProvider } from "./ai-settings/aiSettingMapper";
 import { ChatToolsPanel } from "./ai-settings/ChatToolsPanel";
@@ -262,7 +262,7 @@ const AISection = () => {
     setDeleteLLMTarget(undefined);
   };
 
-  const visiblePanels: { key: AISettingsVisiblePanel; label: string }[] = [
+  const visiblePanels: { key: AISettingsPanel; label: string }[] = [
     { key: "overview", label: t("setting.ai.overview-tab") },
     { key: "llms", label: t("setting.ai.llms-tab") },
     { key: "agents", label: t("setting.ai.agents-tab") },

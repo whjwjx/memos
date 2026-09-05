@@ -1,15 +1,13 @@
 import type { AISettingsPanel } from "./types";
 
-export type AISettingsVisiblePanel = Exclude<AISettingsPanel, "legacy">;
-
 export const AISettingsTabs = ({
   activePanel,
   panels,
   onSelect,
 }: {
   activePanel: AISettingsPanel;
-  panels: { key: AISettingsVisiblePanel; label: string }[];
-  onSelect: (panel: AISettingsVisiblePanel) => void;
+  panels: { key: AISettingsPanel; label: string }[];
+  onSelect: (panel: AISettingsPanel) => void;
 }) => {
   return (
     <div className="flex gap-2 overflow-x-auto border-b border-border pb-2">
