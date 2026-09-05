@@ -108,7 +108,5 @@ export const estimateMemoCardHeight = (memo: Memo, { columnWidth, showCommentPre
   const reactionHeight = (memo.reactions ?? []).length > 0 ? CARD_SECTION_GAP + REACTION_ROW_HEIGHT : 0;
   const commentPreviewHeight = showCommentPreview ? estimateCommentPreviewHeight(memo) : 0;
 
-  return (
-    CARD_VERTICAL_PADDING + CARD_HEADER_HEIGHT + CARD_SECTION_GAP + compactBodyHeight + reactionHeight + commentPreviewHeight
-  );
+  return CARD_VERTICAL_PADDING + CARD_HEADER_HEIGHT + CARD_SECTION_GAP + compactBodyHeight + reactionHeight + commentPreviewHeight;
 };
