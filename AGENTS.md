@@ -16,6 +16,9 @@ Memos is a self-hosted note-taking app.
 
 - Read relevant code before editing; prefer local patterns over new abstractions.
 - Keep diffs scoped. Do not do repo-wide cleanup, dependency churn, or generated-file rewrites unless the task requires it.
+- Before code or documentation changes, start from `dev` and create a dedicated `codex/` branch unless the user explicitly asks otherwise.
+- After making changes, run the project checks that match the changed surface, then commit the verified work.
+- When merging completed work back to `dev`, use a no fast-forward merge (`git merge --no-ff`) so the branch history stays visible.
 - Do not hand-edit generated proto outputs. Change `.proto` files, then run `buf generate`.
 - Add migrations for all database drivers when schema changes, and update each driver's `LATEST.sql`.
 - Add public API endpoints to `server/router/api/v1/acl_config.go`.
