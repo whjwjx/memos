@@ -66,8 +66,8 @@ paths:
             tags:
                 - AIChatService
             description: |-
-                UpdateConversation patches mutable fields (currently the title) of a chat
-                 session. Used to set a human-readable title from the first user message.
+                UpdateConversation patches mutable fields of a chat session, such as the
+                 title, selected agent, and selected LLM.
             operationId: AIChatService_UpdateConversation
             parameters:
                 - name: conversation.id
@@ -3224,6 +3224,9 @@ components:
                 agentId:
                     type: string
                     description: Optional. The chat agent preset id this conversation is bound to.
+                llmId:
+                    type: string
+                    description: Optional. The configured LLM id used for subsequent assistant replies.
                 createTime:
                     readOnly: true
                     type: string
@@ -3271,6 +3274,9 @@ components:
                 title:
                     type: string
                     description: Optional. Initial title.
+                llmId:
+                    type: string
+                    description: Optional. Configured LLM id to bind. Empty uses the agent/default LLM.
         CreateLinkedIdentityRequest:
             required:
                 - parent
@@ -3563,6 +3569,13 @@ components:
                     description: |-
                         translation is the admin-configured AI translation capability surfaced in
                          the /translate page. Non-admin callers can only see whether it is enabled.
+                llms:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/InstanceSetting_LLMConfig'
+                    description: |-
+                        llms is the list of configured model profiles. AI capabilities should
+                         reference one of these entries instead of each storing a raw model name.
             description: AI provider configuration settings.
         InstanceSetting_AgentConfig:
             type: object
@@ -3620,17 +3633,24 @@ components:
                     description: |-
                         provider_id references an entry in AISetting.providers[].id.
                          Empty string means the preset is disabled.
+                         Deprecated: new clients should use llm_id.
                 model:
                     type: string
                     description: |-
                         model is the provider-specific text-generation model identifier.
                          Empty string falls back to the engine default.
+                         Deprecated: new clients should use llm_id.
                 systemPrompt:
                     type: string
                     description: system_prompt steers the assistant's behavior, tone, and constraints.
                 enabled:
                     type: boolean
                     description: enabled toggles whether the preset is selectable in /ai-chat.
+                llmId:
+                    type: string
+                    description: |-
+                        llm_id references an entry in AISetting.llms[].id. Empty string uses
+                         legacy provider_id/model fields.
             description: |-
                 ChatAgentConfig describes a conversational assistant preset for the /ai-chat
                  page. It is a prompt + provider binding with an authorized tool set. Multiple
@@ -3669,6 +3689,25 @@ components:
                     type: boolean
                     description: disallow_change_nickname disallows changing nickname.
             description: General instance settings configuration.
+        InstanceSetting_LLMConfig:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: id is the stable identifier of the LLM profile.
+                title:
+                    type: string
+                    description: title is the human-readable model profile name shown in selectors.
+                providerId:
+                    type: string
+                    description: provider_id references an entry in AISetting.providers[].id.
+                model:
+                    type: string
+                    description: model is the provider-specific model identifier.
+                enabled:
+                    type: boolean
+                    description: enabled toggles whether the LLM can be selected by AI capabilities.
+            description: LLMConfig represents one configured model profile backed by an AI provider.
         InstanceSetting_MemoRelatedSetting:
             type: object
             properties:
@@ -3883,14 +3922,21 @@ components:
                     description: enabled toggles whether regular users can use AI translation.
                 providerId:
                     type: string
-                    description: provider_id references an entry in AISetting.providers[].id.
+                    description: |-
+                        provider_id references an entry in AISetting.providers[].id.
+                         Deprecated: new clients should use llm_id.
                 model:
                     type: string
-                    description: model is the provider-specific text-generation model identifier.
+                    description: |-
+                        model is the provider-specific text-generation model identifier.
+                         Deprecated: new clients should use llm_id.
                 maxTextLength:
                     type: integer
                     description: max_text_length caps a single translation request in characters.
                     format: int32
+                llmId:
+                    type: string
+                    description: llm_id references an entry in AISetting.llms[].id.
             description: TranslationConfig configures the AI-backed translation page.
         InstanceStats:
             type: object
@@ -4743,6 +4789,9 @@ components:
                          that carry the keyword the user typed to approve a sensitive write (e.g.
                          "yes" for query_db update/delete). The assistant injects the keyword into
                          the tool arguments before executing them.
+                llmId:
+                    type: string
+                    description: Optional. Configured LLM id to use for this and subsequent turns.
         SendMessageResponse:
             type: object
             properties:
@@ -5088,7 +5137,7 @@ components:
                     description: Required. The conversation to update, identified by id (or name).
                 updateMask:
                     type: string
-                    description: Fields to update (currently only title is honored).
+                    description: 'Fields to update. Supported paths: title, agent_id, llm_id.'
                     format: field-mask
         UpsertMemoReactionRequest:
             required:

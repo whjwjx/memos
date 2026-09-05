@@ -9,7 +9,7 @@ import (
 	"github.com/usememos/memos/internal/ai/tools"
 )
 
-func TestRegistryContainsAllStage1Tools(t *testing.T) {
+func TestRegistryContainsConversationalTools(t *testing.T) {
 	t.Parallel()
 	r := tools.NewRegistry()
 	got := make(map[string]bool)
@@ -25,8 +25,6 @@ func TestRegistryContainsAllStage1Tools(t *testing.T) {
 		"tag_memo",
 		"batch_update_memos",
 		"manage_settings",
-		"agent_reply",
-		"auto_tag",
 		"query_db",
 		"get_logs",
 		"manage_memory",
@@ -71,8 +69,6 @@ func TestToolsRejectMissingRequiredArgs(t *testing.T) {
 		{"tag_memo", `{}`},                         // missing memoUid
 		{"batch_update_memos", `{}`},               // missing memoUids
 		{"delete_memo", `{}`},                      // missing memoUid
-		{"agent_reply", `{}`},                      // missing memoUid
-		{"auto_tag", `{}`},                         // missing memoUid
 		{"manage_settings", `{"key":"GENERAL"}`},   // missing action
 	}
 	for _, c := range cases {

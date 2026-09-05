@@ -3,7 +3,29 @@
 > 状态：架构梳理与阶段方案
 > 日期：2026-09-04
 > 依据：当前 `dev` 代码核查结果
-> 目标：先收敛 memos 中分散的 AI 功能，只保留 AI Chat、Chatbot 工具、翻译和共享记忆；AI tags、AI comment、语音转文本先隐藏/冻结，后续再决定是否恢复。
+> 目标：收敛 memos 中分散的 AI 功能，只保留 AI Chat、Chatbot 工具、翻译和共享记忆；AI tags、AI comment、语音转文本已从当前产品范围移除。
+
+## 2026-09-05 执行状态补充
+
+当前已经从“隐藏/冻结”推进到“功能级删除 + 不可达实现清理”：
+
+- Admin AI Settings 不再保留 legacy Transcription / 自动评论 Agent / Tagger UI。
+- AI 设置保存时会清空旧 `transcription / agents / taggers` 配置。
+- 新建 memo 后不再调度旧 `agent_reply_task` 和 `memo_tag_task`。
+- `AutoTagMemo` 与 `Transcribe` RPC 仍保留 proto 兼容，但服务端返回 `Unimplemented`，不会再执行旧功能。
+- Chat 工具继续只保留当前 Chatbot 所需工具，`query_queue` 保留。
+- `project_status` 不再展示旧 Agent / Tagger / Transcription 作为当前 AI 能力。
+- 普通音频录制仍保留，只移除 AI 语音转文本能力。
+- 旧 `agent_reply_worker.go`、`memo_tag_worker.go` 已删除；后台调度器只保留当前还需要的周期任务。
+- AI STT / audio LLM / WebM 转码内部包已删除；`go mod tidy` 已移除转写专用依赖。
+- 旧 Chatbot 工具 `auto_tag` / `agent_reply` 后端实现文件已删除；`query_queue` 仍保留，可查看历史 `agent_reply_task` / `memo_tag_task` 表。
+- Admin AI Settings 前端 legacy Agent / Tagger / Transcription 本地类型、mapper、默认工厂已删除。
+
+本轮仍不做的物理删除：
+
+- 不删除 proto 字段。
+- 不删除 store 类型。
+- 不删除 `agent_reply_task` / `memo_tag_task` 表和历史迁移。
 
 ## 0. 阅读顺序
 
@@ -31,6 +53,20 @@
 | Workflows 页面 | 暂不做 |
 | 独立 Diagnostics 页面 | 暂不做 |
 
+### 0.1 2026-09-04 代码状态更新
+
+以下内容已经在 `codex/ai-phase1-scope` 上完成，并已提交：
+
+- Admin AI Settings 已有 `LLM` 配置，model name 集中配置在 LLM 中。
+- 翻译已改为选择配置好的 LLM。
+- AI Chat 输入框已显示 `Agent + LLM` 两个 pill。
+- 同一个 Chat 内已经可以自由切换 LLM，并保存到 conversation。
+- 同一个 Chat 内已经可以自由切换 Agent，并保存到 conversation。
+- `Conversation` / `CreateConversationRequest` / `SendMessageRequest` 已支持 `llm_id`。
+- `conversation` 表已增加 `llm_id`，并补齐 SQLite / MySQL / PostgreSQL migration 与 `LATEST.sql`。
+
+因此本文中早期提到“Agent + LLM 自由组合需要下一期实现”的表述，已经是历史判断；继续开发时以本节和第 15 章的更新版为准。
+
 ## 1. 结论
 
 当前不建议引入 LangChain、llamaindex 等外部 Agent 框架。
@@ -40,7 +76,7 @@
 1. **产品面先收敛**：AI Settings 只展示 Chat、Chatbot 工具、翻译、共享记忆和 LLM/Agent 基础配置；不要继续展示 AI tags、AI comment、语音转文本、Workflows、独立 Diagnostics。
 2. **底层能力再统一**：不要直接物理删除 proto、数据库表和旧 worker；先把入口隐藏、工具不暴露、后台不产生新任务，等 Chat/Translation 稳定后再决定是否删除旧代码。
 
-一个重要现实：当前代码还不能真正做到“当前 Chat 内自由组合 Agent + LLM”。现在 `conversation` 只保存 `agent_id`，而 `ChatAgentConfig` 自己绑定 `provider_id + model`。如果要做参考图那种 `Agent pill + LLM pill`，需要补一个轻量 LLM 配置和会话级 `llm_id`，否则只是 UI 外观变化，实际仍然是 Agent 绑定模型。
+当前代码已经支持“当前 Chat 内自由组合 Agent + LLM”。`conversation` 保存 `agent_id` 和 `llm_id`，用户侧输入框显示 `Agent pill + LLM pill`；切换后会更新当前 conversation，后续消息按新的 Agent system prompt 和新的 LLM provider/model 执行。
 
 项目里已经有一套轻量原生 Agent 基础：
 
@@ -596,7 +632,7 @@ Diagnostics page
 - 先收敛产品入口，再重构设置页。
 - 只隐藏/冻结旧功能，不物理删除 proto、数据库表和迁移。
 - 后端工具暴露面必须同步收敛，不能只做前端隐藏。
-- 真正 `Agent + LLM` 自由组合放到下一期，因为它需要 proto、store、DB migration 和 Chat API 改动。
+- `Agent + LLM` 自由组合已经完成；后续不要再走 Agent 强绑定 model 的旧路径。
 
 ### 9.2 第一期拆分
 
@@ -605,7 +641,7 @@ Diagnostics page
 第一步：收敛工具和入口。
 
 - Chat 后端不再暴露 `auto_tag`、`agent_reply`；保留 `query_queue`。
-- Admin Chat Tools 不再显示这三个工具。
+- Admin Chat Tools 不再显示 `auto_tag`、`agent_reply`。
 - Memo 菜单保留 `Ask AI`，移除 `AI tags`。
 - Memo 录音面板移除 `Transcribe` 入口，只保留添加音频。
 
@@ -635,17 +671,16 @@ Diagnostics page
 - 不新增/删除数据库表。
 - 不删除 proto 字段。
 
-### 9.4 下一期再做
+### 9.4 当前收口项
 
-下一期再考虑真正 `Agent + LLM` 独立组合：
+`Agent + LLM` 独立组合已经落地，当前剩余工作转为收口和降复杂度：
 
-- `Conversation` 增加 `llm_id`。
-- `CreateConversationRequest` / `SendMessageRequest` 支持 `llm_id`。
-- `InstanceAISetting` 增加 `LLMConfig` 或等价结构。
-- `ChatAgentConfig` 从强绑定 provider/model 迁移到默认 LLM fallback。
-- AI Chat 输入框显示 `[Agent v] [LLM v]`，切换 LLM 后下一条消息使用新模型。
+- 拆分 `web/src/components/Settings/AISection.tsx`，先拆静态配置、tabs、overview，再拆各 panel。
+- 把 Chat 和 Translation 的 LLM 解析收敛为更清晰的 runtime resolver。
+- 文档状态持续对齐代码，避免“下一期才做”的旧判断误导开发。
+- 继续保留旧字段和 worker，不做物理删除。
 
-这部分不是第一期，因为当前代码只存 `agent_id`，`ChatAgentConfig` 仍绑定 `provider_id + model`。如果第一期强做，会把“功能收敛”和“数据结构升级”混在一起，风险会明显变大。
+已经完成的实现索引见第 16 章。
 
 ## 10. 不建议做的事
 
@@ -1007,7 +1042,7 @@ Memory
 
 ### 14.2 推荐页面布局
 
-这里建议把 admin 的 `AI Settings` 做成一个轻量“AI 控制台”，不要继续做成一条很长的表单。第一期先收敛范围：不做 AI tag、不做 AI comment、不做语音转文本；admin 侧只管理 Chat、Chatbot 工具、翻译和共享记忆。用户侧 Chat 输入框的最终形态是 `Agent + LLM`，但真正 LLM pill 放到下一期实现。
+这里建议把 admin 的 `AI Settings` 做成一个轻量“AI 控制台”，不要继续做成一条很长的表单。当前范围：不做 AI tag、不做 AI comment、不做语音转文本；admin 侧只管理 Chat、Chatbot 工具、翻译和共享记忆。用户侧 Chat 输入框已经是 `Agent + LLM` 两个 pill，并支持在当前 Chat 内自由切换。
 
 #### 总体信息架构
 
@@ -1457,7 +1492,7 @@ Memory
 
 ## 15. 开发者实施清单
 
-本章是第一期可执行版本。若和前面长期架构讨论有冲突，以本章为准。真正 `Agent + LLM` 自由组合不属于第一期，已单独标成下一期参考。
+本章是当前可执行版本。若和前面长期架构讨论有冲突，以本章为准。真正 `Agent + LLM` 自由组合已经完成，后续重点转为 Admin AI Settings 拆分、runtime 解析层收口和文档状态同步。
 
 ### 15.1 开发前置
 
@@ -1494,16 +1529,16 @@ git switch -c codex/ai-settings-scope-chat-translation
 | 代码位置 | 当前职责 | 本阶段处理 |
 |---|---|---|
 | `web/src/components/Settings/AISection.tsx` | 一个大组件里管理 provider、transcription、translation、AI agents、taggers、chat agents、tools、memory | 拆分并收敛，只展示 LLMs、Agents、Chat Tools、Translation、Memory |
-| `web/src/pages/AIChat.tsx` | Chat 页面，已有 Agent pill、工具确认卡片、memo context | 第一期间保留现有 Agent pill；工具摘要移除 `auto_tag` / `agent_reply` |
-| `web/src/hooks/useAIChatAgents.ts` | 从 `aiSetting.chatAgents` 里取可选 Agent | 保留，后续配合 LLM hook |
-| `web/src/hooks/useAIChat.ts` | Chat conversation / send message / tool confirmation | 第一期不改；下一期若支持会话级 LLM，再增加 `llmId` 入参 |
+| `web/src/pages/AIChat.tsx` | Chat 页面，已有 Agent pill、LLM pill、工具确认卡片、memo context | 已支持当前 chat 内切换 Agent/LLM；继续保持工具摘要不包含 `auto_tag` / `agent_reply` |
+| `web/src/hooks/useAIChatAgents.ts` | 从 `aiSetting.chatAgents` 和 `aiSetting.llms` 里取可选 Agent/LLM | 保留，后续可按职责拆成 Agent hook 与 LLM hook |
+| `web/src/hooks/useAIChat.ts` | Chat conversation / send message / tool confirmation | 已支持 create/send/update conversation 的 `agentId` / `llmId` |
 | `web/src/components/MemoActionMenu/MemoActionMenu.tsx` | memo 操作菜单，包含 Ask AI 和 AI tags | 保留 Ask AI，移除 AI tags |
 | `web/src/components/MemoEditor/index.tsx` | 音频录制后可 attach 或 transcribe | 隐藏/移除 transcribe 入口 |
 | `web/src/components/MemoEditor/components/AudioRecorderPanel.tsx` | 录音面板按钮 | 只保留 attach |
 | `web/src/components/MemoEditor/services/transcriptionService.ts` | 前端调用 `AIService.Transcribe` | 本阶段不再从 UI 调用，可先保留文件 |
 | `web/src/pages/Translate.tsx` | 翻译页面 | 保留 |
 | `web/src/hooks/useTranslation.ts` | 翻译历史和翻译调用 | 保留 |
-| `server/router/api/v1/ai_chat_service.go` | Chat 后端，解析 ChatAgent provider/model，注入工具和 memory | 移除旧工具暴露；后续支持 agent + llm 独立解析 |
+| `server/router/api/v1/ai_chat_service.go` | Chat 后端，解析 Agent + LLM，注入工具和 memory | 已支持 conversation 级 Agent/LLM；后续可整理为独立 runtime resolver |
 | `internal/ai/tools/tool.go` | Chat 工具默认注册表 | 不再注册 `agent_reply`、`auto_tag`；保留 `query_queue` |
 | `server/router/api/v1/ai_service.go` | Transcribe、Translate、Provider test | 保留 Translate 和 TestAIProvider；Transcribe 代码先保留但 UI 不触发 |
 | `server/router/api/v1/v1.go` | 后台 scheduler 同时跑 agent reply、memo tag、schedule reminder | 本阶段不建议删除 scheduler；依靠隐藏入口和不暴露工具避免新任务 |
@@ -1624,12 +1659,58 @@ Admin 设置：
 推荐新目录：
 
 ```text
-web/src/components/Settings/AI/
+web/src/components/Settings/
   AISection.tsx
-  hooks.ts
-  types.ts
-  constants.ts
-  aiSettingMapper.ts
+  ai-settings/
+    types.ts
+    toolRegistry.ts
+    AISettingsTabs.tsx
+    AISettingsOverviewPanel.tsx
+    ChatToolsPanel.tsx
+    LLMsPanel.tsx
+    AgentsPanel.tsx
+    TranslationPanel.tsx
+    MemoryPanel.tsx
+    aiSettingMapper.ts
+    aiSettingFactories.ts
+    saveAISettingPatch.ts
+    dialogs/
+      ProviderDialog.tsx
+      LLMDialog.tsx
+      ChatAgentDialog.tsx
+    hooks.ts
+```
+
+当前拆分进度：
+
+```text
+已拆：
+ai-settings/types.ts
+ai-settings/toolRegistry.ts
+ai-settings/AISettingsTabs.tsx
+ai-settings/AISettingsOverviewPanel.tsx
+ai-settings/LLMsPanel.tsx
+ai-settings/AgentsPanel.tsx
+ai-settings/ChatToolsPanel.tsx
+ai-settings/TranslationPanel.tsx
+ai-settings/MemoryPanel.tsx
+ai-settings/aiSettingMapper.ts
+ai-settings/aiSettingFactories.ts
+ai-settings/saveAISettingPatch.ts
+ai-settings/dialogs/ProviderDialog.tsx
+ai-settings/dialogs/LLMDialog.tsx
+ai-settings/dialogs/ChatAgentDialog.tsx
+
+待拆：
+hooks.ts
+legacy dialogs/forms
+```
+
+当前已经完成静态配置、纯展示 panel、mapper/factory、save helper 和可见 dialogs 的拆分。下一步不是必须项，只有当 `AISection.tsx` 继续增长时，再考虑抽 `hooks.ts`；隐藏 legacy dialogs/forms 先不拆。
+
+历史参考结构：
+
+```text
   OverviewPanel.tsx
   LLMsPanel.tsx
   AgentsPanel.tsx
@@ -1642,7 +1723,7 @@ web/src/components/Settings/AI/
     MemoryEntryDialog.tsx
 ```
 
-第一期不实现“真正 LLM profile”。如果不改 proto，`LLMsPanel` 先展示 provider connection，并在卡片里提示哪些 Chat Agent / Translation 正在使用该 provider。真正 `LLMConfig` 放到下一期。
+真正 LLM profile 已经实现。`LLMsPanel` 后续应直接展示 `InstanceAISetting.llms[]`，并允许配置 title、provider、model、enabled；其他功能只选择 `llm_id`，不再重复填写 model name。
 
 页面结构：
 
@@ -1662,16 +1743,14 @@ AI Settings
 保存逻辑必须改成 patch helper：
 
 ```ts
-saveAISettingPatch({
-  providers?: nextProviders,
-  translation?: nextTranslation,
-  chatAgents?: nextChatAgents,
-  tools?: nextTools,
-  memory?: nextMemory,
-})
+savePatch({ providers: nextProviders }, "Update AI provider")
+savePatch({ translation: nextTranslation }, "Update translation")
+savePatch({ chatAgents: nextChatAgents }, "Update chat agent")
+savePatch({ tools: nextTools }, "Toggle chat tool")
+savePatch({ memory: nextMemory }, "Update memory")
 ```
 
-helper 内部合并原始完整 `aiSetting`：
+helper 内部合并原始完整 `aiSetting`。未传字段使用已保存的 `originalSetting`，避免保存某个 panel 时把其他 panel 的未保存草稿也写入；保存 Chat Tools 时会覆盖当前可见工具，同时保留已隐藏旧工具的 persisted config：
 
 ```text
 next.aiSetting.providers = patch.providers ?? original.providers
@@ -1757,15 +1836,15 @@ go test ./store/...
 
 - 只改前端隐藏工具不够，后端 registry 默认仍会暴露未配置工具。
 - 从 `toolRegistry` 删除工具时，不要让保存逻辑把隐藏的旧配置误清空，除非本阶段明确要清理。
-- `Agent + LLM` 不是纯前端改动；当前后端数据结构不支持真正自由组合。
+- `Agent + LLM` 不是纯前端改动；当前已补齐 proto、store、DB migration 和 Chat API，后续改 UI 时不要退回到 Agent 绑定 model 的旧路径。
 - `Transcribe` 后端可以先保留；产品入口隐藏即可。
 - `agent_reply_worker` 和 `memo_tag_worker` 可以先保留；没有入口和 enabled 配置时不会产生新任务。
 - `query_queue` 虽然和冻结的两个任务相关，但保留为 admin Chat 工具，不做独立 Diagnostics 页面。
 - Provider API key 是 write-only，前端只能显示 `apiKeySet/apiKeyHint`，不能假设能读回真实 key。
 
-## 16. 下一期参考：真正 Agent + LLM 自由组合
+## 16. 已完成：真正 Agent + LLM 自由组合
 
-这一章不属于第一期。第一期先收敛 AI 功能和设置页；如果要把用户侧输入框做到参考图那种 `Agent + LLM`，需要做轻量后端和 proto 改动，建议下一期单独开分支。
+这一章最初是下一期参考，目前核心内容已经完成。保留本章作为实现回顾和后续验收索引。
 
 推荐新增概念：
 
@@ -1783,16 +1862,16 @@ LLMConfig
 Proto 改动：
 
 - `proto/store/instance_setting.proto`
-  - `InstanceAISetting` 增加 `repeated LLMConfig llms = 9;`
-  - 新增 `message LLMConfig`
-  - `ChatAgentConfig` 增加 `default_llm_id`
-  - `TranslationConfig` 增加 `llm_id`
+  - `InstanceAISetting` 已增加 `repeated LLMConfig llms = 9;`
+  - 已新增 `message LLMConfig`
+  - `ChatAgentConfig` 已增加 `llm_id`
+  - `TranslationConfig` 已增加 `llm_id`
 - `proto/api/v1/instance_service.proto`
-  - 同步 API 层字段。
+  - 已同步 API 层字段。
 - `proto/api/v1/ai_chat_service.proto`
-  - `Conversation` 增加 `llm_id`
-  - `CreateConversationRequest` 增加 `llm_id`
-  - `SendMessageRequest` 增加可选 `llm_id`
+  - `Conversation` 已增加 `llm_id`
+  - `CreateConversationRequest` 已增加 `llm_id`
+  - `SendMessageRequest` 已增加可选 `llm_id`
 
 生成：
 
@@ -1805,9 +1884,9 @@ buf lint
 Store / DB 改动：
 
 - `store/conversation.go`
-  - `Conversation` 增加 `LLMID string`
-  - `CreateConversation` 增加 `LLMID string`
-  - `UpdateConversation` 如需切换当前会话默认 LLM，增加 `LLMID *string`
+  - `Conversation` 已增加 `LLMID string`
+  - `CreateConversation` 已增加 `LLMID string`
+  - `UpdateConversation` 已增加 `AgentID *string` 和 `LLMID *string`
 - 三套 DB：
   - `store/db/sqlite/conversation.go`
   - `store/db/mysql/conversation.go`
@@ -1818,11 +1897,11 @@ Store / DB 改动：
 后端 Chat 改动：
 
 - `server/router/api/v1/ai_chat_service.go`
-  - `CreateConversation` 保存 `llm_id`。
-  - `SendMessage` 接收 `request.llm_id`，如果有值就用于当前回合，并可更新 conversation 默认 `llm_id`。
-  - `resolveChatProvider(ctx, agentID)` 改为 `resolveChatRuntime(ctx, agentID, llmID)`。
-  - Agent 只负责 system prompt。
-  - LLM 负责 provider/model。
+  - `CreateConversation` 已保存 `llm_id`。
+  - `UpdateConversation` 已支持当前会话切换 `agent_id` 和 `llm_id`。
+  - `SendMessage` 已接收 `request.llm_id`，有值时会更新 conversation 默认 `llm_id`。
+  - `resolveChatProvider(ctx, agentID, llmID)` 已按 Agent + LLM 解析运行时。
+  - Agent 负责 system prompt；LLM 负责 provider/model。
   - fallback 顺序：
 
 ```text
@@ -1835,15 +1914,17 @@ legacy chatAgent.provider_id + chatAgent.model
 
 前端 Chat 改动：
 
-- 新增 `web/src/hooks/useAIChatLLMs.ts`。
+- 已在 `web/src/hooks/useAIChatAgents.ts` 中同时读取 Chat Agents 和 LLMs；后续可再拆成 `useAIChatLLMs.ts`。
 - `web/src/pages/AIChat.tsx`
-  - 新增 `LLMPill`。
-  - composer 左下角显示 `[Agent] [LLM]`。
-  - 新建 conversation 时传 `agentId + llmId`。
-  - 已有 conversation 中切换 LLM 后，下一次 `sendMessage` 带 `llmId`。
+  - 已新增 `LLMPill`。
+  - composer 左下角已显示 `[Agent] [LLM]`。
+  - 新建 conversation 时已传 `agentId + llmId`。
+  - 已有 conversation 中切换 Agent/LLM 会更新当前会话。
+  - 发送消息时会带当前 `llmId`。
 - `web/src/hooks/useAIChat.ts`
-  - `useCreateConversation` input 增加 `llmId`。
-  - `useSendMessage` input 增加 `llmId`。
+  - `useCreateConversation` input 已增加 `llmId`。
+  - `useSendMessage` input 已增加 `llmId`。
+  - 已新增 `useUpdateConversationAgent` 和 `useUpdateConversationLLM`。
 
 兼容策略：
 

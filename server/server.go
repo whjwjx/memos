@@ -123,7 +123,7 @@ func (s *Server) Start() error {
 
 	// Start Echo server directly (no cmux needed - all traffic is HTTP).
 	s.httpServer = &http.Server{Handler: s.echoServer}
-	s.apiV1Service.StartAgentReplyScheduler()
+	s.apiV1Service.StartBackgroundScheduler()
 	go func() {
 		if err := s.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 			slog.Error("failed to start echo server", "error", err)
@@ -140,7 +140,7 @@ func (s *Server) Shutdown(ctx context.Context) {
 	slog.Info("server shutting down")
 
 	s.closeLongLivedConnections()
-	s.apiV1Service.StopAgentReplyScheduler(ctx)
+	s.apiV1Service.StopBackgroundScheduler(ctx)
 	s.shutdownHTTPServer(ctx)
 
 	// Close database connection.

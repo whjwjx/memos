@@ -340,6 +340,10 @@ message InstanceSetting {
     // translation is the admin-configured AI translation capability surfaced in
     // the /translate page. Non-admin callers can only see whether it is enabled.
     TranslationConfig translation = 8;
+
+    // llms is the list of configured model profiles. AI capabilities should
+    // reference one of these entries instead of each storing a raw model name.
+    repeated LLMConfig llms = 9;
   }
 
   // TranslationConfig configures the AI-backed translation page.
@@ -347,11 +351,15 @@ message InstanceSetting {
     // enabled toggles whether regular users can use AI translation.
     bool enabled = 1;
     // provider_id references an entry in AISetting.providers[].id.
+    // Deprecated: new clients should use llm_id.
     string provider_id = 2;
     // model is the provider-specific text-generation model identifier.
+    // Deprecated: new clients should use llm_id.
     string model = 3;
     // max_text_length caps a single translation request in characters.
     int32 max_text_length = 4;
+    // llm_id references an entry in AISetting.llms[].id.
+    string llm_id = 5;
   }
 
   // MemoryConfig holds the shared context bank used by the AI chat assistant.
@@ -392,14 +400,19 @@ message InstanceSetting {
     bool builtin = 3;
     // provider_id references an entry in AISetting.providers[].id.
     // Empty string means the preset is disabled.
+    // Deprecated: new clients should use llm_id.
     string provider_id = 4;
     // model is the provider-specific text-generation model identifier.
     // Empty string falls back to the engine default.
+    // Deprecated: new clients should use llm_id.
     string model = 5;
     // system_prompt steers the assistant's behavior, tone, and constraints.
     string system_prompt = 6;
     // enabled toggles whether the preset is selectable in /ai-chat.
     bool enabled = 7;
+    // llm_id references an entry in AISetting.llms[].id. Empty string uses
+    // legacy provider_id/model fields.
+    string llm_id = 8;
   }
 
   // ToolConfig is the per-tool toggle and safety configuration stored in
@@ -469,6 +482,20 @@ message InstanceSetting {
     bool api_key_set = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
     // api_key_hint is a masked hint for the stored API key.
     string api_key_hint = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  }
+
+  // LLMConfig represents one configured model profile backed by an AI provider.
+  message LLMConfig {
+    // id is the stable identifier of the LLM profile.
+    string id = 1;
+    // title is the human-readable model profile name shown in selectors.
+    string title = 2;
+    // provider_id references an entry in AISetting.providers[].id.
+    string provider_id = 3;
+    // model is the provider-specific model identifier.
+    string model = 4;
+    // enabled toggles whether the LLM can be selected by AI capabilities.
+    bool enabled = 5;
   }
 
   // AIProviderType is the provider implementation type.

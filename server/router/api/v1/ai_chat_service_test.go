@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/usememos/memos/internal/ai/tools"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
@@ -66,6 +67,24 @@ func TestAIChatConversationCRUD(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, created.Msg.Id, got.Msg.Conversation.Id)
+
+	_, err = s.Store.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
+		Key: storepb.InstanceSettingKey_AI,
+		Value: &storepb.InstanceSetting_AiSetting{AiSetting: &storepb.InstanceAISetting{
+			ChatAgents: []*storepb.ChatAgentConfig{
+				{Id: "research", Name: "Research", Enabled: true},
+			},
+		}},
+	})
+	require.NoError(t, err)
+	updated, err := s.UpdateConversation(ctx, &connect.Request[v1pb.UpdateConversationRequest]{
+		Msg: &v1pb.UpdateConversationRequest{
+			Conversation: &v1pb.Conversation{Id: created.Msg.Id, AgentId: "research"},
+			UpdateMask:   &fieldmaskpb.FieldMask{Paths: []string{"agent_id"}},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "research", updated.Msg.AgentId)
 
 	// Delete.
 	_, err = s.DeleteConversation(ctx, &connect.Request[v1pb.DeleteConversationRequest]{

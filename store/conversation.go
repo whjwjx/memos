@@ -11,6 +11,7 @@ type Conversation struct {
 	UserID    int32
 	Title     string
 	AgentID   string
+	LLMID     string
 	CreatedTs int64
 	UpdatedTs int64
 }
@@ -37,6 +38,7 @@ type CreateConversation struct {
 	UserID  int32
 	Title   string
 	AgentID string
+	LLMID   string
 }
 
 // FindConversation filters conversations.
@@ -51,8 +53,10 @@ type FindConversation struct {
 
 // UpdateConversation mutates a conversation, typically its title.
 type UpdateConversation struct {
-	ID    int32
-	Title *string
+	ID      int32
+	Title   *string
+	AgentID *string
+	LLMID   *string
 }
 
 // CreateConversationMessage is the input for appending a message.

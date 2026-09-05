@@ -234,6 +234,10 @@ message InstanceAISetting {
   // translation is the admin-configured AI translation capability surfaced in
   // the /translate page. When unset or disabled, translation is unavailable.
   TranslationConfig translation = 8;
+
+  // llms is the list of configured model profiles. AI capabilities should
+  // reference one of these entries instead of each storing a raw model name.
+  repeated LLMConfig llms = 9;
 }
 
 // TranslationConfig configures the AI-backed translation page.
@@ -241,13 +245,17 @@ message TranslationConfig {
   // enabled toggles whether regular users can use AI translation.
   bool enabled = 1;
   // provider_id references an entry in InstanceAISetting.providers[].id.
+  // Deprecated: new clients should use llm_id.
   string provider_id = 2;
   // model is the provider-specific text-generation model identifier.
   // Empty string falls back to the engine default.
+  // Deprecated: new clients should use llm_id.
   string model = 3;
   // max_text_length caps a single translation request in characters.
   // 0 means the server default is used.
   int32 max_text_length = 4;
+  // llm_id references an entry in InstanceAISetting.llms[].id.
+  string llm_id = 5;
 }
 
 // MemoryConfig holds the shared context bank used by the AI chat assistant.
@@ -288,14 +296,19 @@ message ChatAgentConfig {
   bool builtin = 3;
   // provider_id references an entry in InstanceAISetting.providers[].id.
   // Empty string means the preset is disabled.
+  // Deprecated: new clients should use llm_id.
   string provider_id = 4;
   // model is the provider-specific text-generation model identifier.
   // Empty string falls back to the engine default.
+  // Deprecated: new clients should use llm_id.
   string model = 5;
   // system_prompt steers the assistant's behavior, tone, and constraints.
   string system_prompt = 6;
   // enabled toggles whether the preset is selectable in /ai-chat.
   bool enabled = 7;
+  // llm_id references an entry in InstanceAISetting.llms[].id. Empty string
+  // uses legacy provider_id/model fields.
+  string llm_id = 8;
 }
 
 // ToolConfig is the per-tool toggle and safety configuration stored in
@@ -370,6 +383,14 @@ message AIProviderConfig {
   string endpoint = 4;
   // api_key is write-only at the API layer and is required by the server to call providers.
   string api_key = 5;
+}
+
+message LLMConfig {
+  string id = 1;
+  string title = 2;
+  string provider_id = 3;
+  string model = 4;
+  bool enabled = 5;
 }
 
 enum AIProviderType {

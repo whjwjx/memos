@@ -1,8 +1,7 @@
 // Package tools defines the function-calling tool abstraction used by the AI
-// chat assistant. Each tool wraps an existing store capability (memos,
-// comments, settings, agents, taggers) and exposes it to the model through a
-// provider-agnostic ToolSpec. The assistant package drives tool execution via
-// the Registry.
+// chat assistant. Each tool wraps an existing store capability and exposes it
+// to the model through a provider-agnostic ToolSpec. The assistant package
+// drives tool execution via the Registry.
 package tools
 
 import (
@@ -40,7 +39,7 @@ type Registry struct {
 	tools map[string]Tool
 }
 
-// NewRegistry builds a registry pre-populated with the stage-1 tool set.
+// NewRegistry builds a registry pre-populated with the conversational tool set.
 func NewRegistry() *Registry {
 	r := &Registry{tools: make(map[string]Tool)}
 	for _, t := range []Tool{
@@ -53,8 +52,6 @@ func NewRegistry() *Registry {
 		&BatchUpdateMemosTool{},
 		&DeleteMemoTool{},
 		&ManageSettingsTool{},
-		&AgentReplyTool{},
-		&AutoTagTool{},
 		&QueryDBTool{},
 		&GetLogsTool{},
 		&ManageMemoryTool{},

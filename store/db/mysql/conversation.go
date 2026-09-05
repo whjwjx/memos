@@ -20,11 +20,11 @@ func (d *DB) CreateConversation(ctx context.Context, create *store.CreateConvers
 
 	stmt := `
 		INSERT INTO ` + "`conversation`" + ` (
-			uid, user_id, title, agent_id
+			uid, user_id, title, agent_id, llm_id
 		)
-		VALUES (?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?)
 	`
-	result, err := tx.ExecContext(ctx, stmt, create.UID, create.UserID, create.Title, create.AgentID)
+	result, err := tx.ExecContext(ctx, stmt, create.UID, create.UserID, create.Title, create.AgentID, create.LLMID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,14 +45,14 @@ func (d *DB) CreateConversation(ctx context.Context, create *store.CreateConvers
 func (*DB) findConversationImpl(ctx context.Context, tx *sql.Tx, where string, args ...any) (*store.Conversation, error) {
 	query := `
 		SELECT
-			id, uid, user_id, title, agent_id, created_ts, updated_ts
+			id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 		FROM ` + "`conversation`" + `
 		WHERE ` + where + `
 		LIMIT 1
 	`
 	conv := &store.Conversation{}
 	if err := tx.QueryRowContext(ctx, query, args...).Scan(
-		&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.CreatedTs, &conv.UpdatedTs,
+		&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.LLMID, &conv.CreatedTs, &conv.UpdatedTs,
 	); err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (d *DB) ListConversations(ctx context.Context, find *store.FindConversation
 	}
 	query := `
 		SELECT
-			id, uid, user_id, title, agent_id, created_ts, updated_ts
+			id, uid, user_id, title, agent_id, llm_id, created_ts, updated_ts
 		FROM ` + "`conversation`" + `
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY updated_ts DESC
@@ -94,7 +94,7 @@ func (d *DB) ListConversations(ctx context.Context, find *store.FindConversation
 	for rows.Next() {
 		conv := &store.Conversation{}
 		if err := rows.Scan(
-			&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.CreatedTs, &conv.UpdatedTs,
+			&conv.ID, &conv.UID, &conv.UserID, &conv.Title, &conv.AgentID, &conv.LLMID, &conv.CreatedTs, &conv.UpdatedTs,
 		); err != nil {
 			return nil, err
 		}
@@ -116,6 +116,12 @@ func (d *DB) UpdateConversation(ctx context.Context, update *store.UpdateConvers
 	set, args := []string{}, []any{}
 	if update.Title != nil {
 		set, args = append(set, "title = ?"), append(args, *update.Title)
+	}
+	if update.AgentID != nil {
+		set, args = append(set, "agent_id = ?"), append(args, *update.AgentID)
+	}
+	if update.LLMID != nil {
+		set, args = append(set, "llm_id = ?"), append(args, *update.LLMID)
 	}
 	if len(set) == 0 {
 		return nil, errors.New("no fields to update in UpdateConversation")
