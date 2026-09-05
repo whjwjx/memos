@@ -24,7 +24,7 @@ const SettingGroup: React.FC<SettingGroupProps> = ({ title, description, childre
                 {description && <p className="max-w-2xl text-xs leading-5 text-muted-foreground">{description}</p>}
               </div>
             )}
-            {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:ml-auto">{actions}</div> : null}
+            {actions ? <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">{actions}</div> : null}
           </div>
         )}
         <div className="flex min-w-0 flex-col gap-3">{children}</div>

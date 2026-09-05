@@ -25,7 +25,7 @@ export const TranslationPanel = ({ llms, providers, translation, translationHasC
       description={t("setting.ai.translation-description")}
       showSeparator
       actions={
-        <Button disabled={!translationHasChanges} onClick={onSave}>
+        <Button className="w-full justify-center sm:w-auto" disabled={!translationHasChanges} onClick={onSave}>
           {t("common.save")}
         </Button>
       }
