@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"mime"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -54,79 +53,8 @@ var supportedTranscriptionContentTypes = map[string]bool{
 }
 
 // Transcribe transcribes an audio file using an instance AI provider.
-func (s *APIV1Service) Transcribe(ctx context.Context, request *v1pb.TranscribeRequest) (*v1pb.TranscribeResponse, error) {
-	user, err := s.fetchCurrentUser(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get current user: %v", err)
-	}
-	if user == nil {
-		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
-	}
-
-	if request.Audio == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "audio is required")
-	}
-	if request.Audio.GetUri() != "" {
-		return nil, status.Errorf(codes.InvalidArgument, "audio uri is not supported")
-	}
-	content := request.Audio.GetContent()
-	if len(content) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "audio content is required")
-	}
-	if len(content) > maxTranscriptionAudioSizeBytes {
-		return nil, status.Errorf(codes.InvalidArgument, "audio file is too large; maximum size is 25 MiB")
-	}
-	filename := strings.TrimSpace(request.Audio.GetFilename())
-	if len(filename) > maxTranscriptionFilenameLength {
-		return nil, status.Errorf(codes.InvalidArgument, "filename is too long; maximum length is %d characters", maxTranscriptionFilenameLength)
-	}
-	contentType := strings.TrimSpace(request.Audio.GetContentType())
-	if contentType == "" {
-		contentType = http.DetectContentType(content)
-	}
-	if !isSupportedTranscriptionContentType(contentType) {
-		return nil, status.Errorf(codes.InvalidArgument, "audio content type %q is not supported", contentType)
-	}
-
-	aiSetting, err := s.Store.GetInstanceAISetting(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get AI setting: %v", err)
-	}
-	persisted := aiSetting.GetTranscription()
-
-	providerID := persisted.GetProviderId()
-	if providerID == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "transcription is not configured")
-	}
-
-	provider, err := s.resolveAIProvider(aiSetting, providerID)
-	if err != nil {
-		return nil, err
-	}
-
-	model := persisted.GetModel()
-	if model == "" {
-		defaultModel, err := ai.DefaultTranscriptionModel(provider.Type)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-		}
-		model = defaultModel
-	}
-
-	var text string
-	switch provider.Type {
-	case ai.ProviderOpenAI:
-		text, err = s.transcribeViaSTT(ctx, provider, persisted, model, content, filename, contentType)
-	case ai.ProviderGemini:
-		text, err = s.transcribeViaAudioLLM(ctx, provider, persisted, model, content, contentType)
-	default:
-		return nil, status.Errorf(codes.FailedPrecondition,
-			"provider type %q is not supported for transcription", provider.Type)
-	}
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to transcribe audio: %v", err)
-	}
-	return &v1pb.TranscribeResponse{Text: text}, nil
+func (s *APIV1Service) Transcribe(context.Context, *v1pb.TranscribeRequest) (*v1pb.TranscribeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "audio transcription has been removed")
 }
 
 // testAIProviderProbeTimeout caps how long TestAIProvider waits for a provider

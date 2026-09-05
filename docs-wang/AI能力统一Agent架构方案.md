@@ -5,6 +5,25 @@
 > 依据：当前 `dev` 代码核查结果
 > 目标：先收敛 memos 中分散的 AI 功能，只保留 AI Chat、Chatbot 工具、翻译和共享记忆；AI tags、AI comment、语音转文本先隐藏/冻结，后续再决定是否恢复。
 
+## 2026-09-05 执行状态补充
+
+当前已经从“隐藏/冻结”推进到“功能级删除”：
+
+- Admin AI Settings 不再保留 legacy Transcription / 自动评论 Agent / Tagger UI。
+- AI 设置保存时会清空旧 `transcription / agents / taggers` 配置。
+- 新建 memo 后不再调度旧 `agent_reply_task` 和 `memo_tag_task`。
+- `AutoTagMemo` 与 `Transcribe` RPC 仍保留 proto 兼容，但服务端返回 `Unimplemented`，不会再执行旧功能。
+- Chat 工具继续只保留当前 Chatbot 所需工具，`query_queue` 保留。
+- `project_status` 不再展示旧 Agent / Tagger / Transcription 作为当前 AI 能力。
+- 普通音频录制仍保留，只移除 AI 语音转文本能力。
+
+本轮仍不做物理删除：
+
+- 不删除 proto 字段。
+- 不删除 store 类型。
+- 不删除 `agent_reply_task` / `memo_tag_task` 表和历史迁移。
+- 不删除旧 worker/helper 文件，避免一次性扩大迁移和兼容风险。
+
 ## 0. 阅读顺序
 
 如果是马上开发，请优先看：

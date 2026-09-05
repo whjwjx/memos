@@ -57,10 +57,11 @@ type APIV1Service struct {
 
 	linkMetadataFetcher linkMetadataFetcher
 
-	// agentReplyScheduler polls the agent_reply_task table and posts agent
-	// replies once their due time arrives.
-	agentReplyScheduler *scheduler.Scheduler
+	// backgroundScheduler runs lightweight periodic maintenance jobs.
+	backgroundScheduler *scheduler.Scheduler
 }
+
+const backgroundScanInterval = "*/15 * * * * *"
 
 // NewAPIV1Service creates an API v1 service with its shared dependencies.
 func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store) *APIV1Service {
@@ -81,41 +82,39 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 	}
 	service.linkMetadataFetcher = httpgetter.NewHTMLMetaFetcher()
 
-	agentScheduler := scheduler.New()
-	agentJob := &scheduler.Job{
-		Name:     "agent-reply-poller",
-		Schedule: agentReplyScanInterval,
+	backgroundScheduler := scheduler.New()
+	backgroundJob := &scheduler.Job{
+		Name:     "background-maintenance",
+		Schedule: backgroundScanInterval,
 		Handler: func(ctx context.Context) error {
-			service.processDueAgentReplies(ctx)
-			service.processDueMemoTagTasks(ctx)
 			service.processDueScheduleReminders(ctx)
 			return nil
 		},
 	}
-	if err := agentScheduler.Register(agentJob); err != nil {
-		slog.Warn("Failed to register agent reply poller", slog.Any("err", err))
+	if err := backgroundScheduler.Register(backgroundJob); err != nil {
+		slog.Warn("Failed to register background maintenance job", slog.Any("err", err))
 	} else {
-		service.agentReplyScheduler = agentScheduler
+		service.backgroundScheduler = backgroundScheduler
 	}
 	return service
 }
 
-// StartAgentReplyScheduler starts the background poller that posts queued
-// agent replies. It is safe to call once during server startup.
-func (s *APIV1Service) StartAgentReplyScheduler() {
-	if s.agentReplyScheduler != nil {
-		if err := s.agentReplyScheduler.Start(); err != nil {
-			slog.Warn("Failed to start agent reply poller", slog.Any("err", err))
+// StartBackgroundScheduler starts periodic maintenance jobs. It is safe to call
+// once during server startup.
+func (s *APIV1Service) StartBackgroundScheduler() {
+	if s.backgroundScheduler != nil {
+		if err := s.backgroundScheduler.Start(); err != nil {
+			slog.Warn("Failed to start background maintenance job", slog.Any("err", err))
 		}
 	}
 }
 
-// StopAgentReplyScheduler stops the background poller. It is safe to call once
-// during graceful shutdown.
-func (s *APIV1Service) StopAgentReplyScheduler(ctx context.Context) {
-	if s.agentReplyScheduler != nil {
-		if err := s.agentReplyScheduler.Stop(ctx); err != nil {
-			slog.Warn("Failed to stop agent reply poller", slog.Any("err", err))
+// StopBackgroundScheduler stops periodic maintenance jobs. It is safe to call
+// once during graceful shutdown.
+func (s *APIV1Service) StopBackgroundScheduler(ctx context.Context) {
+	if s.backgroundScheduler != nil {
+		if err := s.backgroundScheduler.Stop(ctx); err != nil {
+			slog.Warn("Failed to stop background maintenance job", slog.Any("err", err))
 		}
 	}
 }

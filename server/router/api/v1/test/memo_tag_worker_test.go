@@ -70,8 +70,8 @@ func TestParseTaggerCandidateTags(t *testing.T) {
 	}
 }
 
-// TestAutoTagMemoRPC schedules tasks via the public RPC path, ensuring the
-// wired-up handler (not just the internal method) queues work.
+// TestAutoTagMemoRPC keeps the public RPC contract aligned with the current
+// AI product scope: legacy auto-tagging is no longer exposed.
 func TestAutoTagMemoRPC(t *testing.T) {
 	ctx := context.Background()
 	ts := NewTestService(t)
@@ -80,18 +80,11 @@ func TestAutoTagMemoRPC(t *testing.T) {
 	require.NoError(t, err)
 	adminCtx := ts.CreateUserContext(ctx, host.ID)
 
-	upsertTestAISetting(ctx, t, ts,
-		&storepb.TaggerConfig{Id: "tagger-1", Name: "T1", ProviderId: "prov-1", Enabled: true, Prompt: "candidates: work, life", MaxTags: 3},
-	)
-
 	memo := createTestMemo(ctx, t, ts, host.ID, "rpc memo", nil)
 
 	_, err = ts.Service.AutoTagMemo(adminCtx, &v1pb.AutoTagMemoRequest{
 		Name: "memos/" + memo.UID,
 	})
-	require.NoError(t, err)
-
-	tasks, err := ts.Store.ListMemoTagTasks(ctx, &store.FindMemoTagTask{MemoID: &memo.ID})
-	require.NoError(t, err)
-	require.Len(t, tasks, 1)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "AI auto-tagging has been removed")
 }

@@ -2,11 +2,16 @@
 
 > 日期：2026-09-05
 > 基线提交：`f8035b2c refactor: split ai settings panels`
-> 目标：在不改变当前产品行为的前提下，继续降低 Admin AI Settings 的维护成本，方便后续二开。
+> 目标：删除已确认不再保留的旧 AI tags / AI comment / transcribe 触发面，并继续降低 Admin AI Settings 的维护成本，方便后续二开。
 
 ## 0. 本轮执行状态
 
-本轮已经按“尽量一次弄好，但不做大 hook、不删旧后端”的边界完成内部整理。
+本轮已进入第二轮整理，按推荐顺序执行：
+
+1. 先提交第一轮 AI Settings 内部整理。
+2. 新开分支 `codex/remove-legacy-ai-features`。
+3. 删除旧 AI tags / AI comment / transcribe 的可触发面。
+4. 拆小 hook，不抽一个大而全的 `useAISettingsDraft.ts`。
 
 已完成：
 
@@ -14,21 +19,25 @@
 - 新增 `aiSettingFactories.ts`，集中管理 Provider / LLM / Agent / Memory entry 的默认值。
 - 新增 `saveAISettingPatch.ts`，把原来的长位置参数保存方式改为 object patch。
 - 新增 `dialogs/ProviderDialog.tsx`、`dialogs/LLMDialog.tsx`、`dialogs/ChatAgentDialog.tsx`。
-- `AISection.tsx` 从约 2200 行降到约 1380 行。
-- 保存 Chat Tools 时只覆盖当前可见工具，同时保留已隐藏旧工具的 persisted config。
+- 新增 `hooks/useAIChatAgents.ts`、`hooks/useAIToolsSettings.ts`、`hooks/useAITranslationSettings.ts`、`hooks/useAIMemorySettings.ts`。
+- `AISection.tsx` 从约 2200 行降到约 380 行。
+- 保存 Chat Tools 时只覆盖当前可见工具，同时保留 `query_queue` 等当前工具配置。
 - 删除 Provider / LLM 时仍会清理被引用的 Chat Agent / Translation，但不会顺手保存其他 panel 未点击保存的草稿。
+- `saveAISettingPatch.ts` 会清空旧 `transcription / agents / taggers` 配置，避免旧功能在后续保存中继续保留。
+- 后端不再在创建 memo 后调度旧自动评论和自动打标任务。
+- `AutoTagMemo` 和 `Transcribe` RPC 暂保留 proto 兼容，但服务端明确返回 `Unimplemented`。
+- `project_status` 不再把旧 Agent / Tagger / Transcription 当作当前 AI 能力展示。
 
 仍然刻意不做：
 
 - 不抽 `useAISettingsDraft.ts` 大 hook。
-- 不拆隐藏 legacy 的 Agent / Tagger / Transcription UI。
-- 不删除旧 AI tags / AI comment / transcribe 后端代码。
-- 不改 proto / store / migration。
+- 不物理删除 proto 字段、store 类型、旧任务表和迁移。
+- 不删除普通音频录制能力；只删除 AI 转写能力。
 
 当前剩余可以以后再做：
 
-- 如果 `AISection.tsx` 未来继续增长，再抽小 hook，而不是现在一次性抽大 hook。
-- 如果确认永远不恢复 AI tags / AI comment / transcribe，再单独开删除旧代码分支。
+- 如果确认不需要兼容旧 API，再单独做 proto 字段、store 类型、旧任务表的物理删除。
+- 如果 `query_queue` 后续只保留新队列，再把 legacy queue 表从查询范围中移除。
 
 ## 1. 当前结论
 
@@ -43,12 +52,12 @@
 - Chat Tools 不显示 `auto_tag`、`agent_reply`，保留 `query_queue`。
 - AI Chat 输入框支持 `Agent + LLM`，并且当前 chat 内可以自由切换。
 
-新一轮整理只做内部代码结构，不做：
+新一轮整理已经从“只做内部代码结构”推进到“功能级删除旧 AI 入口 + 小 hook 整理”。仍然不做：
 
 - 不改页面信息架构。
 - 不改 proto。
 - 不改数据库。
-- 不删旧 worker、旧 service 或旧 setting 字段。
+- 不物理删除旧 worker 文件、旧 service helper、旧 setting 字段和数据库表。
 - 不恢复 AI tags、AI comment、语音转文本。
 
 ## 2. 当前代码实际状态

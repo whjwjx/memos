@@ -150,19 +150,14 @@ type queueStatusOnly struct {
 }
 
 type projectStatusAI struct {
-	Providers               int  `json:"providers"`
-	ProvidersWithAPIKey     int  `json:"providersWithApiKey"`
-	Agents                  int  `json:"agents"`
-	AgentsEnabled           int  `json:"agentsEnabled"`
-	Taggers                 int  `json:"taggers"`
-	TaggersEnabled          int  `json:"taggersEnabled"`
-	ChatAgents              int  `json:"chatAgents"`
-	ChatAgentsEnabled       int  `json:"chatAgentsEnabled"`
-	ToolsConfigured         int  `json:"toolsConfigured"`
-	MemoryEnabled           bool `json:"memoryEnabled"`
-	MemoryEntries           int  `json:"memoryEntries"`
-	TranslationEnabled      bool `json:"translationEnabled"`
-	TranscriptionConfigured bool `json:"transcriptionConfigured"`
+	Providers           int  `json:"providers"`
+	ProvidersWithAPIKey int  `json:"providersWithApiKey"`
+	ChatAgents          int  `json:"chatAgents"`
+	ChatAgentsEnabled   int  `json:"chatAgentsEnabled"`
+	ToolsConfigured     int  `json:"toolsConfigured"`
+	MemoryEnabled       bool `json:"memoryEnabled"`
+	MemoryEntries       int  `json:"memoryEntries"`
+	TranslationEnabled  bool `json:"translationEnabled"`
 }
 
 type projectStatusLogSummary struct {
@@ -403,8 +398,6 @@ func projectTableCounts(ctx context.Context, s *store.Store) (map[string]int64, 
 		"attachments":          "attachment",
 		"inboxes":              "inbox",
 		"memoShares":           "memo_share",
-		"agentReplyTasks":      "agent_reply_task",
-		"memoTagTasks":         "memo_tag_task",
 		"conversations":        "conversation",
 		"conversationMessages": "conversation_message",
 	}
@@ -449,18 +442,6 @@ func summarizeAISetting(setting *storepb.InstanceAISetting) projectStatusAI {
 			out.ProvidersWithAPIKey++
 		}
 	}
-	out.Agents = len(setting.GetAgents())
-	for _, agent := range setting.GetAgents() {
-		if agent.GetEnabled() {
-			out.AgentsEnabled++
-		}
-	}
-	out.Taggers = len(setting.GetTaggers())
-	for _, tagger := range setting.GetTaggers() {
-		if tagger.GetEnabled() {
-			out.TaggersEnabled++
-		}
-	}
 	out.ChatAgents = len(setting.GetChatAgents())
 	for _, agent := range setting.GetChatAgents() {
 		if agent.GetEnabled() {
@@ -471,7 +452,6 @@ func summarizeAISetting(setting *storepb.InstanceAISetting) projectStatusAI {
 	out.MemoryEnabled = setting.GetMemory().GetEnabled()
 	out.MemoryEntries = len(setting.GetMemory().GetEntries())
 	out.TranslationEnabled = setting.GetTranslation().GetEnabled()
-	out.TranscriptionConfigured = setting.GetTranscription().GetProviderId() != ""
 	return out
 }
 
