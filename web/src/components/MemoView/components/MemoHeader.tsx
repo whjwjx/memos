@@ -3,8 +3,8 @@ import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import RelativeTime from "@/components/RelativeTime";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useNewMemo } from "@/contexts/NewMemoContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNewMemo } from "@/contexts/NewMemoContext";
 import useNavigateTo from "@/hooks/useNavigateTo";
 import i18n from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -27,8 +27,15 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
   const { memo, creator, currentUser, parentPage, isArchived, readonly, openEditor } = useMemoViewContext();
   const { userGeneralSetting } = useAuth();
   const commentIndicatorOnHover = userGeneralSetting?.commentIndicatorOnHover ?? false;
-  const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, relativeTimeFormat, commentAmount, isInMemoDetailPage } =
-    useMemoViewDerived();
+  const {
+    createTime,
+    updateTime,
+    displayTime: memoDisplayTime,
+    isDisplayingUpdatedTime,
+    relativeTimeFormat,
+    commentAmount,
+    isInMemoDetailPage,
+  } = useMemoViewDerived();
   const { newMemoName } = useNewMemo();
 
   const navigateTo = useNavigateTo();
@@ -86,10 +93,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
           <Tooltip>
             <TooltipTrigger
               render={
-                <Link
-                  to={`/${memo.name}#comments`}
-                  className={cn(commentIndicatorOnHover ? "hidden sm:group-hover:block" : "block")}
-                />
+                <Link to={`/${memo.name}#comments`} className={cn(commentIndicatorOnHover ? "hidden sm:group-hover:block" : "block")} />
               }
             >
               <span className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:opacity-80 transition-colors">
@@ -97,9 +101,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
                 <span className="ml-0.5 text-xs leading-none">{commentAmount}</span>
               </span>
             </TooltipTrigger>
-            <TooltipContent>
-              {t("memo.comments-count", { count: commentAmount })}
-            </TooltipContent>
+            <TooltipContent>{t("memo.comments-count", { count: commentAmount })}</TooltipContent>
           </Tooltip>
         )}
 
