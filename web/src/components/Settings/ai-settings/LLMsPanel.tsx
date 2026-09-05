@@ -1,4 +1,5 @@
 import { MoreVerticalIcon, PlusIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InstanceSetting_AIProviderType } from "@/types/proto/api/v1/instance_service_pb";
@@ -65,13 +66,55 @@ export const LLMsPanel = ({
         title={t("setting.ai.integrations-title")}
         description={t("setting.ai.integrations-description")}
         actions={
-          <Button onClick={onCreateProvider}>
+          <Button className="w-full justify-start sm:w-auto sm:justify-center" onClick={onCreateProvider}>
             <PlusIcon className="w-4 h-4 mr-2" />
             {t("setting.ai.add-provider")}
           </Button>
         }
       >
+        <div className="flex flex-col gap-2 md:hidden">
+          {providers.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+              {t("setting.ai.no-providers")}
+            </div>
+          ) : (
+            providers.map((provider) => (
+              <div key={provider.id} className="rounded-lg border border-border bg-background px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {provider.title || getProviderTypeLabel(provider.type)}
+                      </span>
+                      <Badge variant="secondary" shape="pill">
+                        {getProviderTypeLabel(provider.type)}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                      {provider.endpoint || t("setting.ai.default-endpoint")}
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {provider.apiKeySet ? provider.apiKeyHint || t("setting.ai.configured") : t("setting.ai.api-key")}
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="size-8 shrink-0 p-0" />}>
+                      <MoreVerticalIcon className="w-4 h-auto" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" sideOffset={2}>
+                      <DropdownMenuItem onClick={() => onEditProvider(provider)}>{t("common.edit")}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onDeleteProvider(provider)} className="text-destructive focus:text-destructive">
+                        {t("common.delete")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
         <SettingTable
+          className="hidden md:block"
           columns={[
             {
               key: "title",
@@ -132,13 +175,61 @@ export const LLMsPanel = ({
         description={t("setting.ai.llms-description")}
         showSeparator
         actions={
-          <Button onClick={onCreateLLM} disabled={providers.length === 0}>
+          <Button className="w-full justify-start sm:w-auto sm:justify-center" onClick={onCreateLLM} disabled={providers.length === 0}>
             <PlusIcon className="w-4 h-4 mr-2" />
             {t("setting.ai.add-llm")}
           </Button>
         }
       >
+        <div className="flex flex-col gap-2 md:hidden">
+          {llms.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+              {providers.length === 0 ? t("setting.ai.llm-empty-providers") : t("setting.ai.no-llms")}
+            </div>
+          ) : (
+            llms.map((llm) => {
+              const provider = providers.find((item) => item.id === llm.providerId);
+              return (
+                <div key={llm.id} className="rounded-lg border border-border bg-background px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-medium text-foreground">{llm.title || llm.model}</span>
+                        <Badge variant={llm.enabled ? "default" : "secondary"} shape="pill">
+                          {llm.enabled ? t("setting.ai.overview-status-enabled") : t("setting.ai.overview-status-disabled")}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">{provider ? provider.title || provider.id : "-"}</div>
+                      <div className="mt-1 truncate font-mono text-xs text-muted-foreground">{llm.model}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={llm.enabled}
+                        onChange={() => onToggleLLM(llm)}
+                        aria-label={t("setting.ai.llm-toggle-aria", { name: llm.title })}
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="size-8 p-0" />}>
+                          <MoreVerticalIcon className="w-4 h-auto" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" sideOffset={2}>
+                          <DropdownMenuItem onClick={() => onEditLLM(llm)}>{t("common.edit")}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onDeleteLLM(llm)} className="text-destructive focus:text-destructive">
+                            {t("common.delete")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
         <SettingTable
+          className="hidden md:block"
           columns={[
             {
               key: "title",

@@ -10,19 +10,23 @@ export const AISettingsTabs = ({
   onSelect: (panel: AISettingsPanel) => void;
 }) => {
   return (
-    <div className="flex gap-2 overflow-x-auto border-b border-border pb-2">
-      {panels.map((panel) => (
-        <button
-          key={panel.key}
-          type="button"
-          className={`shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors ${
-            activePanel === panel.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-          }`}
-          onClick={() => onSelect(panel.key)}
-        >
-          {panel.label}
-        </button>
-      ))}
+    <div className="border-b border-border">
+      <div className="grid grid-cols-3 gap-2 pb-2 sm:flex sm:flex-wrap" aria-label="AI settings sections">
+        {panels.map((panel) => (
+          <button
+            key={panel.key}
+            type="button"
+            className={`min-w-0 rounded-md px-3 py-1.5 text-center text-sm transition-colors ${
+              activePanel === panel.key
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+            onClick={() => onSelect(panel.key)}
+          >
+            {panel.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
