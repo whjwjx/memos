@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { isEqual } from "lodash-es";
-import { MoreVerticalIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { MoreVerticalIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { v4 as uuidv4 } from "uuid";
@@ -42,21 +42,28 @@ import {
   InstanceSettingSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
 import { useTranslate } from "@/utils/i18n";
+import { AgentsPanel } from "./ai-settings/AgentsPanel";
+import { AISettingsOverviewPanel } from "./ai-settings/AISettingsOverviewPanel";
+import { AISettingsTabs, type AISettingsVisiblePanel } from "./ai-settings/AISettingsTabs";
+import { ChatToolsPanel } from "./ai-settings/ChatToolsPanel";
+import { LLMsPanel } from "./ai-settings/LLMsPanel";
+import { MemoryPanel } from "./ai-settings/MemoryPanel";
+import { TranslationPanel } from "./ai-settings/TranslationPanel";
+import { toolRegistry } from "./ai-settings/toolRegistry";
+import type {
+  AISettingsPanel,
+  ChatAgentTemplate,
+  LocalAIProvider,
+  LocalChatAgent,
+  LocalLLM,
+  LocalMemory,
+  LocalMemoryEntry,
+  LocalTranslation,
+} from "./ai-settings/types";
 import SettingGroup from "./SettingGroup";
-import { SettingPanel } from "./SettingList";
 import SettingSection from "./SettingSection";
 import SettingTable from "./SettingTable";
 import useInstanceSettingUpdater, { buildInstanceSettingName } from "./useInstanceSettingUpdater";
-
-type LocalAIProvider = {
-  id: string;
-  title: string;
-  type: InstanceSetting_AIProviderType;
-  endpoint: string;
-  apiKey: string;
-  apiKeySet: boolean;
-  apiKeyHint: string;
-};
 
 type LocalTranscription = {
   providerId: string;
@@ -65,19 +72,7 @@ type LocalTranscription = {
   prompt: string;
 };
 
-type LocalTranslation = {
-  enabled: boolean;
-  llmId: string;
-  providerId: string;
-  model: string;
-  maxTextLength: number;
-};
-
 const providerTypeOptions = [InstanceSetting_AIProviderType.OPENAI, InstanceSetting_AIProviderType.GEMINI];
-
-const byokNotes = ["setting.ai.byok-key-note", "setting.ai.byok-storage-note", "setting.ai.byok-model-note"] as const;
-
-type AISettingsPanel = "overview" | "llms" | "agents" | "tools" | "translation" | "memory" | "legacy";
 
 const getProviderTypeLabel = (type: InstanceSetting_AIProviderType) => {
   return InstanceSetting_AIProviderType[type] ?? "UNKNOWN";
@@ -94,14 +89,6 @@ const toLocalProvider = (provider: InstanceSetting_AIProviderConfig): LocalAIPro
   apiKeySet: provider.apiKeySet,
   apiKeyHint: provider.apiKeyHint,
 });
-
-type LocalLLM = {
-  id: string;
-  title: string;
-  providerId: string;
-  model: string;
-  enabled: boolean;
-};
 
 const defaultChatModelForProvider = (provider: LocalAIProvider | undefined): string => {
   if (!provider) return "";
@@ -305,88 +292,6 @@ const toTaggerConfig = (tagger: LocalTagger) =>
     maxTags: tagger.maxTags,
   });
 
-// Static registry of the conversational assistant's built-in tools. The tool set
-// is fixed server-side; admin may only toggle enable and mark confirmation. Keys
-// must match internal/ai/tools registry names. `description` is an i18n key
-// resolved with t() at render time.
-// Mirrors the tools actually registered by the backend (internal/ai/tools
-// NewRegistry). Only tools present here can be toggled. All tools default to
-// enabled, and mutating ones (create_memo, update_memo, tag_memo,
-// batch_update_memos, delete_memo, manage_settings, query_db) default to
-// requiring confirmation, while read-only/query tools (search_memos, get_memo,
-// get_comments, get_logs, query_queue, project_status) never require it.
-// confirmEditable=false marks tools whose confirmation is fixed: read-only
-// tools never require confirmation, so the toggle is disabled in the UI.
-const toolRegistry: {
-  name: string;
-  descriptionKey: string;
-  adminOnly: boolean;
-  defaultRequiresConfirmation: boolean;
-  confirmEditable?: boolean;
-}[] = [
-  {
-    name: "search_memos",
-    descriptionKey: "setting.ai.tool-search-memos",
-    adminOnly: false,
-    defaultRequiresConfirmation: false,
-    confirmEditable: false,
-  },
-  {
-    name: "get_memo",
-    descriptionKey: "setting.ai.tool-get-memo",
-    adminOnly: false,
-    defaultRequiresConfirmation: false,
-    confirmEditable: false,
-  },
-  {
-    name: "get_comments",
-    descriptionKey: "setting.ai.tool-get-comments",
-    adminOnly: false,
-    defaultRequiresConfirmation: false,
-    confirmEditable: false,
-  },
-  { name: "create_memo", descriptionKey: "setting.ai.tool-create-memo", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "update_memo", descriptionKey: "setting.ai.tool-update-memo", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "tag_memo", descriptionKey: "setting.ai.tool-tag-memo", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "batch_update_memos", descriptionKey: "setting.ai.tool-batch-update-memos", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "manage_settings", descriptionKey: "setting.ai.tool-manage-settings", adminOnly: false, defaultRequiresConfirmation: true },
-  { name: "delete_memo", descriptionKey: "setting.ai.tool-delete-memo", adminOnly: false, defaultRequiresConfirmation: true },
-  {
-    name: "get_logs",
-    descriptionKey: "setting.ai.tool-get-logs",
-    adminOnly: true,
-    defaultRequiresConfirmation: false,
-    confirmEditable: false,
-  },
-  { name: "query_db", descriptionKey: "setting.ai.tool-query-db", adminOnly: true, defaultRequiresConfirmation: true },
-  { name: "manage_memory", descriptionKey: "setting.ai.tool-manage-memory", adminOnly: true, defaultRequiresConfirmation: true },
-  {
-    name: "query_queue",
-    descriptionKey: "setting.ai.tool-query-queue",
-    adminOnly: true,
-    defaultRequiresConfirmation: false,
-    confirmEditable: false,
-  },
-  {
-    name: "project_status",
-    descriptionKey: "setting.ai.tool-project-status",
-    adminOnly: true,
-    defaultRequiresConfirmation: false,
-    confirmEditable: false,
-  },
-];
-
-type LocalChatAgent = {
-  id: string;
-  name: string;
-  builtin: boolean;
-  llmId: string;
-  providerId: string;
-  model: string;
-  systemPrompt: string;
-  enabled: boolean;
-};
-
 const toLocalChatAgent = (
   agent: InstanceSetting_ChatAgentConfig,
   llms: LocalLLM[] = [],
@@ -449,19 +354,6 @@ const toToolConfig = (tool: LocalTool) =>
     enabled: tool.enabled,
     requiresConfirmation: tool.requiresConfirmation,
   });
-
-type LocalMemoryEntry = {
-  id: string;
-  content: string;
-  createdBy: string;
-  createdTs: bigint;
-  updatedTs: bigint;
-};
-
-type LocalMemory = {
-  enabled: boolean;
-  entries: LocalMemoryEntry[];
-};
 
 const toLocalMemoryEntry = (entry: InstanceSetting_MemoryEntry): LocalMemoryEntry => ({
   id: entry.id,
@@ -542,7 +434,7 @@ const AISection = () => {
   // to seed a ChatAgentConfig draft; the resulting entry is indistinguishable from
   // a user-created one (builtin is informational for the multi-preset selector in a
   // later stage).
-  const chatAgentTemplates: { name: string; systemPrompt: string }[] = [
+  const chatAgentTemplates: ChatAgentTemplate[] = [
     {
       name: t("setting.ai.agent-template-general"),
       systemPrompt: t("setting.ai.agent-template-general-prompt"),
@@ -1237,7 +1129,7 @@ const AISection = () => {
     lastSyncedMemory.current = memory;
   };
 
-  const visiblePanels: { key: Exclude<AISettingsPanel, "legacy">; label: string }[] = [
+  const visiblePanels: { key: AISettingsVisiblePanel; label: string }[] = [
     { key: "overview", label: t("setting.ai.overview-tab") },
     { key: "llms", label: t("setting.ai.llms-tab") },
     { key: "agents", label: t("setting.ai.agents-tab") },
@@ -1248,229 +1140,37 @@ const AISection = () => {
   const enabledLLMCount = llms.filter((llm) => llm.enabled).length;
   const enabledChatAgentCount = chatAgents.filter((agent) => agent.enabled).length;
   const enabledToolCount = tools.filter((tool) => tool.enabled).length;
-  const translationStatus = translation.enabled ? t("setting.ai.overview-status-enabled") : t("setting.ai.overview-status-disabled");
-  const memoryStatus = memory.enabled ? t("setting.ai.overview-status-enabled") : t("setting.ai.overview-status-disabled");
   const showLegacyPanels = activePanel === "legacy";
 
   return (
     <SettingSection title={t("setting.ai.label")}>
-      <div className="flex gap-2 overflow-x-auto border-b border-border pb-2">
-        {visiblePanels.map((panel) => (
-          <button
-            key={panel.key}
-            type="button"
-            className={`shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors ${
-              activePanel === panel.key
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-            onClick={() => setActivePanel(panel.key)}
-          >
-            {panel.label}
-          </button>
-        ))}
-      </div>
+      <AISettingsTabs activePanel={activePanel} panels={visiblePanels} onSelect={setActivePanel} />
 
       {activePanel === "overview" && (
-        <SettingGroup title={t("setting.ai.overview-title")} description={t("setting.ai.overview-description")}>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <SettingPanel className="px-4 py-3">
-              <div className="text-xs text-muted-foreground">{t("setting.ai.llms-tab")}</div>
-              <div className="mt-1 text-2xl font-semibold text-foreground">{llms.length}</div>
-              <div className="text-xs text-muted-foreground">{t("setting.ai.overview-llms-detail", { count: enabledLLMCount })}</div>
-            </SettingPanel>
-            <SettingPanel className="px-4 py-3">
-              <div className="text-xs text-muted-foreground">{t("setting.ai.agents-tab")}</div>
-              <div className="mt-1 text-2xl font-semibold text-foreground">{enabledChatAgentCount}</div>
-              <div className="text-xs text-muted-foreground">{t("setting.ai.overview-agents-detail")}</div>
-            </SettingPanel>
-            <SettingPanel className="px-4 py-3">
-              <div className="text-xs text-muted-foreground">{t("setting.ai.tools-tab")}</div>
-              <div className="mt-1 text-2xl font-semibold text-foreground">{enabledToolCount}</div>
-              <div className="text-xs text-muted-foreground">{t("setting.ai.overview-tools-detail")}</div>
-            </SettingPanel>
-            <SettingPanel className="px-4 py-3">
-              <div className="text-xs text-muted-foreground">{t("setting.ai.translation-tab")}</div>
-              <div className="mt-1 text-lg font-semibold text-foreground">{translationStatus}</div>
-              <div className="text-xs text-muted-foreground">
-                {translation.llmId ? getLLMLabel(translation.llmId) : t("setting.ai.translation-no-llm")}
-              </div>
-            </SettingPanel>
-            <SettingPanel className="px-4 py-3">
-              <div className="text-xs text-muted-foreground">{t("setting.ai.memory-tab")}</div>
-              <div className="mt-1 text-lg font-semibold text-foreground">{memoryStatus}</div>
-              <div className="text-xs text-muted-foreground">
-                {t("setting.ai.overview-memory-detail", { count: memory.entries.length })}
-              </div>
-            </SettingPanel>
-          </div>
-        </SettingGroup>
+        <AISettingsOverviewPanel
+          enabledChatAgentCount={enabledChatAgentCount}
+          enabledLLMCount={enabledLLMCount}
+          enabledToolCount={enabledToolCount}
+          llmCount={llms.length}
+          memoryEnabled={memory.enabled}
+          memoryEntryCount={memory.entries.length}
+          translationEnabled={translation.enabled}
+          translationLLMLabel={translation.llmId ? getLLMLabel(translation.llmId) : t("setting.ai.translation-no-llm")}
+        />
       )}
 
       {activePanel === "llms" && (
-        <>
-          <SettingPanel className="bg-muted/30 px-4 py-3">
-            <div className="flex max-w-3xl flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium text-foreground">
-                  {t("setting.ai.byok-label")}
-                </span>
-                <h4 className="text-sm font-semibold text-foreground">{t("setting.ai.byok-title")}</h4>
-              </div>
-              <p className="text-sm text-muted-foreground">{t("setting.ai.byok-description")}</p>
-              <ul className="space-y-1 text-sm text-muted-foreground">
-                {byokNotes.map((note) => (
-                  <li key={note} className="flex gap-2">
-                    <span className="mt-2 size-1 rounded-full bg-muted-foreground/60" aria-hidden />
-                    <span>{t(note)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </SettingPanel>
-
-          <SettingGroup
-            title={t("setting.ai.integrations-title")}
-            description={t("setting.ai.integrations-description")}
-            actions={
-              <Button onClick={handleCreateProvider}>
-                <PlusIcon className="w-4 h-4 mr-2" />
-                {t("setting.ai.add-provider")}
-              </Button>
-            }
-          >
-            <SettingTable
-              columns={[
-                {
-                  key: "title",
-                  header: t("common.name"),
-                  render: (_, provider: LocalAIProvider) => (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-foreground">{provider.title}</span>
-                      <span className="font-mono text-xs text-muted-foreground">{provider.id}</span>
-                    </div>
-                  ),
-                },
-                {
-                  key: "type",
-                  header: t("setting.ai.provider-type"),
-                  render: (_, provider: LocalAIProvider) => <span>{getProviderTypeLabel(provider.type)}</span>,
-                },
-                {
-                  key: "endpoint",
-                  header: t("setting.ai.endpoint"),
-                  render: (_, provider: LocalAIProvider) => (
-                    <span className="font-mono text-xs">{provider.endpoint || t("setting.ai.default-endpoint")}</span>
-                  ),
-                },
-                {
-                  key: "apiKeySet",
-                  header: t("setting.ai.api-key"),
-                  render: (_, provider: LocalAIProvider) => (
-                    <span className="font-mono text-xs">
-                      {provider.apiKeySet ? provider.apiKeyHint || t("setting.ai.configured") : "-"}
-                    </span>
-                  ),
-                },
-                {
-                  key: "actions",
-                  header: "",
-                  className: "text-right",
-                  render: (_, provider: LocalAIProvider) => (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-                        <MoreVerticalIcon className="w-4 h-auto" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" sideOffset={2}>
-                        <DropdownMenuItem onClick={() => handleEditProvider(provider)}>{t("common.edit")}</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setDeleteTarget(provider)} className="text-destructive focus:text-destructive">
-                          {t("common.delete")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ),
-                },
-              ]}
-              data={providers}
-              emptyMessage={t("setting.ai.no-providers")}
-              getRowKey={(provider) => provider.id}
-            />
-          </SettingGroup>
-
-          <SettingGroup
-            title={t("setting.ai.llms-title")}
-            description={t("setting.ai.llms-description")}
-            showSeparator
-            actions={
-              <Button onClick={handleCreateLLM} disabled={providers.length === 0}>
-                <PlusIcon className="w-4 h-4 mr-2" />
-                {t("setting.ai.add-llm")}
-              </Button>
-            }
-          >
-            <SettingTable
-              columns={[
-                {
-                  key: "title",
-                  header: t("common.name"),
-                  render: (_, llm: LocalLLM) => (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-foreground">{llm.title}</span>
-                      <span className="font-mono text-xs text-muted-foreground">{llm.id}</span>
-                    </div>
-                  ),
-                },
-                {
-                  key: "providerId",
-                  header: t("setting.ai.llm-provider"),
-                  render: (_, llm: LocalLLM) => {
-                    const provider = providers.find((item) => item.id === llm.providerId);
-                    return <span>{provider ? provider.title || provider.id : "-"}</span>;
-                  },
-                },
-                {
-                  key: "model",
-                  header: t("setting.ai.llm-model"),
-                  render: (_, llm: LocalLLM) => <span className="font-mono text-xs">{llm.model}</span>,
-                },
-                {
-                  key: "enabled",
-                  header: t("setting.ai.llm-enabled"),
-                  render: (_, llm: LocalLLM) => (
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-primary"
-                      checked={llm.enabled}
-                      onChange={() => handleToggleLLM(llm)}
-                      aria-label={t("setting.ai.llm-toggle-aria", { name: llm.title })}
-                    />
-                  ),
-                },
-                {
-                  key: "actions",
-                  header: "",
-                  className: "text-right",
-                  render: (_, llm: LocalLLM) => (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-                        <MoreVerticalIcon className="w-4 h-auto" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" sideOffset={2}>
-                        <DropdownMenuItem onClick={() => handleEditLLM(llm)}>{t("common.edit")}</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setDeleteLLMTarget(llm)} className="text-destructive focus:text-destructive">
-                          {t("common.delete")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ),
-                },
-              ]}
-              data={llms}
-              emptyMessage={providers.length === 0 ? t("setting.ai.llm-empty-providers") : t("setting.ai.no-llms")}
-              getRowKey={(llm) => llm.id}
-            />
-          </SettingGroup>
-        </>
+        <LLMsPanel
+          providers={providers}
+          llms={llms}
+          onCreateProvider={handleCreateProvider}
+          onEditProvider={handleEditProvider}
+          onDeleteProvider={setDeleteTarget}
+          onCreateLLM={handleCreateLLM}
+          onEditLLM={handleEditLLM}
+          onToggleLLM={handleToggleLLM}
+          onDeleteLLM={setDeleteLLMTarget}
+        />
       )}
 
       {showLegacyPanels && (
@@ -1494,18 +1194,14 @@ const AISection = () => {
       )}
 
       {activePanel === "translation" && (
-        <SettingGroup
-          title={t("setting.ai.translation-title")}
-          description={t("setting.ai.translation-description")}
-          showSeparator
-          actions={
-            <Button disabled={!translationHasChanges} onClick={handleSaveTranslation}>
-              {t("common.save")}
-            </Button>
-          }
-        >
-          <TranslationForm llms={llms} providers={providers} translation={translation} onChange={setTranslation} />
-        </SettingGroup>
+        <TranslationPanel
+          llms={llms}
+          providers={providers}
+          translation={translation}
+          translationHasChanges={translationHasChanges}
+          onChange={setTranslation}
+          onSave={handleSaveTranslation}
+        />
       )}
 
       {showLegacyPanels && (
@@ -1651,211 +1347,32 @@ const AISection = () => {
       )}
 
       {activePanel === "agents" && (
-        <SettingGroup
-          title={t("setting.ai.chat-agents-title")}
-          description={t("setting.ai.chat-agents-description")}
-          showSeparator
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              {chatAgentTemplates.map((template) => (
-                <Button key={template.name} variant="outline" onClick={() => handleCreateChatAgentFromTemplate(template)}>
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  {template.name}
-                </Button>
-              ))}
-              <Button onClick={handleCreateChatAgent}>
-                <PlusIcon className="w-4 h-4 mr-2" />
-                {t("setting.ai.add-chat-agent")}
-              </Button>
-            </div>
-          }
-        >
-          <SettingTable
-            columns={[
-              {
-                key: "name",
-                header: t("common.name"),
-                render: (_, agent: LocalChatAgent) => (
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-foreground">{agent.name}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{agent.id}</span>
-                  </div>
-                ),
-              },
-              {
-                key: "llmId",
-                header: t("setting.ai.chat-agent-llm"),
-                render: (_, agent: LocalChatAgent) => <span>{agent.llmId ? getLLMLabel(agent.llmId) : "-"}</span>,
-              },
-              {
-                key: "enabled",
-                header: t("setting.ai.chat-agent-enabled"),
-                render: (_, agent: LocalChatAgent) => (
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
-                    checked={agent.enabled}
-                    onChange={() => handleToggleChatAgent(agent)}
-                    aria-label={t("setting.ai.chat-agent-toggle-aria", { name: agent.name })}
-                  />
-                ),
-              },
-              {
-                key: "actions",
-                header: "",
-                className: "text-right",
-                render: (_, agent: LocalChatAgent) => (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-                      <MoreVerticalIcon className="w-4 h-auto" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" sideOffset={2}>
-                      <DropdownMenuItem onClick={() => handleEditChatAgent(agent)}>{t("common.edit")}</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setDeleteChatAgentTarget(agent)} className="text-destructive focus:text-destructive">
-                        {t("common.delete")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ),
-              },
-            ]}
-            data={chatAgents}
-            emptyMessage={t("setting.ai.no-chat-agents")}
-            getRowKey={(agent) => agent.id}
-          />
-        </SettingGroup>
+        <AgentsPanel
+          agents={chatAgents}
+          templates={chatAgentTemplates}
+          getLLMLabel={getLLMLabel}
+          onCreateAgent={handleCreateChatAgent}
+          onCreateAgentFromTemplate={handleCreateChatAgentFromTemplate}
+          onEditAgent={handleEditChatAgent}
+          onToggleAgent={handleToggleChatAgent}
+          onDeleteAgent={setDeleteChatAgentTarget}
+        />
       )}
 
       {activePanel === "tools" && (
-        <SettingGroup title={t("setting.ai.chat-tools-title")} description={t("setting.ai.chat-tools-description")} showSeparator>
-          <SettingTable
-            columns={[
-              {
-                key: "name",
-                header: t("common.name"),
-                render: (_, tool: LocalTool) => {
-                  const meta = toolRegistry.find((item) => item.name === tool.name);
-                  return (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-foreground">{tool.name}</span>
-                      {meta && <span className="text-xs text-muted-foreground">{t(meta.descriptionKey as Parameters<typeof t>[0])}</span>}
-                    </div>
-                  );
-                },
-              },
-              {
-                key: "scope",
-                header: t("setting.ai.chat-tool-scope"),
-                render: (_, tool: LocalTool) => {
-                  const meta = toolRegistry.find((item) => item.name === tool.name);
-                  return <span>{meta?.adminOnly ? t("setting.ai.chat-tool-admin") : t("setting.ai.chat-tool-user")}</span>;
-                },
-              },
-              {
-                key: "enabled",
-                header: t("setting.ai.chat-tool-enabled"),
-                render: (_, tool: LocalTool) => (
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
-                    checked={tool.enabled}
-                    onChange={() => handleToggleTool(tool)}
-                    aria-label={t("setting.ai.chat-tool-toggle-aria", { name: tool.name })}
-                  />
-                ),
-              },
-              {
-                key: "requiresConfirmation",
-                header: t("setting.ai.chat-tool-confirm"),
-                render: (_, tool: LocalTool) => {
-                  const meta = toolRegistry.find((item) => item.name === tool.name);
-                  const locked = meta?.confirmEditable === false;
-                  return (
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-primary disabled:cursor-not-allowed disabled:opacity-40"
-                      checked={locked ? false : tool.requiresConfirmation}
-                      disabled={locked}
-                      onChange={() => handleToggleToolConfirmation(tool)}
-                      aria-label={t("setting.ai.chat-tool-confirm-toggle-aria", { name: tool.name })}
-                    />
-                  );
-                },
-              },
-            ]}
-            data={tools}
-            emptyMessage={t("setting.ai.no-chat-tools")}
-            getRowKey={(tool) => tool.name}
-          />
-        </SettingGroup>
+        <ChatToolsPanel tools={tools} onToggleTool={handleToggleTool} onToggleToolConfirmation={handleToggleToolConfirmation} />
       )}
 
       {activePanel === "memory" && (
-        <SettingGroup
-          title={t("setting.ai.memory-title")}
-          description={t("setting.ai.memory-description")}
-          showSeparator
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={handleAddMemoryEntry}>
-                <PlusIcon className="w-4 h-4 mr-2" />
-                {t("setting.ai.memory-add-entry")}
-              </Button>
-              <Button disabled={!memoryHasChanges} onClick={handleSaveMemory}>
-                {t("common.save")}
-              </Button>
-            </div>
-          }
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={memory.enabled}
-              onChange={handleToggleMemoryEnabled}
-              aria-label={t("setting.ai.memory-enabled-label")}
-            />
-            <span className="text-sm">{t("setting.ai.memory-enabled-label")}</span>
-          </div>
-          <SettingTable
-            columns={[
-              {
-                key: "content",
-                header: t("setting.ai.memory-entry-content"),
-                render: (_, entry: LocalMemoryEntry) => (
-                  <Input
-                    value={entry.content}
-                    onChange={(e) => handleUpdateMemoryEntry(entry.id, e.target.value)}
-                    placeholder={t("setting.ai.memory-entry-placeholder")}
-                  />
-                ),
-              },
-              {
-                key: "createdBy",
-                header: t("setting.ai.memory-entry-created-by"),
-                render: (_, entry: LocalMemoryEntry) => <span className="text-xs text-muted-foreground">{entry.createdBy || "-"}</span>,
-              },
-              {
-                key: "actions",
-                header: "",
-                className: "text-right",
-                render: (_, entry: LocalMemoryEntry) => (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteMemoryEntry(entry.id)}
-                    aria-label={t("setting.ai.memory-entry-delete-aria")}
-                  >
-                    <Trash2Icon className="w-4 h-auto" />
-                  </Button>
-                ),
-              },
-            ]}
-            data={memory.entries}
-            emptyMessage={t("setting.ai.memory-no-entries")}
-            getRowKey={(entry) => entry.id}
-          />
-        </SettingGroup>
+        <MemoryPanel
+          memory={memory}
+          memoryHasChanges={memoryHasChanges}
+          onToggleEnabled={handleToggleMemoryEnabled}
+          onAddEntry={handleAddMemoryEntry}
+          onUpdateEntry={handleUpdateMemoryEntry}
+          onDeleteEntry={handleDeleteMemoryEntry}
+          onSave={handleSaveMemory}
+        />
       )}
 
       <AIProviderDialog
@@ -2033,94 +1550,6 @@ const TranscriptionForm = ({ providers, transcription, referencedProvider, onCha
           maxLength={4096}
         />
         <p className="text-xs text-muted-foreground">{t("setting.ai.transcription-prompt-help")}</p>
-      </div>
-    </div>
-  );
-};
-
-interface TranslationFormProps {
-  llms: LocalLLM[];
-  providers: LocalAIProvider[];
-  translation: LocalTranslation;
-  onChange: (next: LocalTranslation) => void;
-}
-
-const TranslationForm = ({ llms, providers, translation, onChange }: TranslationFormProps) => {
-  const t = useTranslate();
-  const noLLMs = llms.length === 0;
-
-  const llmOptions = useMemo(
-    () => [
-      { value: "__none__", label: t("setting.ai.translation-no-llm") },
-      ...llms.map((llm) => {
-        const provider = providers.find((item) => item.id === llm.providerId);
-        return { value: llm.id, label: `${llm.title || llm.model} · ${provider?.title || llm.providerId}` };
-      }),
-    ],
-    [llms, providers, t],
-  );
-  const referencedLLM = llms.find((item) => item.id === translation.llmId);
-  const referencedProvider = referencedLLM ? providers.find((item) => item.id === referencedLLM.providerId) : undefined;
-
-  const update = (partial: Partial<LocalTranslation>) => {
-    onChange({ ...translation, ...partial });
-  };
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
-      <label className="flex items-center gap-2 sm:col-span-2 text-sm">
-        <input
-          type="checkbox"
-          className="size-4 accent-primary"
-          checked={translation.enabled}
-          onChange={(e) => update({ enabled: e.target.checked })}
-        />
-        <span>{t("setting.ai.translation-enabled")}</span>
-      </label>
-
-      <div className="flex flex-col gap-1.5 sm:col-span-2">
-        <Label>{t("setting.ai.translation-llm")}</Label>
-        <Select
-          value={translation.llmId || "__none__"}
-          items={llmOptions}
-          onValueChange={(value) => {
-            const llm = llms.find((item) => item.id === value);
-            update({
-              llmId: value === "__none__" ? "" : value,
-              providerId: llm?.providerId ?? "",
-              model: llm?.model ?? "",
-            });
-          }}
-          disabled={noLLMs}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {llmOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {noLLMs && <p className="text-xs text-muted-foreground">{t("setting.ai.translation-empty-llms")}</p>}
-        {referencedProvider && !referencedProvider.apiKeySet && (
-          <p className="text-xs text-destructive">{t("setting.ai.translation-warning-no-key")}</p>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label>{t("setting.ai.translation-max-text-length")}</Label>
-        <Input
-          type="number"
-          value={translation.maxTextLength}
-          min={1}
-          max={100000}
-          onChange={(e) => update({ maxTextLength: Number(e.target.value) })}
-          disabled={!translation.llmId}
-        />
-        <p className="text-xs text-muted-foreground">{t("setting.ai.translation-max-text-length-help")}</p>
       </div>
     </div>
   );
