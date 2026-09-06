@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import {
   downloadMemosExport,
+  type ExportProgress,
   type ImportExportResult,
   type ImportExportScope,
   type ImportProgress,
@@ -26,6 +27,11 @@ const formatImportResult = (result: ImportExportResult) => {
   return { created, skipped };
 };
 
+const getExportProgressPercent = (progress: ExportProgress): number | undefined => {
+  if (!progress.totalBytes) return undefined;
+  return Math.min(100, Math.round((progress.downloadedBytes / progress.totalBytes) * 100));
+};
+
 const DataSection = () => {
   const t = useTranslate();
   const user = useCurrentUser();
@@ -34,19 +40,22 @@ const DataSection = () => {
   const pendingScopeRef = useRef<ImportExportScope>("mine");
   const pendingSourceRef = useRef<ImportSource>("memos");
   const [exportingScope, setExportingScope] = useState<ImportExportScope | undefined>();
+  const [exportProgress, setExportProgress] = useState<ExportProgress | undefined>();
   const [importingScope, setImportingScope] = useState<ImportExportScope | undefined>();
   const [importingSource, setImportingSource] = useState<ImportSource | undefined>();
   const [importProgress, setImportProgress] = useState<ImportProgress | undefined>();
 
   const handleExport = async (scope: ImportExportScope) => {
     setExportingScope(scope);
+    setExportProgress({ downloadedBytes: 0, phase: "preparing" });
     try {
-      await downloadMemosExport(scope);
+      await downloadMemosExport(scope, setExportProgress);
       toast.success(t("setting.data.export-success"));
     } catch (error) {
       handleError(error, toast.error, { context: "Export data" });
     } finally {
       setExportingScope(undefined);
+      setExportProgress(undefined);
     }
   };
 
@@ -98,6 +107,36 @@ const DataSection = () => {
     return t("setting.data.importing");
   };
 
+  const getExportProgressLabel = (progress: ExportProgress) => {
+    const percent = getExportProgressPercent(progress);
+    if (progress.phase === "downloading" && percent !== undefined) {
+      return t("setting.data.export-downloading-progress", { percent });
+    }
+    if (progress.phase === "downloading") {
+      return t("setting.data.export-downloading");
+    }
+    return t("setting.data.exporting");
+  };
+
+  const renderExportProgress = (scope: ImportExportScope) => {
+    if (exportingScope !== scope || !exportProgress) return null;
+
+    const percent = getExportProgressPercent(exportProgress);
+    const isDeterminate = exportProgress.phase === "downloading" && percent !== undefined;
+
+    return (
+      <div className="flex w-full flex-col gap-1 sm:min-w-64 sm:max-w-80">
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full bg-primary transition-all duration-300 ${isDeterminate ? "" : "w-1/2 animate-pulse"}`}
+            style={isDeterminate ? { width: `${percent}%` } : undefined}
+          />
+        </div>
+        <span className="text-xs text-muted-foreground">{getExportProgressLabel(exportProgress)}</span>
+      </div>
+    );
+  };
+
   return (
     <SettingSection title={t("setting.data.label")} description={t("setting.data.description")}>
       <input ref={fileInputRef} type="file" accept=".zip,application/zip" className="hidden" onChange={handleImportFileChange} />
@@ -129,6 +168,7 @@ const DataSection = () => {
               <UploadIcon className="h-4 w-4" />
               {getImportButtonText("mine", "memos", "setting.data.import-memos-package")}
             </Button>
+            {renderExportProgress("mine")}
           </SettingListItem>
 
           <SettingListItem
@@ -178,6 +218,7 @@ const DataSection = () => {
                 <UploadIcon className="h-4 w-4" />
                 {getImportButtonText("all", "memos", "setting.data.import-all-memos-package")}
               </Button>
+              {renderExportProgress("all")}
             </SettingListItem>
           </SettingList>
         </SettingGroup>

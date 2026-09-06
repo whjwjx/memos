@@ -633,6 +633,8 @@
       "export-memos-package": "Export Memos data package",
       "export-my-data": "Export my data",
       "export-success": "Export started",
+      "export-downloading": "Downloading...",
+      "export-downloading-progress": "Downloading {{percent}}%...",
       "exporting": "Preparing export package...",
       "flomo-package-title": "flomo data package",
       "import-all-data": "Import all data",

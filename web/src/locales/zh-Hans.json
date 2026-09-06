@@ -558,6 +558,8 @@
       "export-memos-package": "导出 Memos 数据包",
       "export-my-data": "导出我的数据",
       "export-success": "已开始导出",
+      "export-downloading": "下载中...",
+      "export-downloading-progress": "下载中 {{percent}}%...",
       "exporting": "正在准备导出包...",
       "flomo-package-title": "flomo 数据包",
       "import-all-data": "导入全部数据",
