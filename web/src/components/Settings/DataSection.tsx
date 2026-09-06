@@ -118,22 +118,38 @@ const DataSection = () => {
     return t("setting.data.exporting");
   };
 
-  const renderExportProgress = (scope: ImportExportScope) => {
-    if (exportingScope !== scope || !exportProgress) return null;
-
-    const percent = getExportProgressPercent(exportProgress);
-    const isDeterminate = exportProgress.phase === "downloading" && percent !== undefined;
+  const renderExportButton = (scope: ImportExportScope, labelKey: Translations) => {
+    const activeProgress = exportingScope === scope ? exportProgress : undefined;
+    const percent = activeProgress ? getExportProgressPercent(activeProgress) : undefined;
+    const isDeterminate = activeProgress?.phase === "downloading" && percent !== undefined;
+    const label = t(labelKey);
 
     return (
-      <div className="flex w-full flex-col gap-1 sm:min-w-64 sm:max-w-80">
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className={`h-full rounded-full bg-primary transition-all duration-300 ${isDeterminate ? "" : "w-1/2 animate-pulse"}`}
-            style={isDeterminate ? { width: `${percent}%` } : undefined}
-          />
-        </div>
-        <span className="text-xs text-muted-foreground">{getExportProgressLabel(exportProgress)}</span>
-      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="relative w-full overflow-hidden sm:w-auto"
+        disabled={!!exportingScope || !!importingScope}
+        onClick={() => handleExport(scope)}
+      >
+        <DownloadIcon className="h-4 w-4" />
+        <span className="grid min-w-0">
+          <span className={`col-start-1 row-start-1 ${activeProgress ? "invisible" : ""}`}>{label}</span>
+          {activeProgress && (
+            <span className="col-start-1 row-start-1" aria-live="polite">
+              {getExportProgressLabel(activeProgress)}
+            </span>
+          )}
+        </span>
+        {activeProgress && (
+          <span className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden bg-primary/15">
+            <span
+              className={`block h-full bg-primary transition-all duration-300 ${isDeterminate ? "" : "w-1/2 animate-pulse"}`}
+              style={isDeterminate ? { width: `${percent}%` } : undefined}
+            />
+          </span>
+        )}
+      </Button>
     );
   };
 
@@ -148,16 +164,7 @@ const DataSection = () => {
             description={t("setting.data.import-memos-package-description")}
             controlClassName="flex-wrap gap-2"
           >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-              disabled={!!exportingScope || !!importingScope}
-              onClick={() => handleExport("mine")}
-            >
-              <DownloadIcon className="h-4 w-4" />
-              {exportingScope === "mine" ? t("setting.data.exporting") : t("setting.data.export-memos-package")}
-            </Button>
+            {renderExportButton("mine", "setting.data.export-memos-package")}
             <Button
               variant="outline"
               size="sm"
@@ -168,7 +175,6 @@ const DataSection = () => {
               <UploadIcon className="h-4 w-4" />
               {getImportButtonText("mine", "memos", "setting.data.import-memos-package")}
             </Button>
-            {renderExportProgress("mine")}
           </SettingListItem>
 
           <SettingListItem
@@ -198,16 +204,7 @@ const DataSection = () => {
               description={t("setting.data.admin-data-description")}
               controlClassName="flex-wrap gap-2"
             >
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={!!exportingScope || !!importingScope}
-                onClick={() => handleExport("all")}
-              >
-                <DownloadIcon className="h-4 w-4" />
-                {exportingScope === "all" ? t("setting.data.exporting") : t("setting.data.export-all-memos-package")}
-              </Button>
+              {renderExportButton("all", "setting.data.export-all-memos-package")}
               <Button
                 variant="outline"
                 size="sm"
@@ -218,7 +215,6 @@ const DataSection = () => {
                 <UploadIcon className="h-4 w-4" />
                 {getImportButtonText("all", "memos", "setting.data.import-all-memos-package")}
               </Button>
-              {renderExportProgress("all")}
             </SettingListItem>
           </SettingList>
         </SettingGroup>
