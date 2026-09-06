@@ -1029,6 +1029,11 @@
     "rename-tag": "重新命名標籤",
     "rename-tip": "您的標籤名稱將會被更新"
   },
+  "statistics-summary": {
+    "days": "天",
+    "notes": "筆記",
+    "tags": "標籤"
+  },
   "tooltip": {
     "link-memo": "連結備忘錄",
     "markdown-menu": "Markdown 選單",

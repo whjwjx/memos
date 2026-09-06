@@ -13,3 +13,9 @@ export interface StatisticsData {
   activityStats: Record<string, number>;
   timeBasis: MemoTimeBasis;
 }
+
+export interface StatisticsSummary {
+  activeDays: number;
+  memoCount: number;
+  tagCount: number;
+}

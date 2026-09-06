@@ -305,7 +305,7 @@ const CollectionSidebarContent = ({ context }: { context: MemoStatsContext }) =>
     enabled: context === "profile" && !!profileMatch?.params.username,
   });
   const statsUserName = context === "home" ? currentUser?.name : context === "profile" ? profileUser?.name : undefined;
-  const { statistics, tags } = useFilteredMemoStats({
+  const { loading, statistics, summary, tags } = useFilteredMemoStats({
     context,
     userName: statsUserName,
     enabled: authInitialized && instanceInitialized && (md || mobileOpen),
@@ -322,7 +322,13 @@ const CollectionSidebarContent = ({ context }: { context: MemoStatsContext }) =>
     <div className={SIDEBAR_SECTION_STACK_CLASSES}>
       {context === "profile" && <ProfileMode />}
       <SidebarSection ariaLabel={t("common.statistics")}>
-        <StatisticsView statisticsData={statistics} navigationTarget={filterTarget} onDateSelect={() => setMobileOpen(false)} />
+        <StatisticsView
+          statisticsData={statistics}
+          summary={summary}
+          loading={loading}
+          navigationTarget={filterTarget}
+          onDateSelect={() => setMobileOpen(false)}
+        />
       </SidebarSection>
       {showViews && <TimeNavigationSection />}
       {showViews && <ViewsSection />}

@@ -8,10 +8,11 @@ import { useAllUserStats, useUserStats } from "@/hooks/useUserQueries";
 import { mergeTagCounts } from "@/lib/tag";
 import { State } from "@/types/proto/api/v1/common_pb";
 import type { UserStats } from "@/types/proto/api/v1/user_service_pb";
-import type { StatisticsData } from "@/types/statistics";
+import type { StatisticsData, StatisticsSummary } from "@/types/statistics";
 
 export interface FilteredMemoStats {
   statistics: StatisticsData;
+  summary: StatisticsSummary;
   tags: Record<string, number>;
   loading: boolean;
 }
@@ -36,6 +37,10 @@ const timestampsForBasis = (stats: UserStats, basis: MemoTimeBasis) => {
   }
   return wantUpdated && !oldServerFallback ? updatedArray : createdArray;
 };
+
+const countActiveDays = (activityStats: Record<string, number>) => Object.keys(activityStats).length;
+
+const countTags = (tagCount: Record<string, number>) => Object.keys(tagCount).length;
 
 export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}): FilteredMemoStats => {
   const { userName, context, enabled = true } = options;
@@ -63,10 +68,12 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
     const loading = isLoadingUserStats || isLoadingAllUserStats;
     let activityStats: Record<string, number> = {};
     let tagCount: Record<string, number> = mergeTagCounts();
+    let memoCount = 0;
 
     if (context === "explore" || context === "archived") {
       const displayDates: string[] = [];
       tagCount = mergeTagCounts(...allUserStats.map((stats) => stats.tagCount));
+      memoCount = allUserStats.reduce((total, stats) => total + stats.totalMemoCount, 0);
       for (const stats of allUserStats) {
         displayDates.push(
           ...timestampsForBasis(stats, timeBasis)
@@ -90,9 +97,19 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
       if (userStats.tagCount) {
         tagCount = mergeTagCounts(userStats.tagCount);
       }
+      memoCount = userStats.totalMemoCount;
     }
 
-    return { statistics: { activityStats, timeBasis }, tags: tagCount, loading };
+    return {
+      statistics: { activityStats, timeBasis },
+      summary: {
+        activeDays: countActiveDays(activityStats),
+        memoCount,
+        tagCount: countTags(tagCount),
+      },
+      tags: tagCount,
+      loading,
+    };
   }, [context, userName, userStats, allUserStats, isLoadingUserStats, isLoadingAllUserStats, timeBasis]);
 
   return data;

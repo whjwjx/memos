@@ -1326,6 +1326,11 @@
       "title": "未关联的上传"
     }
   },
+  "statistics-summary": {
+    "days": "天",
+    "notes": "笔记",
+    "tags": "标签"
+  },
   "aiChat": {
     "title": "AI 对话",
     "empty-hint": "与你的 AI 助手开始一段对话。",

@@ -1338,6 +1338,11 @@
     "rename-tag": "Rename tag",
     "rename-tip": "All your memos with this tag will be updated."
   },
+  "statistics-summary": {
+    "days": "Days",
+    "notes": "Notes",
+    "tags": "Tags"
+  },
   "tooltip": {
     "link-memo": "Link Memo",
     "markdown-menu": "Markdown",
