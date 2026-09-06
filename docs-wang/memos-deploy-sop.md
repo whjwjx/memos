@@ -337,6 +337,18 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 校验：公网前端资产 `index-BFy8sQp8.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB，词典功能持续生效）。
 - 备注：本次 C 盘 47.6GB 充足，无需 `go clean -cache`。沿用 9.4 网关特殊字符处理方案（本地日期串 + 显式文件名备份），**本次无新增踩坑**。
 
+### 8.11 部署记录（2026-09-06）
+
+> 完整重新部署：纳入 sidebar statistics summary（`0a1f051c`/`0715a09e`）、import/export 进度与健壮性优化（`8154c388` 等）、mobile AI settings（`9e0b7b33`）、AI 能力统一（`cc943899` chat agent llm selection、`6a933b5c` consolidate ai llm settings）、移除 legacy ai（`81556e00` 等）。纯代码部署，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `0715a09e`（merge: sidebar statistics summary）。
+- 构建：`pnpm release`（资产 `index-CeWK1Dcs.js`，5129 modules）→ `go build`（linux/amd64，102639412 字节 / ≈97.9MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260906_1539/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `5d7b5864`），容器 recreate 时间 `2026-09-06T15:41:54+08:00`（北京时间 9-06 15:41）。
+- 校验：公网前端资产 `index-CeWK1Dcs.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志显示**自动迁移** `0.37.2 → 0.38.1`（`conversation_llm_id`，对应 chat agent llm 选择），`migration completed migrationsApplied=1` 无报错；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）。
+- 清理：悬空镜像已 `docker image prune -f`（15 个 dangling 已删）；旧备份目录（20260823~20260901 共 12 个）删除命令已准备但因审批超时未执行，待确认后清理（保留 `20260902_1630` 与 `20260906_1539`）。
+- 备注：本次 C 盘 40.9GB 充足，无需 `go clean -cache`。本次有 DB schema 迁移，回滚时须**同步回滚二进制与备份**（见 9.6）。
+
 ---
 
 ## 9. 部署踩坑与注意事项
@@ -379,3 +391,21 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
   2. **备份 db 用显式文件名**：`sudo cp /root/.memos/memos_prod.db /root/.memos/memos_prod.db-shm /root/.memos/memos_prod.db-wal /dest/`，避免 `*` 通配符。
   3. **避免 `sudo bash -c "..."` 嵌套**：拆成多条独立简单命令（每条仅普通字符 + `&&`）。
   4. **含 `>`/`|` 的远端命令**：PowerShell 双引号 ssh 会本地解析 `>`/`|`；改用 PowerShell **单引号**包裹整个 ssh 命令（如 `ssh host 'curl ... > /tmp/x; grep ... /tmp/x'`），远端命令避免 `%`（`%` 亦触发网关问题）。
+
+### 9.5 部署后清理冗余（悬空镜像 + 备份目录）
+
+- **现象**：多次部署后服务器累积——① 悬空镜像（每次 `docker build` 产生新的 `memos-ai:local`，旧镜像变 `<untagged>`，约 200MB/个，可达数 GB）；② 备份目录（每次带时间戳，可累积数十个）。
+- **清理（安全，建议每次部署后做）**：
+  1. **悬空镜像**：`ssh host "docker image prune -f"`。只删 dangling（无 tag、无容器引用），**不影响**当前运行的 tagged 镜像（`memos-ai:local`），安全。
+  2. **备份目录**：保留最近 2 个（本次 + 上次），删除更早的。**必须用显式目录名列表**（网关不展开 `*`），不要 `rm -rf /home/deployer/backups/memos_data_2026*`。示例：
+     `ssh host "sudo rm -rf /home/deployer/backups/memos_data_20260823 /home/deployer/backups/memos_data_20260825 ..."`（逐条列出待删目录）。
+- **注意**：清理前确认当前容器用的镜像有 tag（`docker images memos-ai` 仅 1 个 `memos-ai:local`），prune 不会动它；删除备份目录前确认至少保留 1 个可用回滚点。
+
+### 9.6 含 DB schema 迁移的部署与回滚
+
+- **现象**：memos 升级常伴随 DB 迁移（日志 `start migration currentSchemaVersion=X targetSchemaVersion=Y`，如本次 `0.37.2 → 0.38.1`）。迁移在容器**启动瞬间自动执行且不可逆**（sqlite 无便捷 down-migration）。
+- **关键**：备份是在 `docker compose up`（触发迁移）**之前**做的，因此备份是迁移**前**的 schema。回滚时必须**同时回滚二进制 + 该备份**：
+  - 仅回滚二进制（新二进制 + 旧备份）→ 新二进制期望新 schema，但 DB 是旧的 → 启动报错/迁移再跑。
+  - 仅恢复旧备份（旧备份 + 当前二进制）→ 当前二进制期望新 schema，旧 DB 缺新表 → 报错。
+  - 正确：旧二进制 + 对应的旧备份一起回滚。
+- **做法**：每次部署前备份即对应本次二进制；回滚时用该次备份 + 同次上传的 `memos-linux`（或上一个稳定 commit 重新构建）。
