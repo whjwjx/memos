@@ -558,7 +558,7 @@
       "export-memos-package": "导出 Memos 数据包",
       "export-my-data": "导出我的数据",
       "export-success": "已开始导出",
-      "exporting": "导出中...",
+      "exporting": "正在准备导出包...",
       "flomo-package-title": "flomo 数据包",
       "import-all-data": "导入全部数据",
       "import-all-memos-package": "导入全部 Memos 数据包",

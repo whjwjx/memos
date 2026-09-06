@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -247,6 +249,30 @@ func TestOpenExportAttachmentContentStreamsLocalAttachment(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("local attachment"), got)
 	require.Equal(t, int64(len(got)), content.size)
+}
+
+func TestReadZipEntryWithLimit(t *testing.T) {
+	t.Parallel()
+
+	var buffer bytes.Buffer
+	zipWriter := zip.NewWriter(&buffer)
+	entry, err := zipWriter.Create("attachments/att/file.txt")
+	require.NoError(t, err)
+	_, err = entry.Write([]byte("attachment content"))
+	require.NoError(t, err)
+	require.NoError(t, zipWriter.Close())
+
+	zipReader, err := zip.NewReader(bytes.NewReader(buffer.Bytes()), int64(buffer.Len()))
+	require.NoError(t, err)
+	require.Len(t, zipReader.File, 1)
+
+	blob, err := readZipEntryWithLimit(zipReader.File[0], int64(len("attachment content")))
+	require.NoError(t, err)
+	require.Equal(t, []byte("attachment content"), blob)
+
+	_, err = readZipEntryWithLimit(zipReader.File[0], 4)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exceeds 4 bytes")
 }
 
 func int32Ptr(v int32) *int32 {

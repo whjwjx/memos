@@ -35,6 +35,9 @@ const (
 	importExportVersion     = 1
 	importExportPageSize    = 1000
 	maxImportExportWarnings = 30
+
+	maxImportMetadataEntryBytes int64 = MaxAPIRequestBytes
+	maxImportZipEntryBytes      int64 = maxImportUploadBytes
 )
 
 type importSource string
@@ -1555,6 +1558,9 @@ func readJSONFromZip[T any](zipReader *zip.Reader, entryName string) (*T, error)
 	if zipEntry == nil {
 		return nil, errors.Errorf("zip entry %s not found", entryName)
 	}
+	if err := validateZipEntrySize(zipEntry, entryName, maxImportMetadataEntryBytes); err != nil {
+		return nil, err
+	}
 	reader, err := zipEntry.Open()
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open zip entry %s", entryName)
@@ -1571,6 +1577,9 @@ func readJSONLFromZip[T any](zipReader *zip.Reader, entryName string) ([]T, erro
 	zipEntry := findZipEntry(zipReader, entryName)
 	if zipEntry == nil {
 		return []T{}, nil
+	}
+	if err := validateZipEntrySize(zipEntry, entryName, maxImportMetadataEntryBytes); err != nil {
+		return nil, err
 	}
 	reader, err := zipEntry.Open()
 	if err != nil {
@@ -1610,12 +1619,37 @@ func findZipEntry(zipReader *zip.Reader, entryName string) *zip.File {
 }
 
 func readZipEntry(zipEntry *zip.File) ([]byte, error) {
+	return readZipEntryWithLimit(zipEntry, maxImportZipEntryBytes)
+}
+
+func readZipEntryWithLimit(zipEntry *zip.File, maxBytes int64) ([]byte, error) {
+	if err := validateZipEntrySize(zipEntry, zipEntry.Name, maxBytes); err != nil {
+		return nil, err
+	}
 	reader, err := zipEntry.Open()
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
-	return io.ReadAll(reader)
+	limitedReader := io.LimitReader(reader, maxBytes+1)
+	blob, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(blob)) > maxBytes {
+		return nil, errors.Errorf("zip entry %s exceeds %d bytes", zipEntry.Name, maxBytes)
+	}
+	return blob, nil
+}
+
+func validateZipEntrySize(zipEntry *zip.File, entryName string, maxBytes int64) error {
+	if maxBytes <= 0 {
+		return nil
+	}
+	if zipEntry.UncompressedSize64 > uint64(maxBytes) {
+		return errors.Errorf("zip entry %s exceeds %d bytes", entryName, maxBytes)
+	}
+	return nil
 }
 
 func logImportExportStage(user *store.User, scope importExportScope, operation string, stage string, duration time.Duration, attrs ...any) {
