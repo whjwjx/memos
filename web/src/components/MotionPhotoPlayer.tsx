@@ -99,6 +99,7 @@ const MotionPhotoPlayer = ({
         draggable={false}
         loading="lazy"
         decoding="async"
+        fetchPriority="low"
       />
       <video
         ref={videoRef}

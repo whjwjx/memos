@@ -94,7 +94,7 @@ const VideoPoster = ({ sourceUrl, alt, className, posterUrl }: VideoPosterProps)
   );
 
   if (posterImageUrl) {
-    return <img src={posterImageUrl} alt={alt} className={className} loading="lazy" decoding="async" />;
+    return <img src={posterImageUrl} alt={alt} className={className} loading="lazy" decoding="async" fetchPriority="low" />;
   }
 
   if (!nearViewport) {

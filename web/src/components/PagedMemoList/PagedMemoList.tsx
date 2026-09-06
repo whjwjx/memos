@@ -386,7 +386,7 @@ const BackToTop = () => {
       setIsVisible(shouldShow);
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 

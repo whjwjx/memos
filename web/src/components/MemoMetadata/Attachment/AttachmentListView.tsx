@@ -134,7 +134,7 @@ const CollageVisualItem = ({
           mediaClassName={COVER_MEDIA_CLASS}
         />
       ) : (
-        <img src={item.posterUrl} alt={item.filename} className={COVER_MEDIA_CLASS} loading="lazy" decoding="async" />
+        <img src={item.posterUrl} alt={item.filename} className={COVER_MEDIA_CLASS} loading="lazy" decoding="async" fetchPriority="low" />
       )}
     </VisualTile>
   );
@@ -146,7 +146,7 @@ const SingleVisualItem = ({ item, onPreview }: { item: VisualItem; onPreview?: (
   if (item.kind === "image") {
     return (
       <VisualTile className="inline-block max-w-full" onPreview={onPreview}>
-        <img src={item.posterUrl} alt={item.filename} className={NATURAL_MEDIA_CLASS} loading="lazy" decoding="async" />
+        <img src={item.posterUrl} alt={item.filename} className={NATURAL_MEDIA_CLASS} loading="lazy" decoding="async" fetchPriority="low" />
       </VisualTile>
     );
   }

@@ -177,6 +177,7 @@ func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.Creat
 		}
 	}
 
+	thumbnailSource := create.Blob
 	if err := SaveAttachmentBlob(ctx, s.Profile, s.Store, create); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save attachment blob: %v", err)
 	}
@@ -185,8 +186,28 @@ func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.Creat
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create attachment: %v", err)
 	}
+	s.prewarmAttachmentThumbnailBestEffort(attachment, thumbnailSource)
 
 	return convertAttachmentFromStore(attachment), nil
+}
+
+func (s *APIV1Service) prewarmAttachmentThumbnailBestEffort(attachment *store.Attachment, source []byte) {
+	if attachment == nil || !isThumbnailPrewarmSupported(attachment.Type) {
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		if err := s.prewarmAttachmentThumbnail(ctx, attachment, source); err != nil {
+			slog.Debug("failed to prewarm attachment thumbnail",
+				slog.String("attachment_uid", attachment.UID),
+				slog.String("type", attachment.Type),
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
 }
 
 func (s *APIV1Service) ListAttachments(ctx context.Context, request *v1pb.ListAttachmentsRequest) (*v1pb.ListAttachmentsResponse, error) {
