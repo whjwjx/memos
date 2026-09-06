@@ -40,6 +40,7 @@ const MemoContent = (props: MemoContentProps) => {
           resolvedMentionUsernames={resolvedMentionUsernames}
           memoName={props.memoName}
           compact={Boolean(props.compact)}
+          priorityMedia={Boolean(props.priorityMedia)}
         />
       </div>
     </div>

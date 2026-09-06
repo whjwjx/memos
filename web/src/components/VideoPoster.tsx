@@ -6,6 +6,7 @@ interface VideoPosterProps {
   alt: string;
   className?: string;
   posterUrl?: string;
+  priority?: boolean;
 }
 
 const MAX_POSTER_DIMENSION = 960;
@@ -27,7 +28,7 @@ const getCanvasSize = (width: number, height: number) => {
   };
 };
 
-const VideoPoster = ({ sourceUrl, alt, className, posterUrl }: VideoPosterProps) => {
+const VideoPoster = ({ sourceUrl, alt, className, posterUrl, priority }: VideoPosterProps) => {
   const placeholderRef = useRef<HTMLDivElement>(null);
   const usablePosterUrl = posterUrl && posterUrl !== sourceUrl ? posterUrl : undefined;
   const [capturedPoster, setCapturedPoster] = useState<{ sourceUrl: string; url: string }>();
@@ -94,7 +95,16 @@ const VideoPoster = ({ sourceUrl, alt, className, posterUrl }: VideoPosterProps)
   );
 
   if (posterImageUrl) {
-    return <img src={posterImageUrl} alt={alt} className={className} loading="lazy" decoding="async" />;
+    return (
+      <img
+        src={posterImageUrl}
+        alt={alt}
+        className={className}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        fetchPriority={priority ? "high" : "low"}
+      />
+    );
   }
 
   if (!nearViewport) {

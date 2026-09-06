@@ -37,8 +37,8 @@ const Home = () => {
     <div className="w-full min-h-full bg-background text-foreground">
       <NewMemoProvider>
         <PagedMemoList
-          renderer={(memo: Memo, { compact }) => (
-            <MemoView key={getMemoKey(memo)} memo={memo} showVisibility showPinned compact={compact} />
+          renderer={(memo: Memo, { compact, priorityMedia }) => (
+            <MemoView key={getMemoKey(memo)} memo={memo} showVisibility showPinned compact={compact} priorityMedia={priorityMedia} />
           )}
           listSort={listSort}
           orderBy={orderBy}

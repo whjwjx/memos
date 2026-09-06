@@ -6,7 +6,11 @@ import { buildRehypePlugins, buildRemarkPlugins } from "@/components/MemoContent
 import { isMentionElement, isTagElement, isTaskListItemElement } from "@/types/markdown";
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
 import { lazyWithReload } from "@/utils/lazy";
-import { resolveManagedAttachmentImageSource } from "@/utils/managed-attachment";
+import {
+  resolveManagedAttachmentImageMetadata,
+  resolveManagedAttachmentImageSource,
+  resolveManagedAttachmentOriginalImageSource,
+} from "@/utils/managed-attachment";
 import { CodeBlock } from "./CodeBlock";
 import { MarkdownRenderContext, rootMarkdownRenderContext } from "./MarkdownRenderContext";
 import { Mention } from "./Mention";
@@ -25,6 +29,8 @@ export interface MemoMarkdownRendererProps {
   memoName?: string;
   /** Whether the memo is rendered as a collapsed feed card. */
   compact?: boolean;
+  /** Prioritize media likely to be visible in the first viewport. */
+  priorityMedia?: boolean;
 }
 
 type RemarkPlugins = NonNullable<ComponentProps<typeof ReactMarkdown>["remarkPlugins"]>;
@@ -63,6 +69,7 @@ export const MemoMarkdownRendererCore = ({
   resolvedMentionUsernames,
   memoName,
   compact,
+  priorityMedia,
   mathRemarkPlugins = [],
   mathRehypePlugins = [],
 }: MemoMarkdownRendererCoreProps) => {
@@ -141,7 +148,21 @@ export const MemoMarkdownRendererCore = ({
     },
     code: ({ children, ...props }) => <InlineCode {...props}>{children}</InlineCode>,
     iframe: TrustedIframe,
-    img: ({ src, ...props }) => <Image {...props} src={resolveManagedAttachmentImageSource(src, attachments)} />,
+    img: ({ src, ...props }) => {
+      const metadata = resolveManagedAttachmentImageMetadata(src, attachments);
+      const preferThumbnail = Boolean(compact || priorityMedia);
+      const originalSrc = preferThumbnail ? resolveManagedAttachmentOriginalImageSource(src, attachments) : undefined;
+      return (
+        <Image
+          {...props}
+          width={props.width ?? metadata?.width}
+          height={props.height ?? metadata?.height}
+          src={resolveManagedAttachmentImageSource(src, attachments, { preferThumbnail })}
+          data-source-url={originalSrc}
+          priority={Boolean(priorityMedia)}
+        />
+      );
+    },
     pre: CodeBlock,
     table: ({ children, ...props }) => <Table {...props}>{children}</Table>,
     thead: ({ children, ...props }) => <TableHead {...props}>{children}</TableHead>,
@@ -189,5 +210,6 @@ export const MemoMarkdownRenderer = memo(
     previous.attachments === next.attachments &&
     previous.memoName === next.memoName &&
     previous.compact === next.compact &&
+    previous.priorityMedia === next.priorityMedia &&
     haveEqualResolvedMentions(previous.resolvedMentionUsernames, next.resolvedMentionUsernames),
 );

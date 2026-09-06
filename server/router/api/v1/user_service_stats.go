@@ -90,6 +90,16 @@ func (s *APIV1Service) ListAllUserStats(ctx context.Context, request *v1pb.ListA
 			memoFind.VisibilityList = []store.Visibility{store.Public, store.Protected}
 		}
 	}
+	viewerID := int32(0)
+	if currentUser != nil {
+		viewerID = currentUser.ID
+	}
+	cacheKey := makeAllUserStatsCacheKey(viewerID, request)
+	if s.userStatsCache != nil {
+		if cached, ok := s.userStatsCache.getAllUserStats(cacheKey); ok {
+			return cached, nil
+		}
+	}
 
 	userMemoStatMap := make(map[int32]*v1pb.UserStats)
 	pinnedMemoUIDsByUserID := make(map[int32][]string)
@@ -185,6 +195,9 @@ func (s *APIV1Service) ListAllUserStats(ctx context.Context, request *v1pb.ListA
 	response := &v1pb.ListAllUserStatsResponse{
 		Stats: userMemoStats,
 	}
+	if s.userStatsCache != nil {
+		s.userStatsCache.setAllUserStats(cacheKey, response)
+	}
 	return response, nil
 }
 
@@ -216,6 +229,16 @@ func (s *APIV1Service) GetUserStats(ctx context.Context, request *v1pb.GetUserSt
 		memoFind.VisibilityList = []store.Visibility{store.Public}
 	} else if currentUser.ID != userID {
 		memoFind.VisibilityList = []store.Visibility{store.Public, store.Protected}
+	}
+	viewerID := int32(0)
+	if currentUser != nil {
+		viewerID = currentUser.ID
+	}
+	cacheKey := makeUserStatsCacheKey(viewerID, request.Name)
+	if s.userStatsCache != nil {
+		if cached, ok := s.userStatsCache.getUserStats(cacheKey); ok {
+			return cached, nil
+		}
 	}
 
 	createdTimestamps := []*timestamppb.Timestamp{}
@@ -288,6 +311,9 @@ func (s *APIV1Service) GetUserStats(ctx context.Context, request *v1pb.GetUserSt
 		},
 	}
 
+	if s.userStatsCache != nil {
+		s.userStatsCache.setUserStats(cacheKey, userStats)
+	}
 	return userStats, nil
 }
 

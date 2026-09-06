@@ -5,7 +5,7 @@ import { gfm } from "micromark-extension-gfm";
 import { normalizeIdentifier } from "micromark-util-normalize-identifier";
 import { visit } from "unist-util-visit";
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
-import { getAttachmentMotionGroupId, getAttachmentUrl, isImage } from "@/utils/attachment";
+import { getAttachmentMotionGroupId, getAttachmentThumbnailUrl, getAttachmentUrl, isImage } from "@/utils/attachment";
 
 const ATTACHMENT_NAME_PREFIX = "attachments/";
 const MANAGED_ATTACHMENT_PATH_PREFIX = "/file/attachments/";
@@ -246,10 +246,29 @@ export const filterInlineManagedAttachments = (content: string, attachments: Att
   );
 };
 
-export const resolveManagedAttachmentImageSource = (source: string | undefined, attachments: Attachment[]): string | undefined => {
-  if (!source) return source;
+const findManagedImageAttachment = (source: string | undefined, attachments: Attachment[]): Attachment | undefined => {
+  if (!source) return undefined;
   const uid = parseManagedAttachmentImageURL(source);
-  if (!uid) return source;
-  const attachment = attachments.find((candidate) => extractAttachmentUIDFromName(candidate.name) === uid);
-  return attachment ? getAttachmentUrl(attachment) : source;
+  if (!uid) return undefined;
+  return attachments.find((candidate) => extractAttachmentUIDFromName(candidate.name) === uid);
 };
+
+export const resolveManagedAttachmentImageSource = (
+  source: string | undefined,
+  attachments: Attachment[],
+  options: { preferThumbnail?: boolean } = {},
+): string | undefined => {
+  const attachment = findManagedImageAttachment(source, attachments);
+  if (!attachment) return source;
+  return options.preferThumbnail ? getAttachmentThumbnailUrl(attachment) : getAttachmentUrl(attachment);
+};
+
+export const resolveManagedAttachmentOriginalImageSource = (source: string | undefined, attachments: Attachment[]): string | undefined => {
+  const attachment = findManagedImageAttachment(source, attachments);
+  return attachment ? getAttachmentUrl(attachment) : undefined;
+};
+
+export const resolveManagedAttachmentImageMetadata = (
+  source: string | undefined,
+  attachments: Attachment[],
+): Attachment["mediaMetadata"] | undefined => findManagedImageAttachment(source, attachments)?.mediaMetadata;

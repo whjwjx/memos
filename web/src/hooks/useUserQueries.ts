@@ -22,6 +22,7 @@ import {
 
 const BATCH_GET_USERS_LIMIT = 100;
 const USER_PROFILE_STALE_TIME = 1000 * 60 * 5;
+const USER_STATS_STALE_TIME = 1000 * 60 * 2;
 type ListAllUserStatsQuery = Pick<ListAllUserStatsRequest, "state" | "filter">;
 
 // Query keys factory
@@ -66,6 +67,7 @@ export function useUserStats(username?: string, options?: { enabled?: boolean })
       return stats;
     },
     enabled: !!username && (options?.enabled ?? true),
+    staleTime: USER_STATS_STALE_TIME,
   });
 }
 
@@ -77,6 +79,7 @@ export function useAllUserStats(request: Partial<ListAllUserStatsQuery> = {}, op
       return stats;
     },
     enabled: options?.enabled ?? true,
+    staleTime: USER_STATS_STALE_TIME,
   });
 }
 

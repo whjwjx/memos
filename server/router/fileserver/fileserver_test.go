@@ -863,3 +863,69 @@ func TestServeAttachmentFile_RefreshCookieAuthenticatesOwner(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "secret content", rec.Body.String())
 }
+
+func TestServeAttachmentFile_PrivateThumbnailUsesShortBrowserCache(t *testing.T) {
+	ctx := context.Background()
+	svc, fs, _, cleanup := newShareAttachmentTestServices(ctx, t)
+	defer cleanup()
+
+	owner, err := svc.Store.CreateUser(ctx, &store.User{
+		Username: "private-thumbnail-owner",
+		Role:     store.RoleUser,
+		Email:    "private-thumbnail-owner@example.com",
+	})
+	require.NoError(t, err)
+	ownerCtx := context.WithValue(ctx, auth.UserIDContextKey, owner.ID)
+
+	attachment, err := svc.CreateAttachment(ownerCtx, &apiv1.CreateAttachmentRequest{
+		Attachment: &apiv1.Attachment{
+			Filename: "private-thumbnail.png",
+			Type:     "image/png",
+			Content:  testPNGWithChunk(t, "tEXt", []byte("note\x00ok")),
+		},
+	})
+	require.NoError(t, err)
+
+	_, err = svc.CreateMemo(ownerCtx, &apiv1.CreateMemoRequest{
+		Memo: &apiv1.Memo{
+			Content:     "private thumbnail",
+			Visibility:  apiv1.Visibility_PRIVATE,
+			Attachments: []*apiv1.Attachment{{Name: attachment.Name}},
+		},
+	})
+	require.NoError(t, err)
+
+	tokenID := util.GenUUID()
+	require.NoError(t, svc.Store.AddUserRefreshToken(ctx, owner.ID, &storepb.RefreshTokensUserSetting_RefreshToken{
+		TokenId:   tokenID,
+		ExpiresAt: timestamppb.New(time.Now().Add(auth.RefreshTokenDuration)),
+		CreatedAt: timestamppb.Now(),
+	}))
+	refreshToken, _, err := auth.GenerateRefreshToken(owner.ID, tokenID, []byte(svc.Secret))
+	require.NoError(t, err)
+
+	e := echo.New()
+	fs.RegisterRoutes(e)
+	url := fmt.Sprintf("/file/%s/%s", attachment.Name, attachment.Filename)
+	thumbnailURL := url + "?thumbnail=true"
+
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, thumbnailURL, nil))
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	require.Equal(t, privateAttachmentCacheControl, rec.Header().Get(echo.HeaderCacheControl))
+
+	req := httptest.NewRequest(http.MethodGet, url, nil)
+	req.AddCookie(&http.Cookie{Name: auth.RefreshTokenCookieName, Value: refreshToken})
+	rec = httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, privateAttachmentCacheControl, rec.Header().Get(echo.HeaderCacheControl))
+
+	req = httptest.NewRequest(http.MethodGet, thumbnailURL, nil)
+	req.AddCookie(&http.Cookie{Name: auth.RefreshTokenCookieName, Value: refreshToken})
+	rec = httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "image/jpeg", rec.Header().Get(echo.HeaderContentType))
+	require.Equal(t, privateThumbnailAttachmentCacheControl, rec.Header().Get(echo.HeaderCacheControl))
+}

@@ -54,6 +54,7 @@ type APIV1Service struct {
 
 	// instanceStatsCache memoizes GetInstanceStats results for instanceStatsCacheTTL.
 	instanceStatsCache instanceStatsCache
+	userStatsCache     *userStatsCache
 
 	linkMetadataFetcher linkMetadataFetcher
 
@@ -79,6 +80,7 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		NotificationWebPushSender: &notification.WebPushDispatcher{},
 		thumbnailSemaphore:        semaphore.NewWeighted(3), // Limit to 3 concurrent thumbnail generations
 		imageProcessingSemaphore:  semaphore.NewWeighted(2),
+		userStatsCache:            newUserStatsCache(),
 	}
 	service.linkMetadataFetcher = httpgetter.NewHTMLMetaFetcher()
 

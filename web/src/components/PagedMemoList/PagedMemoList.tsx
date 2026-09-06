@@ -27,6 +27,10 @@ export const getMemoKey = (memo: Memo) => memo.name;
 // Columns never stretch past this, so 2 columns on a wide monitor stay readable and the
 // grid centers in the leftover space instead of filling it.
 const MAX_COLUMN_WIDTH = 420;
+const AUTO_FETCH_DELAY_MS = 200;
+const AUTO_FETCH_MEDIA_DELAY_MS = 900;
+const MAX_AUTO_FETCH_ROUNDS_WITH_MEDIA = 1;
+const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*]\([^)]+\)|<img\s/i;
 
 const Loader = () => (
   <div className="w-full flex flex-row justify-center items-center py-8">
@@ -35,7 +39,7 @@ const Loader = () => (
 );
 
 interface Props {
-  renderer: (memo: Memo, options: { compact: boolean }) => ReactElement;
+  renderer: (memo: Memo, options: { compact: boolean; priorityMedia: boolean }) => ReactElement;
   listSort?: (list: Memo[]) => Memo[];
   state?: State;
   orderBy?: string;
@@ -49,18 +53,23 @@ interface Props {
 
 function useAutoFetchWhenNotScrollable({
   enabled,
+  hasDeferredMedia,
   hasNextPage,
   isFetchingNextPage,
   memoCount,
   onFetchNext,
+  resetKey,
 }: {
   enabled: boolean;
+  hasDeferredMedia: boolean;
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
   memoCount: number;
   onFetchNext: () => Promise<unknown>;
+  resetKey: string;
 }) {
   const autoFetchTimeoutRef = useRef<number | null>(null);
+  const autoFetchCountRef = useRef(0);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
 
@@ -74,11 +83,18 @@ function useAutoFetchWhenNotScrollable({
       clearTimeout(autoFetchTimeoutRef.current);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, hasDeferredMedia ? AUTO_FETCH_MEDIA_DELAY_MS : AUTO_FETCH_DELAY_MS));
 
-    const shouldFetch = enabledRef.current && !isPageScrollable() && hasNextPage && !isFetchingNextPage && memoCount > 0;
+    const shouldFetch =
+      enabledRef.current &&
+      !isPageScrollable() &&
+      hasNextPage &&
+      !isFetchingNextPage &&
+      memoCount > 0 &&
+      (!hasDeferredMedia || autoFetchCountRef.current < MAX_AUTO_FETCH_ROUNDS_WITH_MEDIA);
 
     if (shouldFetch) {
+      autoFetchCountRef.current += 1;
       await onFetchNext();
 
       if (enabledRef.current) {
@@ -87,7 +103,11 @@ function useAutoFetchWhenNotScrollable({
         }, 500);
       }
     }
-  }, [enabled, hasNextPage, isFetchingNextPage, memoCount, isPageScrollable, onFetchNext]);
+  }, [enabled, hasDeferredMedia, hasNextPage, isFetchingNextPage, memoCount, isPageScrollable, onFetchNext]);
+
+  useEffect(() => {
+    autoFetchCountRef.current = 0;
+  }, [resetKey]);
 
   useEffect(() => {
     if (enabled && !isFetchingNextPage && memoCount > 0) {
@@ -110,6 +130,10 @@ function useAutoFetchWhenNotScrollable({
     };
   }, []);
 }
+
+const memoHasDeferredMedia = (memo: Memo): boolean =>
+  MARKDOWN_IMAGE_PATTERN.test(memo.content ?? "") ||
+  (memo.attachments ?? []).some((attachment) => attachment.type.startsWith("image/") || attachment.type.startsWith("video/"));
 
 const arraysEqual = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
@@ -235,10 +259,12 @@ const PagedMemoList = (props: Props) => {
   // Auto-fetch hook: fetches more content when page isn't scrollable
   useAutoFetchWhenNotScrollable({
     enabled: !isDisplayPending,
+    hasDeferredMedia: sortedMemoList.some(memoHasDeferredMedia),
     hasNextPage,
     isFetchingNextPage,
     memoCount: sortedMemoList.length,
     onFetchNext: fetchNextPage,
+    resetKey: orderResetKey,
   });
 
   // Infinite scroll: fetch more when user scrolls near bottom
@@ -252,7 +278,7 @@ const PagedMemoList = (props: Props) => {
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isDisplayPending, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
@@ -262,7 +288,9 @@ const PagedMemoList = (props: Props) => {
   // appears right under the composer instead of dropping into a random (shortest) column.
   const displayMemoList = isDisplayPending ? [] : sortedMemoList;
   const firstMemo = displayMemoList[0];
-  const priorityKey = newMemoName && firstMemo?.name === newMemoName ? getMemoKey(firstMemo) : undefined;
+  const firstMemoKey = firstMemo ? getMemoKey(firstMemo) : undefined;
+  const firstMediaMemoKey = displayMemoList.find(memoHasDeferredMedia)?.name;
+  const priorityKey = newMemoName && firstMemo?.name === newMemoName ? firstMemoKey : undefined;
 
   // Stable reference so MentionResolutionProvider's memo (keyed on the array) actually holds.
   const contents = useMemo(() => displayMemoList.map((memo) => memo.content), [displayMemoList]);
@@ -321,7 +349,9 @@ const PagedMemoList = (props: Props) => {
               <ColumnGrid
                 items={displayMemoList}
                 getKey={getMemoKey}
-                renderItem={(memo) => props.renderer(memo, { compact: effectiveCompact })}
+                renderItem={(memo) =>
+                  props.renderer(memo, { compact: effectiveCompact, priorityMedia: getMemoKey(memo) === firstMediaMemoKey })
+                }
                 estimateHeight={(memo, context) =>
                   estimateMemoCardHeight(memo, { ...context, showCommentPreview: userGeneralSetting?.showCommentPreview ?? true })
                 }
@@ -337,7 +367,9 @@ const PagedMemoList = (props: Props) => {
               {leadingContent}
               <MemoFilters className="mb-2" />
               {initialLoader}
-              {displayMemoList.map((memo) => props.renderer(memo, { compact: effectiveCompact }))}
+              {displayMemoList.map((memo) =>
+                props.renderer(memo, { compact: effectiveCompact, priorityMedia: getMemoKey(memo) === firstMediaMemoKey }),
+              )}
               {emptyPlaceholder}
               {!isDisplayPending && footer}
             </>
@@ -360,7 +392,7 @@ const BackToTop = () => {
       setIsVisible(shouldShow);
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 

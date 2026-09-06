@@ -235,6 +235,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 		s.dispatchMemoMentionNotificationsBestEffort(ctx, memo, nil, "")
 	}
 
+	s.invalidateUserStatsCache()
 	return memoMessage, nil
 }
 
@@ -662,6 +663,7 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 		s.dispatchMemoMentionNotificationsBestEffort(ctx, memo, parentMemo, previousContent)
 	}
 	s.dispatchMemoUpdatedSideEffects(ctx, memo, parentMemo, memoMessage)
+	s.invalidateUserStatsCache()
 
 	return memoMessage, nil
 }
@@ -740,6 +742,7 @@ func (s *APIV1Service) DeleteMemo(ctx context.Context, request *v1pb.DeleteMemoR
 		CreatorID:  resolveSSECreatorID(memo, nil),
 	})
 
+	s.invalidateUserStatsCache()
 	return &emptypb.Empty{}, nil
 }
 

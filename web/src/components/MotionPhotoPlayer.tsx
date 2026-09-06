@@ -11,6 +11,7 @@ interface MotionPhotoPlayerProps {
   posterClassName?: string;
   videoClassName?: string;
   active?: boolean;
+  priority?: boolean;
   loop?: boolean;
 }
 
@@ -24,6 +25,7 @@ const MotionPhotoPlayer = ({
   posterClassName,
   videoClassName,
   active,
+  priority,
   loop = false,
 }: MotionPhotoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -97,8 +99,9 @@ const MotionPhotoPlayer = ({
         alt={alt}
         className={cn("block max-h-full max-w-full select-none object-cover", mediaClassName, posterClassName)}
         draggable={false}
-        loading="lazy"
+        loading={priority ? "eager" : "lazy"}
         decoding="async"
+        fetchPriority={priority ? "high" : "low"}
       />
       <video
         ref={videoRef}

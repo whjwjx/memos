@@ -50,8 +50,9 @@ const (
 	// cacheMaxAge is the max-age value for Cache-Control headers (1 hour).
 	cacheMaxAge = "public, max-age=3600"
 
-	publicAttachmentCacheControl  = "public, no-cache"
-	privateAttachmentCacheControl = "private, no-store"
+	publicAttachmentCacheControl           = "public, no-cache"
+	privateAttachmentCacheControl          = "private, no-store"
+	privateThumbnailAttachmentCacheControl = "private, max-age=3600"
 )
 
 // xssUnsafeTypes contains MIME types that could execute scripts if served directly.
@@ -149,6 +150,8 @@ func (s *FileServerService) serveAttachmentFile(c *echo.Context) error {
 	}
 	if readClass == access.MemoReadClassPublic {
 		c.Response().Header().Set(echo.HeaderCacheControl, publicAttachmentCacheControl)
+	} else if wantThumbnail {
+		c.Response().Header().Set(echo.HeaderCacheControl, privateThumbnailAttachmentCacheControl)
 	}
 
 	if wantMotion {
