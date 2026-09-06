@@ -11,7 +11,11 @@ export const MEDIA_HOVER_SURFACE_CLASS = "group/media relative h-full min-h-0 w-
 export const COVER_MEDIA_CLASS = "h-full w-full rounded-none object-cover transition-transform duration-300 group-hover/media:scale-[1.02]";
 
 export const NATURAL_MEDIA_CLASS =
-  "block h-auto max-h-[20rem] w-auto max-w-full rounded-none transition-transform duration-300 group-hover/media:scale-[1.02]";
+  "block h-auto w-auto max-w-full rounded-none object-contain transition-transform duration-300 group-hover/media:scale-[1.02]";
+
+export const NATURAL_MEDIA_LIST_SIZE_CLASS = "max-h-[18rem] sm:max-w-[32rem]";
+
+export const NATURAL_MEDIA_DETAIL_SIZE_CLASS = "max-h-[32rem]";
 
 /** Motion overlay video in single-tile layout (pairs with {@link NATURAL_MEDIA_CLASS} poster). */
 export const SINGLE_MOTION_VIDEO_CLASS =

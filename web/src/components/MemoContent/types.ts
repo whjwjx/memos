@@ -1,6 +1,8 @@
 import type React from "react";
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
 
+export type MemoMediaSize = "list" | "detail";
+
 export interface MemoContentProps {
   content: string;
   /** Attachments bound to this memo, used to resolve managed image URLs in share/S3 modes. */
@@ -11,6 +13,8 @@ export interface MemoContentProps {
   compact?: boolean;
   /** Prioritize media likely to be visible in the first viewport. */
   priorityMedia?: boolean;
+  /** Visual size policy for inline media. */
+  mediaSize?: MemoMediaSize;
   className?: string;
   contentClassName?: string;
   onClick?: (e: React.MouseEvent) => void;

@@ -32,7 +32,7 @@ const BlurOverlay: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
   );
 };
 
-const MemoBody: React.FC<MemoBodyProps> = ({ compact, priorityMedia }) => {
+const MemoBody: React.FC<MemoBodyProps> = ({ compact, priorityMedia, mediaSize }) => {
   const { memo, parentPage, showBlurredContent, blurred, readonly, openEditor, openPreview, toggleBlurVisibility } = useMemoViewContext();
 
   const { handleMemoContentClick, handleMemoContentDoubleClick } = useMemoHandlers({ readonly, openEditor, openPreview });
@@ -64,8 +64,14 @@ const MemoBody: React.FC<MemoBodyProps> = ({ compact, priorityMedia }) => {
             onDoubleClick={handleMemoContentDoubleClick}
             compact={Boolean(compact)}
             priorityMedia={Boolean(priorityMedia)}
+            mediaSize={mediaSize}
           />
-          <AttachmentListView attachments={attachmentOnlyItems} onImagePreview={openPreview} priorityMedia={Boolean(priorityMedia)} />
+          <AttachmentListView
+            attachments={attachmentOnlyItems}
+            onImagePreview={openPreview}
+            priorityMedia={Boolean(priorityMedia)}
+            mediaSize={mediaSize}
+          />
           <RelationListView relations={referencedMemos} currentMemoName={memo.name} parentPage={parentPage} />
           {memo.location && <LocationDisplayView location={memo.location} />}
         </ClampedSection>
