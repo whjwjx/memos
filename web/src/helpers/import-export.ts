@@ -27,13 +27,21 @@ interface ImportUploadResponse {
 }
 
 export interface ImportProgress {
-  uploadedChunks: number;
-  totalChunks: number;
-  uploadedBytes: number;
-  totalBytes: number;
+  phase: "preparing" | "uploading" | "processing";
+  uploadedChunks?: number;
+  totalChunks?: number;
+  uploadedBytes?: number;
+  totalBytes?: number;
+}
+
+export interface ExportProgress {
+  phase: "preparing" | "downloading";
+  downloadedBytes: number;
+  totalBytes?: number;
 }
 
 const directImportThresholdBytes = 32 * 1024 * 1024;
+const progressUpdateIntervalMs = 100;
 
 const parseErrorMessage = async (response: Response) => {
   const text = await response.text();
@@ -63,7 +71,54 @@ const filenameFromDisposition = (disposition: string | null, fallback: string) =
   return asciiMatch?.[1] || fallback;
 };
 
-export const downloadMemosExport = async (scope: ImportExportScope) => {
+const parseContentLength = (value: string | null): number | undefined => {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const readResponseBlob = async (response: Response, onProgress?: (progress: ExportProgress) => void): Promise<Blob> => {
+  const totalBytes = parseContentLength(response.headers.get("Content-Length"));
+  const contentType = response.headers.get("Content-Type") || "application/zip";
+
+  if (!response.body) {
+    const blob = await response.blob();
+    onProgress?.({
+      downloadedBytes: blob.size,
+      phase: "downloading",
+      totalBytes: totalBytes ?? blob.size,
+    });
+    return blob;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: BlobPart[] = [];
+  let downloadedBytes = 0;
+  let lastProgressAt = 0;
+
+  onProgress?.({ downloadedBytes, phase: "downloading", totalBytes });
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+
+    chunks.push(value as BlobPart);
+    downloadedBytes += value.byteLength;
+
+    const now = performance.now();
+    if (now - lastProgressAt >= progressUpdateIntervalMs) {
+      onProgress?.({ downloadedBytes, phase: "downloading", totalBytes });
+      lastProgressAt = now;
+    }
+  }
+
+  onProgress?.({ downloadedBytes, phase: "downloading", totalBytes });
+  return new Blob(chunks, { type: contentType });
+};
+
+export const downloadMemosExport = async (scope: ImportExportScope, onProgress?: (progress: ExportProgress) => void) => {
+  onProgress?.({ downloadedBytes: 0, phase: "preparing" });
   const headers = await buildHeaders();
   const response = await fetch(`/api/v1/export:download?scope=${scope}`, {
     credentials: "include",
@@ -73,7 +128,7 @@ export const downloadMemosExport = async (scope: ImportExportScope) => {
     throw new Error(await parseErrorMessage(response));
   }
 
-  const blob = await response.blob();
+  const blob = await readResponseBlob(response, onProgress);
   const filename = filenameFromDisposition(response.headers.get("Content-Disposition"), `memos-export-${scope}.zip`);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -91,6 +146,7 @@ export const importMemosExport = async (
   source: ImportSource = "memos",
   onProgress?: (progress: ImportProgress) => void,
 ): Promise<ImportExportResult> => {
+  onProgress?.({ phase: "preparing", totalBytes: file.size, uploadedBytes: 0 });
   if (file.size > directImportThresholdBytes) {
     return importMemosExportInChunks(scope, file, source, onProgress);
   }
@@ -99,6 +155,7 @@ export const importMemosExport = async (
   const formData = new FormData();
   formData.set("file", file);
 
+  onProgress?.({ phase: "processing", totalBytes: file.size, uploadedBytes: file.size });
   const response = await fetch(`/api/v1/import?scope=${scope}&source=${source}`, {
     body: formData,
     credentials: "include",
@@ -142,6 +199,13 @@ const importMemosExportInChunks = async (
 
   try {
     let uploadedBytes = 0;
+    onProgress?.({
+      phase: "uploading",
+      totalBytes: file.size,
+      totalChunks: upload.chunkCount,
+      uploadedBytes,
+      uploadedChunks: 0,
+    });
     for (let index = 0; index < upload.chunkCount; index++) {
       const start = index * upload.chunkSize;
       const end = Math.min(start + upload.chunkSize, file.size);
@@ -158,6 +222,7 @@ const importMemosExportInChunks = async (
       }
       uploadedBytes += chunk.size;
       onProgress?.({
+        phase: "uploading",
         totalBytes: file.size,
         totalChunks: upload.chunkCount,
         uploadedBytes,
@@ -165,6 +230,7 @@ const importMemosExportInChunks = async (
       });
     }
 
+    onProgress?.({ phase: "processing", totalBytes: file.size, uploadedBytes: file.size });
     const completeHeaders = await buildHeaders();
     const completeResponse = await fetch(`/api/v1/import/uploads/${upload.uploadId}/complete`, {
       credentials: "include",

@@ -91,9 +91,22 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 			return nil
 		},
 	}
+	importUploadCleanupJob := &scheduler.Job{
+		Name:     "import-upload-cleanup",
+		Schedule: "0 */30 * * * *",
+		Handler: func(ctx context.Context) error {
+			if err := service.cleanupExpiredImportUploads(); err != nil {
+				slog.Warn("Failed to clean expired import uploads", slog.Any("err", err))
+			}
+			return nil
+		},
+	}
 	if err := backgroundScheduler.Register(backgroundJob); err != nil {
 		slog.Warn("Failed to register background maintenance job", slog.Any("err", err))
 	} else {
+		if err := backgroundScheduler.Register(importUploadCleanupJob); err != nil {
+			slog.Warn("Failed to register import upload cleanup job", slog.Any("err", err))
+		}
 		service.backgroundScheduler = backgroundScheduler
 	}
 	return service

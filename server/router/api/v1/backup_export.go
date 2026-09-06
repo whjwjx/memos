@@ -52,6 +52,7 @@ func (s *APIV1Service) RegisterBackupRoutes(echoServer *echo.Echo) {
 }
 
 func (s *APIV1Service) exportBackup(c *echo.Context, authenticator *auth.Authenticator) error {
+	startedAt := time.Now()
 	ctx := c.Request().Context()
 	if !s.backupInProgress.CompareAndSwap(false, true) {
 		return echo.NewHTTPError(http.StatusConflict, "backup is already running")
@@ -93,10 +94,12 @@ func (s *APIV1Service) exportBackup(c *echo.Context, authenticator *auth.Authent
 	zipFilePath := filepath.Join(tmpDir, backupFilename)
 	snapshotPath := filepath.Join(tmpDir, "memos.db")
 
+	packageStartedAt := time.Now()
 	manifest, err := s.createBackupZip(ctx, db, zipFilePath, snapshotPath, databasePath)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create backup zip").Wrap(err)
 	}
+	packageDuration := time.Since(packageStartedAt)
 
 	zipSize, err := getFileSize(zipFilePath)
 	if err != nil {
@@ -126,10 +129,18 @@ func (s *APIV1Service) exportBackup(c *echo.Context, authenticator *auth.Authent
 	if _, err := io.Copy(c.Response(), zipFile); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to write backup file").Wrap(err)
 	}
+	slog.Info("memos backup sent",
+		"username", user.Username,
+		"filename", backupFilename,
+		"bytes", zipSize,
+		"packageDuration", packageDuration.String(),
+		"totalDuration", time.Since(startedAt).String(),
+	)
 	return nil
 }
 
 func (s *APIV1Service) createBackupZip(ctx context.Context, db *sql.DB, zipFilePath string, snapshotPath string, databasePath string) (*backupManifest, error) {
+	startedAt := time.Now()
 	zipFile, err := os.Create(zipFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create zip file")
@@ -139,14 +150,25 @@ func (s *APIV1Service) createBackupZip(ctx context.Context, db *sql.DB, zipFileP
 	zipWriter := zip.NewWriter(zipFile)
 	defer zipWriter.Close()
 
+	stageStartedAt := time.Now()
 	if err := createSQLiteSnapshot(ctx, db, snapshotPath); err != nil {
 		return nil, errors.Wrap(err, "failed to snapshot sqlite database")
 	}
 	if err := addFileToZip(zipWriter, "database/memos.db", snapshotPath); err != nil {
 		return nil, err
 	}
+	slog.Info("memos backup stage completed", "stage", "database", "duration", time.Since(stageStartedAt).String())
 
+	stageStartedAt = time.Now()
 	totalAttachmentCount, localAttachmentCount, skippedAttachmentCount, skippedAttachmentReasons := s.addLocalAttachmentsToZip(ctx, zipWriter)
+	slog.Info(
+		"memos backup stage completed",
+		"stage", "attachments",
+		"totalAttachments", totalAttachmentCount,
+		"localAttachments", localAttachmentCount,
+		"skippedAttachments", skippedAttachmentCount,
+		"duration", time.Since(stageStartedAt).String(),
+	)
 	manifest := &backupManifest{
 		Version:                  s.Profile.Version,
 		Driver:                   s.Profile.Driver,
@@ -167,6 +189,7 @@ func (s *APIV1Service) createBackupZip(ctx context.Context, db *sql.DB, zipFileP
 	if err := writeManifestToZip(zipWriter, manifestData); err != nil {
 		return nil, err
 	}
+	slog.Info("memos backup package completed", "duration", time.Since(startedAt).String())
 	return manifest, nil
 }
 

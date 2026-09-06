@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import {
   downloadMemosExport,
+  type ExportProgress,
   type ImportExportResult,
   type ImportExportScope,
   type ImportProgress,
@@ -26,6 +27,16 @@ const formatImportResult = (result: ImportExportResult) => {
   return { created, skipped };
 };
 
+const getExportProgressPercent = (progress: ExportProgress): number | undefined => {
+  if (!progress.totalBytes) return undefined;
+  return Math.min(100, Math.round((progress.downloadedBytes / progress.totalBytes) * 100));
+};
+
+const getImportProgressPercent = (progress: ImportProgress): number | undefined => {
+  if (!progress.totalBytes || progress.uploadedBytes === undefined) return undefined;
+  return Math.min(100, Math.round((progress.uploadedBytes / progress.totalBytes) * 100));
+};
+
 const DataSection = () => {
   const t = useTranslate();
   const user = useCurrentUser();
@@ -34,19 +45,22 @@ const DataSection = () => {
   const pendingScopeRef = useRef<ImportExportScope>("mine");
   const pendingSourceRef = useRef<ImportSource>("memos");
   const [exportingScope, setExportingScope] = useState<ImportExportScope | undefined>();
+  const [exportProgress, setExportProgress] = useState<ExportProgress | undefined>();
   const [importingScope, setImportingScope] = useState<ImportExportScope | undefined>();
   const [importingSource, setImportingSource] = useState<ImportSource | undefined>();
   const [importProgress, setImportProgress] = useState<ImportProgress | undefined>();
 
   const handleExport = async (scope: ImportExportScope) => {
     setExportingScope(scope);
+    setExportProgress({ downloadedBytes: 0, phase: "preparing" });
     try {
-      await downloadMemosExport(scope);
+      await downloadMemosExport(scope, setExportProgress);
       toast.success(t("setting.data.export-success"));
     } catch (error) {
       handleError(error, toast.error, { context: "Export data" });
     } finally {
       setExportingScope(undefined);
+      setExportProgress(undefined);
     }
   };
 
@@ -67,7 +81,7 @@ const DataSection = () => {
     const source = pendingSourceRef.current;
     setImportingScope(scope);
     setImportingSource(source);
-    setImportProgress(undefined);
+    setImportProgress({ phase: "preparing", totalBytes: file.size, uploadedBytes: 0 });
     try {
       const result = await importMemosExport(scope, file, source, setImportProgress);
       const summary = formatImportResult(result);
@@ -85,17 +99,95 @@ const DataSection = () => {
     }
   };
 
-  const getImportButtonText = (scope: ImportExportScope, source: ImportSource, labelKey: Translations) => {
-    if (importingScope !== scope || importingSource !== source) {
-      return t(labelKey);
+  const getExportProgressLabel = (progress: ExportProgress) => {
+    const percent = getExportProgressPercent(progress);
+    if (progress.phase === "downloading" && percent !== undefined) {
+      return t("setting.data.export-downloading-progress", { percent });
     }
-    if (importProgress) {
-      return t("setting.data.importing-progress", {
-        current: importProgress.uploadedChunks,
-        total: importProgress.totalChunks,
-      });
+    if (progress.phase === "downloading") {
+      return t("setting.data.export-downloading");
+    }
+    return t("setting.data.exporting");
+  };
+
+  const getImportProgressLabel = (progress: ImportProgress) => {
+    const percent = getImportProgressPercent(progress);
+    if (progress.phase === "uploading" && percent !== undefined) {
+      return t("setting.data.import-uploading-progress", { percent });
+    }
+    if (progress.phase === "processing") {
+      return t("setting.data.import-processing");
     }
     return t("setting.data.importing");
+  };
+
+  const renderProgressTrack = (active: boolean, determinate: boolean, percent?: number) => {
+    if (!active) return null;
+
+    return (
+      <span className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden bg-primary/15">
+        <span
+          className={`block h-full bg-primary transition-all duration-300 ${determinate ? "" : "w-1/2 animate-pulse"}`}
+          style={determinate ? { width: `${percent}%` } : undefined}
+        />
+      </span>
+    );
+  };
+
+  const renderExportButton = (scope: ImportExportScope, labelKey: Translations) => {
+    const activeProgress = exportingScope === scope ? exportProgress : undefined;
+    const percent = activeProgress ? getExportProgressPercent(activeProgress) : undefined;
+    const isDeterminate = activeProgress?.phase === "downloading" && percent !== undefined;
+    const label = t(labelKey);
+
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="relative w-full overflow-hidden sm:w-auto"
+        disabled={!!exportingScope || !!importingScope}
+        onClick={() => handleExport(scope)}
+      >
+        <DownloadIcon className="h-4 w-4" />
+        <span className="grid min-w-0">
+          <span className={`col-start-1 row-start-1 ${activeProgress ? "invisible" : ""}`}>{label}</span>
+          {activeProgress && (
+            <span className="col-start-1 row-start-1" aria-live="polite">
+              {getExportProgressLabel(activeProgress)}
+            </span>
+          )}
+        </span>
+        {renderProgressTrack(!!activeProgress, isDeterminate, percent)}
+      </Button>
+    );
+  };
+
+  const renderImportButton = (scope: ImportExportScope, source: ImportSource, labelKey: Translations) => {
+    const activeProgress = importingScope === scope && importingSource === source ? importProgress : undefined;
+    const percent = activeProgress ? getImportProgressPercent(activeProgress) : undefined;
+    const isDeterminate = activeProgress?.phase === "uploading" && percent !== undefined;
+    const label = t(labelKey);
+
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="relative w-full overflow-hidden sm:w-auto"
+        disabled={!!exportingScope || !!importingScope}
+        onClick={() => openImportFilePicker(scope, source)}
+      >
+        <UploadIcon className="h-4 w-4" />
+        <span className="grid min-w-0">
+          <span className={`col-start-1 row-start-1 ${activeProgress ? "invisible" : ""}`}>{label}</span>
+          {activeProgress && (
+            <span className="col-start-1 row-start-1" aria-live="polite">
+              {getImportProgressLabel(activeProgress)}
+            </span>
+          )}
+        </span>
+        {renderProgressTrack(!!activeProgress, isDeterminate, percent)}
+      </Button>
+    );
   };
 
   return (
@@ -109,26 +201,8 @@ const DataSection = () => {
             description={t("setting.data.import-memos-package-description")}
             controlClassName="flex-wrap gap-2"
           >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-              disabled={!!exportingScope || !!importingScope}
-              onClick={() => handleExport("mine")}
-            >
-              <DownloadIcon className="h-4 w-4" />
-              {exportingScope === "mine" ? t("setting.data.exporting") : t("setting.data.export-memos-package")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-              disabled={!!exportingScope || !!importingScope}
-              onClick={() => openImportFilePicker("mine", "memos")}
-            >
-              <UploadIcon className="h-4 w-4" />
-              {getImportButtonText("mine", "memos", "setting.data.import-memos-package")}
-            </Button>
+            {renderExportButton("mine", "setting.data.export-memos-package")}
+            {renderImportButton("mine", "memos", "setting.data.import-memos-package")}
           </SettingListItem>
 
           <SettingListItem
@@ -136,16 +210,7 @@ const DataSection = () => {
             description={t("setting.data.import-flomo-package-description")}
             controlClassName="flex-wrap gap-2"
           >
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-              disabled={!!exportingScope || !!importingScope}
-              onClick={() => openImportFilePicker("mine", "flomo")}
-            >
-              <UploadIcon className="h-4 w-4" />
-              {getImportButtonText("mine", "flomo", "setting.data.import-flomo-package")}
-            </Button>
+            {renderImportButton("mine", "flomo", "setting.data.import-flomo-package")}
           </SettingListItem>
         </SettingList>
       </SettingGroup>
@@ -158,26 +223,8 @@ const DataSection = () => {
               description={t("setting.data.admin-data-description")}
               controlClassName="flex-wrap gap-2"
             >
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={!!exportingScope || !!importingScope}
-                onClick={() => handleExport("all")}
-              >
-                <DownloadIcon className="h-4 w-4" />
-                {exportingScope === "all" ? t("setting.data.exporting") : t("setting.data.export-all-memos-package")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={!!exportingScope || !!importingScope}
-                onClick={() => openImportFilePicker("all", "memos")}
-              >
-                <UploadIcon className="h-4 w-4" />
-                {getImportButtonText("all", "memos", "setting.data.import-all-memos-package")}
-              </Button>
+              {renderExportButton("all", "setting.data.export-all-memos-package")}
+              {renderImportButton("all", "memos", "setting.data.import-all-memos-package")}
             </SettingListItem>
           </SettingList>
         </SettingGroup>
