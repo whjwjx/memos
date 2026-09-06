@@ -52,6 +52,7 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
 
   const location = useLocation();
   const isInMemoDetailPage = location.pathname.startsWith(`/${memoData.name}`) || location.pathname.startsWith("/memos/shares/");
+  const mediaSize = props.mediaSize ?? (isInMemoDetailPage ? "detail" : "list");
   const commentAmount = computeCommentAmount(memoData);
   const showCommentPreview = !isInMemoDetailPage && commentAmount > 0 && (userGeneralSetting?.showCommentPreview ?? true);
 
@@ -132,7 +133,7 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
     >
       <MemoHeader showCreator={showCreator} showVisibility={showVisibility} showPinned={showPinned} />
 
-      <MemoBody compact={compact} priorityMedia={priorityMedia} />
+      <MemoBody compact={compact} priorityMedia={priorityMedia} mediaSize={mediaSize} />
 
       {previewState.items.length > 0 && (
         <Suspense fallback={null}>

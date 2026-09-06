@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } fro
 import { Tag } from "./Tag";
 import { TaskListItem } from "./TaskListItem";
 import { TrustedIframe } from "./TrustedIframe";
+import type { MemoMediaSize } from "./types";
 
 export interface MemoMarkdownRendererProps {
   content: string;
@@ -31,6 +32,8 @@ export interface MemoMarkdownRendererProps {
   compact?: boolean;
   /** Prioritize media likely to be visible in the first viewport. */
   priorityMedia?: boolean;
+  /** Visual size policy for inline media. */
+  mediaSize?: MemoMediaSize;
 }
 
 type RemarkPlugins = NonNullable<ComponentProps<typeof ReactMarkdown>["remarkPlugins"]>;
@@ -70,6 +73,7 @@ export const MemoMarkdownRendererCore = ({
   memoName,
   compact,
   priorityMedia,
+  mediaSize = "list",
   mathRemarkPlugins = [],
   mathRehypePlugins = [],
 }: MemoMarkdownRendererCoreProps) => {
@@ -160,6 +164,7 @@ export const MemoMarkdownRendererCore = ({
           src={resolveManagedAttachmentImageSource(src, attachments, { preferThumbnail })}
           data-source-url={originalSrc}
           priority={Boolean(priorityMedia)}
+          mediaSize={compact ? "list" : mediaSize}
         />
       );
     },
@@ -211,5 +216,6 @@ export const MemoMarkdownRenderer = memo(
     previous.memoName === next.memoName &&
     previous.compact === next.compact &&
     previous.priorityMedia === next.priorityMedia &&
+    previous.mediaSize === next.mediaSize &&
     haveEqualResolvedMentions(previous.resolvedMentionUsernames, next.resolvedMentionUsernames),
 );

@@ -1,6 +1,7 @@
 import { DownloadIcon, FileIcon, PaperclipIcon, PlayIcon } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { useMemo } from "react";
+import type { MemoMediaSize } from "@/components/MemoContent/types";
 import MetadataSection from "@/components/MemoMetadata/MetadataSection";
 import MotionPhotoPreview from "@/components/MotionPhotoPreview";
 import VideoPoster from "@/components/VideoPoster";
@@ -17,6 +18,8 @@ import {
   MEDIA_HOVER_GRADIENT_CLASS,
   MEDIA_HOVER_SURFACE_CLASS,
   NATURAL_MEDIA_CLASS,
+  NATURAL_MEDIA_DETAIL_SIZE_CLASS,
+  NATURAL_MEDIA_LIST_SIZE_CLASS,
   OVERFLOW_TILE_OVERLAY_CLASS,
   SINGLE_MOTION_VIDEO_CLASS,
   SINGLE_VIDEO_CARD_WIDTH_CLASS,
@@ -28,6 +31,7 @@ interface AttachmentListViewProps {
   attachments: Attachment[];
   onImagePreview?: (items: PreviewMediaItem[], index: number) => void;
   priorityMedia?: boolean;
+  mediaSize?: MemoMediaSize;
 }
 
 type VisualItem = AttachmentVisualItem;
@@ -172,11 +176,22 @@ const CollageVisualItem = ({
   );
 };
 
-const SingleVisualItem = ({ item, onPreview, priorityMedia }: { item: VisualItem; onPreview?: () => void; priorityMedia?: boolean }) => {
+const SingleVisualItem = ({
+  item,
+  onPreview,
+  priorityMedia,
+  mediaSize = "list",
+}: {
+  item: VisualItem;
+  onPreview?: () => void;
+  priorityMedia?: boolean;
+  mediaSize?: MemoMediaSize;
+}) => {
   const motionPreviewProps = item.kind === "motion" ? getMotionPreviewProps(item) : undefined;
   const dimensions = getResolvedMediaDimensions(item, priorityMedia);
   const loading = priorityMedia ? "eager" : "lazy";
   const fetchPriority = priorityMedia ? "high" : "low";
+  const naturalMediaSizeClass = mediaSize === "detail" ? NATURAL_MEDIA_DETAIL_SIZE_CLASS : NATURAL_MEDIA_LIST_SIZE_CLASS;
 
   if (item.kind === "image") {
     return (
@@ -186,7 +201,7 @@ const SingleVisualItem = ({ item, onPreview, priorityMedia }: { item: VisualItem
           alt={item.filename}
           width={dimensions?.width}
           height={dimensions?.height}
-          className={NATURAL_MEDIA_CLASS}
+          className={cn(NATURAL_MEDIA_CLASS, naturalMediaSizeClass)}
           loading={loading}
           decoding="async"
           fetchPriority={fetchPriority}
@@ -204,7 +219,7 @@ const SingleVisualItem = ({ item, onPreview, priorityMedia }: { item: VisualItem
           alt={item.filename}
           presentationTimestampUs={motionPreviewProps.presentationTimestampUs}
           containerClassName="max-w-full"
-          posterClassName={cn(NATURAL_MEDIA_CLASS, "object-contain")}
+          posterClassName={cn(NATURAL_MEDIA_CLASS, naturalMediaSizeClass)}
           videoClassName={SINGLE_MOTION_VIDEO_CLASS}
           badgeClassName="left-2 top-2 px-2 py-0.5 text-[10px]"
           priority={priorityMedia}
@@ -236,10 +251,12 @@ const VisualGallery = ({
   items,
   onPreview,
   priorityMedia,
+  mediaSize,
 }: {
   items: VisualItem[];
   onPreview?: (itemId: string) => void;
   priorityMedia?: boolean;
+  mediaSize?: MemoMediaSize;
 }) => {
   const layout = resolveVisualGalleryLayout(items);
 
@@ -250,7 +267,12 @@ const VisualGallery = ({
   if (layout.mode === "single") {
     return (
       <div className="w-full">
-        <SingleVisualItem item={layout.item} onPreview={() => onPreview?.(layout.item.id)} priorityMedia={priorityMedia} />
+        <SingleVisualItem
+          item={layout.item}
+          onPreview={() => onPreview?.(layout.item.id)}
+          priorityMedia={priorityMedia}
+          mediaSize={mediaSize}
+        />
       </div>
     );
   }
@@ -298,7 +320,7 @@ const DocsList = ({ attachments }: { attachments: Attachment[] }) => (
 
 const Divider = () => <div className="border-t border-border/70 opacity-80" />;
 
-const AttachmentListView = ({ attachments, onImagePreview, priorityMedia }: AttachmentListViewProps) => {
+const AttachmentListView = ({ attachments, onImagePreview, priorityMedia, mediaSize }: AttachmentListViewProps) => {
   const { visual, audio, docs } = useMemo(() => separateAttachments(attachments), [attachments]);
   const visualItems = useMemo(() => buildAttachmentVisualItems(visual), [visual]);
   const previewItems = useMemo(() => visualItems.map((item) => item.previewItem), [visualItems]);
@@ -325,7 +347,7 @@ const AttachmentListView = ({ attachments, onImagePreview, priorityMedia }: Atta
     >
       {hasMedia && (
         <div className="flex flex-col gap-2">
-          {hasVisual && <VisualGallery items={visualItems} onPreview={handlePreview} priorityMedia={priorityMedia} />}
+          {hasVisual && <VisualGallery items={visualItems} onPreview={handlePreview} priorityMedia={priorityMedia} mediaSize={mediaSize} />}
           {hasAudio && <AudioList attachments={audio.filter(isAudioAttachment)} compact />}
         </div>
       )}

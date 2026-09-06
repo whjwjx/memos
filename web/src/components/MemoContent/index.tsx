@@ -41,6 +41,7 @@ const MemoContent = (props: MemoContentProps) => {
           memoName={props.memoName}
           compact={Boolean(props.compact)}
           priorityMedia={Boolean(props.priorityMedia)}
+          mediaSize={props.mediaSize}
         />
       </div>
     </div>
