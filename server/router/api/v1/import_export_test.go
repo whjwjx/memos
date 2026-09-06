@@ -1,11 +1,16 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/usememos/memos/internal/profile"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
 )
@@ -220,6 +225,28 @@ func TestImportExportManifestJSON(t *testing.T) {
 	require.Equal(t, string(importExportScopeMine), decoded.Scope)
 	require.Equal(t, 1, decoded.Counts.Memos)
 	require.Equal(t, 2, decoded.Counts.Attachments)
+}
+
+func TestOpenExportAttachmentContentStreamsLocalAttachment(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	attachmentPath := filepath.Join(dataDir, "assets", "local.txt")
+	require.NoError(t, os.MkdirAll(filepath.Dir(attachmentPath), 0755))
+	require.NoError(t, os.WriteFile(attachmentPath, []byte("local attachment"), 0644))
+
+	service := &APIV1Service{Profile: &profile.Profile{Data: dataDir}}
+	content, err := service.openExportAttachmentContent(context.Background(), &store.Attachment{
+		StorageType: storepb.AttachmentStorageType_LOCAL,
+		Reference:   "assets/local.txt",
+	})
+	require.NoError(t, err)
+	defer content.close()
+
+	got, err := io.ReadAll(content.reader)
+	require.NoError(t, err)
+	require.Equal(t, []byte("local attachment"), got)
+	require.Equal(t, int64(len(got)), content.size)
 }
 
 func int32Ptr(v int32) *int32 {

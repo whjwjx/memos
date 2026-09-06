@@ -2,6 +2,7 @@ package v1
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -625,36 +626,49 @@ func (s *APIV1Service) writeExportAttachments(
 				addImportExportWarning(warnings, fmt.Sprintf("%s: external attachment skipped", attachment.UID))
 				continue
 			}
-			blob, err := s.GetAttachmentBlob(ctx, attachment)
-			if err != nil {
-				skipped++
-				addImportExportWarning(warnings, fmt.Sprintf("%s: failed to read attachment: %v", attachment.UID, err))
-				continue
-			}
-			if len(blob) == 0 && attachment.Size > 0 {
-				skipped++
-				addImportExportWarning(warnings, fmt.Sprintf("%s: empty attachment content", attachment.UID))
-				continue
-			}
 			if !validateFilename(attachment.Filename) {
 				skipped++
 				addImportExportWarning(warnings, fmt.Sprintf("%s: invalid attachment filename", attachment.UID))
 				continue
 			}
-			creatorIDs = append(creatorIDs, attachment.CreatorID)
 			contentPath := path.Join("attachments", attachment.UID, attachment.Filename)
+			content, err := s.openExportAttachmentContent(ctx, attachment)
+			if err != nil {
+				skipped++
+				addImportExportWarning(warnings, fmt.Sprintf("%s: failed to read attachment: %v", attachment.UID, err))
+				continue
+			}
+			if content.size == 0 && attachment.Size > 0 {
+				content.close()
+				skipped++
+				addImportExportWarning(warnings, fmt.Sprintf("%s: empty attachment content", attachment.UID))
+				continue
+			}
+
 			entry, err := zipWriter.Create(contentPath)
 			if err != nil {
+				content.close()
 				return nil, 0, errors.Wrap(err, "failed to create attachment zip entry")
 			}
-			if _, err := entry.Write(blob); err != nil {
+			sha256Hash := sha256.New()
+			written, err := io.Copy(io.MultiWriter(entry, sha256Hash), content.reader)
+			closeErr := content.close()
+			if err != nil {
 				return nil, 0, errors.Wrap(err, "failed to write attachment zip entry")
+			}
+			if closeErr != nil {
+				return nil, 0, errors.Wrap(closeErr, "failed to close attachment content")
+			}
+			if written == 0 && attachment.Size > 0 {
+				skipped++
+				addImportExportWarning(warnings, fmt.Sprintf("%s: empty attachment content", attachment.UID))
+				continue
 			}
 			payload, err := marshalProtoJSON(sanitizeAttachmentPayload(attachment.Payload))
 			if err != nil {
 				return nil, 0, errors.Wrap(err, "failed to marshal attachment payload")
 			}
-			sum := sha256.Sum256(blob)
+			creatorIDs = append(creatorIDs, attachment.CreatorID)
 			records = append(records, &importExportAttachmentRecord{
 				UID:             attachment.UID,
 				CreatorUsername: user.Username,
@@ -662,11 +676,11 @@ func (s *APIV1Service) writeExportAttachments(
 				UpdatedTs:       attachment.UpdatedTs,
 				Filename:        attachment.Filename,
 				Type:            attachment.Type,
-				Size:            int64(len(blob)),
+				Size:            written,
 				MemoUID:         memoUID,
 				Payload:         payload,
 				ContentPath:     contentPath,
-				Sha256:          hex.EncodeToString(sum[:]),
+				Sha256:          hex.EncodeToString(sha256Hash.Sum(nil)),
 			})
 		}
 		if len(attachments) < limit {
@@ -707,6 +721,47 @@ func (s *APIV1Service) fillAttachmentCreatorUsernames(ctx context.Context, recor
 		}
 	}
 	return nil
+}
+
+type exportAttachmentContent struct {
+	reader io.ReadCloser
+	size   int64
+}
+
+func (c exportAttachmentContent) close() error {
+	if c.reader == nil {
+		return nil
+	}
+	return c.reader.Close()
+}
+
+func (s *APIV1Service) openExportAttachmentContent(ctx context.Context, attachment *store.Attachment) (exportAttachmentContent, error) {
+	if attachment.StorageType == storepb.AttachmentStorageType_LOCAL {
+		attachmentPath := filepath.FromSlash(attachment.Reference)
+		if !filepath.IsAbs(attachmentPath) {
+			attachmentPath = filepath.Join(s.Profile.Data, attachmentPath)
+		}
+
+		file, err := os.Open(attachmentPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return exportAttachmentContent{}, errors.Wrap(err, "file not found")
+			}
+			return exportAttachmentContent{}, errors.Wrap(err, "failed to open the file")
+		}
+		fileInfo, err := file.Stat()
+		if err != nil {
+			_ = file.Close()
+			return exportAttachmentContent{}, errors.Wrap(err, "failed to stat the file")
+		}
+		return exportAttachmentContent{reader: file, size: fileInfo.Size()}, nil
+	}
+
+	blob, err := s.GetAttachmentBlob(ctx, attachment)
+	if err != nil {
+		return exportAttachmentContent{}, err
+	}
+	return exportAttachmentContent{reader: io.NopCloser(bytes.NewReader(blob)), size: int64(len(blob))}, nil
 }
 
 func (s *APIV1Service) buildExportRelationRecords(ctx context.Context, memoIDToUID map[int32]string) ([]*importExportRelationRecord, error) {
