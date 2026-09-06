@@ -569,6 +569,8 @@
       "import-memos-package": "导入 Memos 数据包",
       "import-memos-package-description": "支持从 Memos 导出的 .zip 数据包。",
       "import-my-data": "导入我的数据",
+      "import-processing": "正在处理导入包...",
+      "import-uploading-progress": "上传中 {{percent}}%...",
       "importing-progress": "上传中 {{current}}/{{total}}...",
       "import-success": "导入完成：新增 {{created}}，跳过 {{skipped}}",
       "import-warning": "导入完成，但有 {{count}} 条提醒。",

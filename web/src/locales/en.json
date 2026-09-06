@@ -644,6 +644,8 @@
       "import-memos-package": "Import Memos data package",
       "import-memos-package-description": "Use a .zip data package exported from Memos.",
       "import-my-data": "Import my data",
+      "import-processing": "Processing import...",
+      "import-uploading-progress": "Uploading {{percent}}%...",
       "importing-progress": "Uploading {{current}}/{{total}}...",
       "import-success": "Import finished: {{created}} created, {{skipped}} skipped",
       "import-warning": "Import completed with {{count}} warnings.",

@@ -27,10 +27,11 @@ interface ImportUploadResponse {
 }
 
 export interface ImportProgress {
-  uploadedChunks: number;
-  totalChunks: number;
-  uploadedBytes: number;
-  totalBytes: number;
+  phase: "preparing" | "uploading" | "processing";
+  uploadedChunks?: number;
+  totalChunks?: number;
+  uploadedBytes?: number;
+  totalBytes?: number;
 }
 
 export interface ExportProgress {
@@ -145,6 +146,7 @@ export const importMemosExport = async (
   source: ImportSource = "memos",
   onProgress?: (progress: ImportProgress) => void,
 ): Promise<ImportExportResult> => {
+  onProgress?.({ phase: "preparing", totalBytes: file.size, uploadedBytes: 0 });
   if (file.size > directImportThresholdBytes) {
     return importMemosExportInChunks(scope, file, source, onProgress);
   }
@@ -153,6 +155,7 @@ export const importMemosExport = async (
   const formData = new FormData();
   formData.set("file", file);
 
+  onProgress?.({ phase: "processing", totalBytes: file.size, uploadedBytes: file.size });
   const response = await fetch(`/api/v1/import?scope=${scope}&source=${source}`, {
     body: formData,
     credentials: "include",
@@ -196,6 +199,13 @@ const importMemosExportInChunks = async (
 
   try {
     let uploadedBytes = 0;
+    onProgress?.({
+      phase: "uploading",
+      totalBytes: file.size,
+      totalChunks: upload.chunkCount,
+      uploadedBytes,
+      uploadedChunks: 0,
+    });
     for (let index = 0; index < upload.chunkCount; index++) {
       const start = index * upload.chunkSize;
       const end = Math.min(start + upload.chunkSize, file.size);
@@ -212,6 +222,7 @@ const importMemosExportInChunks = async (
       }
       uploadedBytes += chunk.size;
       onProgress?.({
+        phase: "uploading",
         totalBytes: file.size,
         totalChunks: upload.chunkCount,
         uploadedBytes,
@@ -219,6 +230,7 @@ const importMemosExportInChunks = async (
       });
     }
 
+    onProgress?.({ phase: "processing", totalBytes: file.size, uploadedBytes: file.size });
     const completeHeaders = await buildHeaders();
     const completeResponse = await fetch(`/api/v1/import/uploads/${upload.uploadId}/complete`, {
       credentials: "include",
