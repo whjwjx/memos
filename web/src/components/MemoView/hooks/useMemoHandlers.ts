@@ -18,7 +18,7 @@ export const useMemoHandlers = (options: UseMemoHandlersOptions) => {
       if (targetEl.tagName === "IMG") {
         const linkElement = targetEl.closest("a");
         if (linkElement) return; // If image is inside a link, don't show preview
-        const imgUrl = targetEl.getAttribute("src");
+        const imgUrl = targetEl.getAttribute("data-source-url") || targetEl.getAttribute("src");
         if (imgUrl) openPreview(imgUrl);
       }
     },

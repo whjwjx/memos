@@ -6,7 +6,7 @@ import { buildRehypePlugins, buildRemarkPlugins } from "@/components/MemoContent
 import { isMentionElement, isTagElement, isTaskListItemElement } from "@/types/markdown";
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
 import { lazyWithReload } from "@/utils/lazy";
-import { resolveManagedAttachmentImageSource } from "@/utils/managed-attachment";
+import { resolveManagedAttachmentImageSource, resolveManagedAttachmentOriginalImageSource } from "@/utils/managed-attachment";
 import { CodeBlock } from "./CodeBlock";
 import { MarkdownRenderContext, rootMarkdownRenderContext } from "./MarkdownRenderContext";
 import { Mention } from "./Mention";
@@ -141,7 +141,16 @@ export const MemoMarkdownRendererCore = ({
     },
     code: ({ children, ...props }) => <InlineCode {...props}>{children}</InlineCode>,
     iframe: TrustedIframe,
-    img: ({ src, ...props }) => <Image {...props} src={resolveManagedAttachmentImageSource(src, attachments)} />,
+    img: ({ src, ...props }) => {
+      const originalSrc = compact ? resolveManagedAttachmentOriginalImageSource(src, attachments) : undefined;
+      return (
+        <Image
+          {...props}
+          src={resolveManagedAttachmentImageSource(src, attachments, { preferThumbnail: Boolean(compact) })}
+          data-source-url={originalSrc}
+        />
+      );
+    },
     pre: CodeBlock,
     table: ({ children, ...props }) => <Table {...props}>{children}</Table>,
     thead: ({ children, ...props }) => <TableHead {...props}>{children}</TableHead>,
