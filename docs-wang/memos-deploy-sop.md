@@ -346,7 +346,7 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 备份：`/home/deployer/backups/memos_data_20260906_1539/`（memos_prod.db + -shm + -wal）。
 - 镜像：`memos-ai:local`（哈希 `5d7b5864`），容器 recreate 时间 `2026-09-06T15:41:54+08:00`（北京时间 9-06 15:41）。
 - 校验：公网前端资产 `index-CeWK1Dcs.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志显示**自动迁移** `0.37.2 → 0.38.1`（`conversation_llm_id`，对应 chat agent llm 选择），`migration completed migrationsApplied=1` 无报错；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）。
-- 清理：悬空镜像已 `docker image prune -f`（15 个 dangling 已删）；旧备份目录（20260823~20260901 共 12 个）删除命令已准备但因审批超时未执行，待确认后清理（保留 `20260902_1630` 与 `20260906_1539`）。
+- 清理：悬空镜像已 `docker image prune -f`（15 个 dangling 已删）；旧备份目录（20260823~20260901 共 12 个）已删除，保留 `20260902_1630` 与 `20260906_1539`。
 - 备注：本次 C 盘 40.9GB 充足，无需 `go clean -cache`。本次有 DB schema 迁移，回滚时须**同步回滚二进制与备份**（见 9.6）。
 
 ---
