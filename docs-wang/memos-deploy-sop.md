@@ -347,6 +347,18 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 镜像：`memos-ai:local`（哈希 `5d7b5864`），容器 recreate 时间 `2026-09-06T15:41:54+08:00`（北京时间 9-06 15:41）。
 - 校验：公网前端资产 `index-CeWK1Dcs.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志显示**自动迁移** `0.37.2 → 0.38.1`（`conversation_llm_id`，对应 chat agent llm 选择），`migration completed migrationsApplied=1` 无报错；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）。
 - 清理：悬空镜像已 `docker image prune -f`（15 个 dangling 已删）；旧备份目录（20260823~20260901 共 12 个）已删除，保留 `20260902_1630` 与 `20260906_1539`。
+
+### 8.12 部署记录（2026-09-06，晚）
+
+> 完整重新部署：纳入 Home feed 性能优化（`cb4123bb` improve home feed loading、`f82f5332` second round optimizations、`cf0c0fee` prioritize first feed media、`a0ee83fd` thumbnail for priority media，`f2500a7d` merge）。纯代码部署，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `f2500a7d`（merge home performance optimizations）。
+- 构建：`pnpm release`（资产 `index-BuDAnneP.js`，5129 modules）→ `go build`（linux/amd64，102666878 字节 / ≈97.9MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260906_1941/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `98b88bc3`），容器 recreate 时间 `2026-09-06T19:43:43+08:00`（北京时间 9-06 19:43）。
+- 校验：公网前端资产 `index-BuDAnneP.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常、**无 DB 迁移**（home 性能优化不涉及 schema 变更）；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）。
+- 清理：悬空镜像已 `docker image prune -f`（删 `5d7b5864`）；旧备份目录 `memos_data_20260902_1630` 已删，保留 `20260906_1539` 与 `20260906_1941`。
+- 备注：本次 C 盘 40.1GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.6 方案，**本次无新增踩坑**。
 - 备注：本次 C 盘 40.9GB 充足，无需 `go clean -cache`。本次有 DB schema 迁移，回滚时须**同步回滚二进制与备份**（见 9.6）。
 
 ---
