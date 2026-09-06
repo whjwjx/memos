@@ -174,6 +174,7 @@ func (s *APIV1Service) RegisterImportExportRoutes(echoServer *echo.Echo) {
 }
 
 func (s *APIV1Service) exportStructuredData(c *echo.Context, authenticator *auth.Authenticator) error {
+	startedAt := time.Now()
 	ctx := c.Request().Context()
 	user, scope, err := s.authenticateImportExportRequest(ctx, c, authenticator)
 	if err != nil {
@@ -189,10 +190,12 @@ func (s *APIV1Service) exportStructuredData(c *echo.Context, authenticator *auth
 	exportFilename := fmt.Sprintf("memos-export-%s-%s.zip", scope, time.Now().Format("20060102-150405"))
 	zipFilePath := filepath.Join(tmpDir, exportFilename)
 
+	packageStartedAt := time.Now()
 	manifest, err := s.createStructuredExportZip(ctx, user, scope, zipFilePath)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create export zip").Wrap(err)
 	}
+	packageDuration := time.Since(packageStartedAt)
 	zipSize, err := getFileSize(zipFilePath)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read export zip").Wrap(err)
@@ -221,6 +224,14 @@ func (s *APIV1Service) exportStructuredData(c *echo.Context, authenticator *auth
 	if _, err := io.Copy(c.Response(), zipFile); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to write export file").Wrap(err)
 	}
+	slog.Info("memos structured export sent",
+		"username", user.Username,
+		"scope", scope,
+		"filename", exportFilename,
+		"bytes", zipSize,
+		"packageDuration", packageDuration.String(),
+		"totalDuration", time.Since(startedAt).String(),
+	)
 	return nil
 }
 
@@ -314,6 +325,7 @@ func parseImportExportScope(raw string) (importExportScope, error) {
 }
 
 func (s *APIV1Service) importZip(ctx context.Context, user *store.User, scope importExportScope, zipFilePath string, source importSource) (*importExportResult, error) {
+	startedAt := time.Now()
 	zipReader, err := zip.OpenReader(zipFilePath)
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid import zip").Wrap(err)
@@ -324,7 +336,21 @@ func (s *APIV1Service) importZip(ctx context.Context, user *store.User, scope im
 		if source == importSourceFlomo {
 			return nil, echo.NewHTTPError(http.StatusBadRequest, "selected flomo import but uploaded a Memos data package")
 		}
-		return s.importStructuredZip(ctx, user, scope, zipFilePath)
+		result, err := s.importStructuredZip(ctx, user, scope, zipFilePath)
+		if err == nil {
+			slog.Info("memos structured import completed",
+				"username", user.Username,
+				"scope", scope,
+				"createdMemos", result.CreatedMemos,
+				"createdAttachments", result.CreatedAttachments,
+				"createdRelations", result.CreatedRelations,
+				"createdReactions", result.CreatedReactions,
+				"skippedMemos", result.SkippedMemos,
+				"skippedAttachments", result.SkippedAttachments,
+				"duration", time.Since(startedAt).String(),
+			)
+		}
+		return result, err
 	}
 
 	flomoHTML := findFlomoHTMLZipEntry(&zipReader.Reader)
@@ -335,13 +361,24 @@ func (s *APIV1Service) importZip(ctx context.Context, user *store.User, scope im
 		if scope != importExportScopeMine {
 			return nil, echo.NewHTTPError(http.StatusBadRequest, "flomo import only supports scope=mine")
 		}
-		return s.importFlomoZip(ctx, user, scope, zipFilePath, flomoHTML.Name)
+		result, err := s.importFlomoZip(ctx, user, scope, zipFilePath, flomoHTML.Name)
+		if err == nil {
+			slog.Info("memos flomo import completed",
+				"username", user.Username,
+				"scope", scope,
+				"createdMemos", result.CreatedMemos,
+				"skippedMemos", result.SkippedMemos,
+				"duration", time.Since(startedAt).String(),
+			)
+		}
+		return result, err
 	}
 
 	return nil, echo.NewHTTPError(http.StatusBadRequest, "unsupported import format")
 }
 
 func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *store.User, scope importExportScope, zipFilePath string) (*importExportManifest, error) {
+	startedAt := time.Now()
 	zipFile, err := os.Create(zipFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create zip file")
@@ -355,10 +392,12 @@ func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *stor
 	if err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "export", "users", time.Since(startedAt), "count", len(users))
 	if err := writeJSONLToZip(zipWriter, "users.jsonl", users); err != nil {
 		return nil, err
 	}
 
+	stageStartedAt := time.Now()
 	memos, err := s.listExportMemos(ctx, user, scope)
 	if err != nil {
 		return nil, err
@@ -375,7 +414,9 @@ func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *stor
 	if err := writeJSONLToZip(zipWriter, "memos.jsonl", memoRecords); err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "export", "memos", time.Since(stageStartedAt), "count", len(memoRecords))
 
+	stageStartedAt = time.Now()
 	var warnings []string
 	attachmentRecords, skippedAttachments, err := s.writeExportAttachments(ctx, zipWriter, user, scope, memoIDToUID, &warnings)
 	if err != nil {
@@ -384,7 +425,9 @@ func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *stor
 	if err := writeJSONLToZip(zipWriter, "attachments.jsonl", attachmentRecords); err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "export", "attachments", time.Since(stageStartedAt), "count", len(attachmentRecords), "skipped", skippedAttachments)
 
+	stageStartedAt = time.Now()
 	relationRecords, err := s.buildExportRelationRecords(ctx, memoIDToUID)
 	if err != nil {
 		return nil, err
@@ -392,7 +435,9 @@ func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *stor
 	if err := writeJSONLToZip(zipWriter, "memo_relations.jsonl", relationRecords); err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "export", "relations", time.Since(stageStartedAt), "count", len(relationRecords))
 
+	stageStartedAt = time.Now()
 	reactionRecords, err := s.buildExportReactionRecords(ctx, user, scope, memoIDToUID)
 	if err != nil {
 		return nil, err
@@ -400,6 +445,7 @@ func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *stor
 	if err := writeJSONLToZip(zipWriter, "reactions.jsonl", reactionRecords); err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "export", "reactions", time.Since(stageStartedAt), "count", len(reactionRecords))
 
 	manifest := &importExportManifest{
 		Format:         importExportFormat,
@@ -428,6 +474,7 @@ func (s *APIV1Service) createStructuredExportZip(ctx context.Context, user *stor
 	if err := writeJSONToZip(zipWriter, "manifest.json", manifest); err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "export", "package", time.Since(startedAt))
 	return manifest, nil
 }
 
@@ -546,6 +593,7 @@ func (s *APIV1Service) writeExportAttachments(
 	offset := 0
 	records := []*importExportAttachmentRecord{}
 	skipped := 0
+	creatorIDs := []int32{}
 
 	for {
 		find := &store.FindAttachment{
@@ -593,6 +641,7 @@ func (s *APIV1Service) writeExportAttachments(
 				addImportExportWarning(warnings, fmt.Sprintf("%s: invalid attachment filename", attachment.UID))
 				continue
 			}
+			creatorIDs = append(creatorIDs, attachment.CreatorID)
 			contentPath := path.Join("attachments", attachment.UID, attachment.Filename)
 			entry, err := zipWriter.Create(contentPath)
 			if err != nil {
@@ -627,7 +676,7 @@ func (s *APIV1Service) writeExportAttachments(
 	}
 
 	if scope == importExportScopeAll {
-		if err := s.fillAttachmentCreatorUsernames(ctx, records); err != nil {
+		if err := s.fillAttachmentCreatorUsernames(ctx, records, creatorIDs); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -640,35 +689,19 @@ func (s *APIV1Service) writeExportAttachments(
 	return records, skipped, nil
 }
 
-func (s *APIV1Service) fillAttachmentCreatorUsernames(ctx context.Context, records []*importExportAttachmentRecord) error {
+func (s *APIV1Service) fillAttachmentCreatorUsernames(ctx context.Context, records []*importExportAttachmentRecord, creatorIDs []int32) error {
 	if len(records) == 0 {
 		return nil
-	}
-	attachmentsByUID := make(map[string]*store.Attachment, len(records))
-	for _, record := range records {
-		uid := record.UID
-		attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &uid})
-		if err != nil {
-			return errors.Wrap(err, "failed to get attachment creator")
-		}
-		if attachment != nil {
-			attachmentsByUID[uid] = attachment
-		}
-	}
-	creatorIDs := make([]int32, 0, len(attachmentsByUID))
-	for _, attachment := range attachmentsByUID {
-		creatorIDs = append(creatorIDs, attachment.CreatorID)
 	}
 	creatorMap, err := s.listUsersByID(ctx, creatorIDs)
 	if err != nil {
 		return errors.Wrap(err, "failed to list attachment creators")
 	}
-	for _, record := range records {
-		attachment := attachmentsByUID[record.UID]
-		if attachment == nil {
+	for i, record := range records {
+		if i >= len(creatorIDs) {
 			continue
 		}
-		creator := creatorMap[attachment.CreatorID]
+		creator := creatorMap[creatorIDs[i]]
 		if creator != nil {
 			record.CreatorUsername = creator.Username
 		}
@@ -768,6 +801,7 @@ func (s *APIV1Service) buildExportReactionRecords(ctx context.Context, user *sto
 }
 
 func (s *APIV1Service) importStructuredZip(ctx context.Context, user *store.User, scope importExportScope, zipFilePath string) (*importExportResult, error) {
+	startedAt := time.Now()
 	zipReader, err := zip.OpenReader(zipFilePath)
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid import zip").Wrap(err)
@@ -789,6 +823,7 @@ func (s *APIV1Service) importStructuredZip(ctx context.Context, user *store.User
 		return nil, err
 	}
 	uidMapper := newImportUIDMapper(user, scope)
+	stageStartedAt := time.Now()
 	memoRecords, err := readJSONLFromZip[importExportMemoRecord](&zipReader.Reader, "memos.jsonl")
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid memos.jsonl").Wrap(err)
@@ -797,6 +832,9 @@ func (s *APIV1Service) importStructuredZip(ctx context.Context, user *store.User
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "invalid attachments.jsonl").Wrap(err)
 	}
+	logImportExportStage(user, scope, "import", "read-records", time.Since(stageStartedAt), "memos", len(memoRecords), "attachments", len(attachmentRecords))
+
+	stageStartedAt = time.Now()
 	attachmentUIDMap, err := s.buildImportAttachmentUIDMap(ctx, attachmentRecords, userIDs, scope, uidMapper)
 	if err != nil {
 		return nil, err
@@ -805,15 +843,34 @@ func (s *APIV1Service) importStructuredZip(ctx context.Context, user *store.User
 	if err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "import", "memos", time.Since(stageStartedAt), "created", result.CreatedMemos, "skipped", result.SkippedMemos)
+
+	stageStartedAt = time.Now()
 	if err := s.importAttachmentsFromZip(ctx, zipEntries, attachmentRecords, userIDs, scope, uidMapper, memoIDsByUID, result); err != nil {
 		return nil, err
 	}
+	logImportExportStage(
+		user, scope, "import", "attachments", time.Since(stageStartedAt),
+		"created", result.CreatedAttachments,
+		"skipped", result.SkippedAttachments,
+	)
+
+	stageStartedAt = time.Now()
 	if err := s.importRelationsFromZip(ctx, &zipReader.Reader, memoIDsByUID, result); err != nil {
 		return nil, err
 	}
+	logImportExportStage(user, scope, "import", "relations", time.Since(stageStartedAt), "created", result.CreatedRelations, "skipped", result.SkippedRelations)
+
+	stageStartedAt = time.Now()
 	if err := s.importReactionsFromZip(ctx, &zipReader.Reader, userIDs, scope, memoIDsByUID, result); err != nil {
 		return nil, err
 	}
+	logImportExportStage(
+		user, scope, "import", "reactions", time.Since(stageStartedAt),
+		"created", result.CreatedReactions,
+		"skipped", result.SkippedReactions,
+		"totalDuration", time.Since(startedAt).String(),
+	)
 	return result, nil
 }
 
@@ -1102,7 +1159,6 @@ func (s *APIV1Service) importAttachmentsFromZip(
 	memoIDsByUID map[string]int32,
 	result *importExportResult,
 ) error {
-	inputs := make([]importAttachmentInput, 0, len(records))
 	for _, record := range records {
 		if err := validateImportAttachmentContentPath(record.ContentPath); err != nil {
 			result.SkippedAttachments++
@@ -1119,12 +1175,11 @@ func (s *APIV1Service) importAttachmentsFromZip(
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "failed to read attachment content").Wrap(err)
 		}
-		inputs = append(inputs, importAttachmentInput{
-			Record: record,
-			Blob:   blob,
-		})
+		if err := s.importAttachmentFromRecord(ctx, record, blob, userIDs, scope, uidMapper, memoIDsByUID, result); err != nil {
+			return err
+		}
 	}
-	return s.importAttachmentsFromRecords(ctx, inputs, userIDs, scope, uidMapper, memoIDsByUID, result)
+	return nil
 }
 
 type importAttachmentInput struct {
@@ -1142,80 +1197,94 @@ func (s *APIV1Service) importAttachmentsFromRecords(
 	result *importExportResult,
 ) error {
 	for _, input := range inputs {
-		record := input.Record
-		creatorID, ok := importCreatorID(userIDs, record.CreatorUsername, scope)
-		if !ok {
-			result.SkippedAttachments++
-			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment creator %q not found", record.UID, record.CreatorUsername))
-			continue
+		if err := s.importAttachmentFromRecord(ctx, input.Record, input.Blob, userIDs, scope, uidMapper, memoIDsByUID, result); err != nil {
+			return err
 		}
-		targetUID, existing, err := s.resolveImportAttachmentUID(ctx, record.UID, creatorID, scope, uidMapper)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get attachment").Wrap(err)
-		}
-		if existing != nil {
-			if scope == importExportScopeMine && existing.CreatorID != creatorID {
-				result.SkippedAttachments++
-				addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment UID already belongs to another user", targetUID))
-				continue
-			}
-			result.SkippedAttachments++
-			continue
-		}
-		if !validateFilename(record.Filename) {
-			result.SkippedAttachments++
-			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: invalid filename", record.UID))
-			continue
-		}
-		blob := input.Blob
-		if record.Sha256 != "" {
-			sum := sha256.Sum256(blob)
-			if !strings.EqualFold(record.Sha256, hex.EncodeToString(sum[:])) {
-				result.SkippedAttachments++
-				addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment checksum mismatch", record.UID))
-				continue
-			}
-		}
-		attachmentType, ok := importAttachmentType(record.Type, blob)
-		if !ok {
-			result.SkippedAttachments++
-			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: invalid attachment type", record.UID))
-			continue
-		}
-		payload, err := unmarshalAttachmentPayload(record.Payload)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid attachment payload").Wrap(err)
-		}
-		create := &store.Attachment{
-			UID:       targetUID,
-			CreatorID: creatorID,
-			Filename:  record.Filename,
-			Type:      attachmentType,
-			Size:      int64(len(blob)),
-			Blob:      blob,
-			Payload:   payload,
-		}
-		if record.MemoUID != "" {
-			memoID, ok := memoIDsByUID[record.MemoUID]
-			if !ok {
-				result.SkippedAttachments++
-				addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: target memo %q not found", record.UID, record.MemoUID))
-				continue
-			}
-			create.MemoID = &memoID
-		}
-		if err := SaveAttachmentBlob(ctx, s.Profile, s.Store, create); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to save attachment content").Wrap(err)
-		}
-		if _, err := s.Store.CreateAttachment(ctx, create); err != nil {
-			if isUniqueConstraintError(err) {
-				result.SkippedAttachments++
-				continue
-			}
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to create attachment").Wrap(err)
-		}
-		result.CreatedAttachments++
 	}
+	return nil
+}
+
+func (s *APIV1Service) importAttachmentFromRecord(
+	ctx context.Context,
+	record importExportAttachmentRecord,
+	blob []byte,
+	userIDs map[string]int32,
+	scope importExportScope,
+	uidMapper *importUIDMapper,
+	memoIDsByUID map[string]int32,
+	result *importExportResult,
+) error {
+	creatorID, ok := importCreatorID(userIDs, record.CreatorUsername, scope)
+	if !ok {
+		result.SkippedAttachments++
+		addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment creator %q not found", record.UID, record.CreatorUsername))
+		return nil
+	}
+	targetUID, existing, err := s.resolveImportAttachmentUID(ctx, record.UID, creatorID, scope, uidMapper)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get attachment").Wrap(err)
+	}
+	if existing != nil {
+		if scope == importExportScopeMine && existing.CreatorID != creatorID {
+			result.SkippedAttachments++
+			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment UID already belongs to another user", targetUID))
+			return nil
+		}
+		result.SkippedAttachments++
+		return nil
+	}
+	if !validateFilename(record.Filename) {
+		result.SkippedAttachments++
+		addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: invalid filename", record.UID))
+		return nil
+	}
+	if record.Sha256 != "" {
+		sum := sha256.Sum256(blob)
+		if !strings.EqualFold(record.Sha256, hex.EncodeToString(sum[:])) {
+			result.SkippedAttachments++
+			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: attachment checksum mismatch", record.UID))
+			return nil
+		}
+	}
+	attachmentType, ok := importAttachmentType(record.Type, blob)
+	if !ok {
+		result.SkippedAttachments++
+		addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: invalid attachment type", record.UID))
+		return nil
+	}
+	payload, err := unmarshalAttachmentPayload(record.Payload)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid attachment payload").Wrap(err)
+	}
+	create := &store.Attachment{
+		UID:       targetUID,
+		CreatorID: creatorID,
+		Filename:  record.Filename,
+		Type:      attachmentType,
+		Size:      int64(len(blob)),
+		Blob:      blob,
+		Payload:   payload,
+	}
+	if record.MemoUID != "" {
+		memoID, ok := memoIDsByUID[record.MemoUID]
+		if !ok {
+			result.SkippedAttachments++
+			addImportExportWarning(&result.Warnings, fmt.Sprintf("%s: target memo %q not found", record.UID, record.MemoUID))
+			return nil
+		}
+		create.MemoID = &memoID
+	}
+	if err := SaveAttachmentBlob(ctx, s.Profile, s.Store, create); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to save attachment content").Wrap(err)
+	}
+	if _, err := s.Store.CreateAttachment(ctx, create); err != nil {
+		if isUniqueConstraintError(err) {
+			result.SkippedAttachments++
+			return nil
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create attachment").Wrap(err)
+	}
+	result.CreatedAttachments++
 	return nil
 }
 
@@ -1492,6 +1561,18 @@ func readZipEntry(zipEntry *zip.File) ([]byte, error) {
 	}
 	defer reader.Close()
 	return io.ReadAll(reader)
+}
+
+func logImportExportStage(user *store.User, scope importExportScope, operation string, stage string, duration time.Duration, attrs ...any) {
+	logAttrs := []any{
+		"username", user.Username,
+		"scope", scope,
+		"operation", operation,
+		"stage", stage,
+		"duration", duration.String(),
+	}
+	logAttrs = append(logAttrs, attrs...)
+	slog.Info("memos import export stage completed", logAttrs...)
 }
 
 func validateImportAttachmentContentPath(contentPath string) error {
