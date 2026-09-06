@@ -9,6 +9,8 @@ export interface MemoContentProps {
   memoName?: string;
   /** The card renders collapsed (ClampedSection), so footnote links navigate instead of scrolling. */
   compact?: boolean;
+  /** Prioritize media likely to be visible in the first viewport. */
+  priorityMedia?: boolean;
   className?: string;
   contentClassName?: string;
   onClick?: (e: React.MouseEvent) => void;

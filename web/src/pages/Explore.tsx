@@ -28,7 +28,9 @@ const Explore = () => {
 
   return (
     <PagedMemoList
-      renderer={(memo: Memo, { compact }) => <MemoView key={getMemoKey(memo)} memo={memo} showCreator showVisibility compact={compact} />}
+      renderer={(memo: Memo, { compact, priorityMedia }) => (
+        <MemoView key={getMemoKey(memo)} memo={memo} showCreator showVisibility compact={compact} priorityMedia={priorityMedia} />
+      )}
       listSort={listSort}
       orderBy={orderBy}
       filter={memoFilter}

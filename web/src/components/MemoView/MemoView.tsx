@@ -20,7 +20,7 @@ const MemoShareImageDialog = lazyWithReload(() => import("../MemoActionMenu/Memo
 const PreviewImageDialog = lazyWithReload(() => import("../PreviewImageDialog"));
 
 const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
-  const { memo: memoData, className, parentPage: parentPageProp, compact, showCreator, showVisibility, showPinned } = props;
+  const { memo: memoData, className, parentPage: parentPageProp, compact, priorityMedia, showCreator, showVisibility, showPinned } = props;
   const cardRef = useRef<HTMLDivElement>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [EditorComponent, setEditorComponent] = useState<ComponentType<MemoEditorProps>>();
@@ -132,7 +132,7 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
     >
       <MemoHeader showCreator={showCreator} showVisibility={showVisibility} showPinned={showPinned} />
 
-      <MemoBody compact={compact} />
+      <MemoBody compact={compact} priorityMedia={priorityMedia} />
 
       {previewState.items.length > 0 && (
         <Suspense fallback={null}>

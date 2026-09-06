@@ -1,22 +1,32 @@
 import { cn } from "@/lib/utils";
 import type { ReactMarkdownProps } from "./types";
 
-interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement>, ReactMarkdownProps {}
+interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement>, ReactMarkdownProps {
+  priority?: boolean;
+}
+
+const PRIORITY_IMAGE_FALLBACK_WIDTH = 1600;
+const PRIORITY_IMAGE_FALLBACK_HEIGHT = 1000;
 
 /**
  * Image component for markdown images
  * Responsive with rounded corners
  */
-export const Image = ({ className, alt, node: _node, height, width, style, ...props }: ImageProps) => {
+export const Image = ({ className, alt, node: _node, height, width, priority, style, ...props }: ImageProps) => {
+  const resolvedWidth = priority && !width && !height ? PRIORITY_IMAGE_FALLBACK_WIDTH : width;
+  const resolvedHeight = priority && !width && !height ? PRIORITY_IMAGE_FALLBACK_HEIGHT : height;
+
   return (
     <img
-      className={cn("max-w-full my-2", !height && "h-auto", className)}
+      className={cn("max-w-full h-auto my-2", className)}
       alt={alt}
-      style={{ height: height ? `${height}px` : undefined, width: width ? `${width}px` : undefined, ...style }}
+      width={resolvedWidth}
+      height={resolvedHeight}
+      style={style}
       {...props}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
       decoding="async"
-      fetchPriority="low"
+      fetchPriority={priority ? "high" : "low"}
     />
   );
 };

@@ -48,9 +48,10 @@ vi.mock("@/components/MemoFilters", () => ({
 }));
 
 const memo = { name: "memos/1", content: "hello", updateTime: undefined } as unknown as Memo;
+const mediaMemo = { name: "memos/2", content: "![image](/file/attachments/image-id)", updateTime: undefined } as unknown as Memo;
 
 const renderList = (
-  renderer: (memo: Memo, options: { compact: boolean }) => React.ReactElement = () => <div />,
+  renderer: (memo: Memo, options: { compact: boolean; priorityMedia: boolean }) => React.ReactElement = () => <div />,
   options: { leading?: React.ReactNode } = {},
 ) =>
   render(
@@ -183,14 +184,14 @@ describe("<PagedMemoList>", () => {
     it("threads compact=false at one column with compact mode off", () => {
       const renderer = vi.fn((m: Memo) => <div key={m.name} />);
       renderList(renderer);
-      expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: false });
+      expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: false, priorityMedia: false });
     });
 
     it("threads compact=true at one column with compact mode on", () => {
       view.compactMode = true;
       const renderer = vi.fn((m: Memo) => <div key={m.name} />);
       renderList(renderer);
-      expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: true });
+      expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: true, priorityMedia: false });
     });
 
     it("respects the compact setting in the narrow-width fallback even when columns are allowed", () => {
@@ -198,7 +199,7 @@ describe("<PagedMemoList>", () => {
       view.maxColumns = 0;
       const renderer = vi.fn((m: Memo) => <div key={m.name} />);
       renderList(renderer);
-      expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: false });
+      expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: false, priorityMedia: false });
     });
 
     it("forces compact once the width fits the grid", () => {
@@ -207,10 +208,20 @@ describe("<PagedMemoList>", () => {
       try {
         const renderer = vi.fn((m: Memo) => <div key={m.name} />);
         renderList(renderer);
-        expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: true });
+        expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: true, priorityMedia: false });
       } finally {
         widthSpy.mockRestore();
       }
     });
+  });
+
+  it("prioritizes the first memo with deferred media", () => {
+    feed.memos = [memo, mediaMemo];
+    const renderer = vi.fn((m: Memo) => <div key={m.name}>{m.name}</div>);
+
+    renderList(renderer);
+
+    expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/1" }), { compact: false, priorityMedia: false });
+    expect(renderer).toHaveBeenCalledWith(expect.objectContaining({ name: "memos/2" }), { compact: false, priorityMedia: true });
   });
 });

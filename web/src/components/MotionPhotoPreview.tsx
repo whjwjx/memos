@@ -12,6 +12,7 @@ interface MotionPhotoPreviewProps {
   posterClassName?: string;
   videoClassName?: string;
   badgeClassName?: string;
+  priority?: boolean;
   loop?: boolean;
 }
 
@@ -25,6 +26,7 @@ const MotionPhotoPreview = ({
   posterClassName,
   videoClassName,
   badgeClassName,
+  priority,
   loop = false,
 }: MotionPhotoPreviewProps) => {
   const [motionActive, setMotionActive] = useState(false);
@@ -46,6 +48,7 @@ const MotionPhotoPreview = ({
         mediaClassName={mediaClassName}
         posterClassName={posterClassName}
         videoClassName={videoClassName}
+        priority={priority}
       />
       <div
         role="button"

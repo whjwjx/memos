@@ -3,6 +3,7 @@ import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 export interface MemoViewProps {
   memo: Memo;
   compact?: boolean;
+  priorityMedia?: boolean;
   showCreator?: boolean;
   showVisibility?: boolean;
   showPinned?: boolean;
@@ -20,4 +21,5 @@ export interface MemoHeaderProps {
 
 export interface MemoBodyProps {
   compact?: boolean;
+  priorityMedia?: boolean;
 }

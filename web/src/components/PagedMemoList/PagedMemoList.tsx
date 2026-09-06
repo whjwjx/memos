@@ -39,7 +39,7 @@ const Loader = () => (
 );
 
 interface Props {
-  renderer: (memo: Memo, options: { compact: boolean }) => ReactElement;
+  renderer: (memo: Memo, options: { compact: boolean; priorityMedia: boolean }) => ReactElement;
   listSort?: (list: Memo[]) => Memo[];
   state?: State;
   orderBy?: string;
@@ -288,7 +288,9 @@ const PagedMemoList = (props: Props) => {
   // appears right under the composer instead of dropping into a random (shortest) column.
   const displayMemoList = isDisplayPending ? [] : sortedMemoList;
   const firstMemo = displayMemoList[0];
-  const priorityKey = newMemoName && firstMemo?.name === newMemoName ? getMemoKey(firstMemo) : undefined;
+  const firstMemoKey = firstMemo ? getMemoKey(firstMemo) : undefined;
+  const firstMediaMemoKey = displayMemoList.find(memoHasDeferredMedia)?.name;
+  const priorityKey = newMemoName && firstMemo?.name === newMemoName ? firstMemoKey : undefined;
 
   // Stable reference so MentionResolutionProvider's memo (keyed on the array) actually holds.
   const contents = useMemo(() => displayMemoList.map((memo) => memo.content), [displayMemoList]);
@@ -347,7 +349,9 @@ const PagedMemoList = (props: Props) => {
               <ColumnGrid
                 items={displayMemoList}
                 getKey={getMemoKey}
-                renderItem={(memo) => props.renderer(memo, { compact: effectiveCompact })}
+                renderItem={(memo) =>
+                  props.renderer(memo, { compact: effectiveCompact, priorityMedia: getMemoKey(memo) === firstMediaMemoKey })
+                }
                 estimateHeight={(memo, context) =>
                   estimateMemoCardHeight(memo, { ...context, showCommentPreview: userGeneralSetting?.showCommentPreview ?? true })
                 }
@@ -363,7 +367,9 @@ const PagedMemoList = (props: Props) => {
               {leadingContent}
               <MemoFilters className="mb-2" />
               {initialLoader}
-              {displayMemoList.map((memo) => props.renderer(memo, { compact: effectiveCompact }))}
+              {displayMemoList.map((memo) =>
+                props.renderer(memo, { compact: effectiveCompact, priorityMedia: getMemoKey(memo) === firstMediaMemoKey }),
+              )}
               {emptyPlaceholder}
               {!isDisplayPending && footer}
             </>

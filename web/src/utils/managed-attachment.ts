@@ -267,3 +267,8 @@ export const resolveManagedAttachmentOriginalImageSource = (source: string | und
   const attachment = findManagedImageAttachment(source, attachments);
   return attachment ? getAttachmentUrl(attachment) : undefined;
 };
+
+export const resolveManagedAttachmentImageMetadata = (
+  source: string | undefined,
+  attachments: Attachment[],
+): Attachment["mediaMetadata"] | undefined => findManagedImageAttachment(source, attachments)?.mediaMetadata;

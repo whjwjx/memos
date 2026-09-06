@@ -27,6 +27,7 @@ import { resolveVisualGalleryLayout } from "./visualGalleryLayout";
 interface AttachmentListViewProps {
   attachments: Attachment[];
   onImagePreview?: (items: PreviewMediaItem[], index: number) => void;
+  priorityMedia?: boolean;
 }
 
 type VisualItem = AttachmentVisualItem;
@@ -71,6 +72,16 @@ const getMotionPreviewProps = (item: VisualItem) => ({
   presentationTimestampUs: item.previewItem.kind === "motion" ? item.previewItem.presentationTimestampUs : undefined,
 });
 
+const getMediaDimensions = (item: VisualItem) => {
+  const metadata = item.attachments.find((attachment) => attachment.mediaMetadata?.width && attachment.mediaMetadata.height)?.mediaMetadata;
+  return metadata?.width && metadata.height ? { width: metadata.width, height: metadata.height } : undefined;
+};
+
+const PRIORITY_MEDIA_FALLBACK_DIMENSIONS = { width: 1600, height: 1000 } as const;
+
+const getResolvedMediaDimensions = (item: VisualItem, priorityMedia?: boolean) =>
+  getMediaDimensions(item) ?? (priorityMedia ? PRIORITY_MEDIA_FALLBACK_DIMENSIONS : undefined);
+
 const VisualTile = ({
   className,
   onPreview,
@@ -104,19 +115,30 @@ const CollageVisualItem = ({
   onPreview,
   className,
   overlayLabel,
+  priorityMedia,
 }: {
   item: VisualItem;
   onPreview?: () => void;
   className?: string;
   overlayLabel?: string;
+  priorityMedia?: boolean;
 }) => {
   const motionPreviewProps = item.kind === "motion" ? getMotionPreviewProps(item) : undefined;
+  const dimensions = getResolvedMediaDimensions(item, priorityMedia);
+  const loading = priorityMedia ? "eager" : "lazy";
+  const fetchPriority = priorityMedia ? "high" : "low";
 
   return (
     <VisualTile className={cn("block h-full w-full", className)} onPreview={onPreview} overlayLabel={overlayLabel}>
       {item.kind === "video" ? (
         <>
-          <VideoPoster sourceUrl={item.sourceUrl} posterUrl={item.posterUrl} alt={item.filename} className={COVER_MEDIA_CLASS} />
+          <VideoPoster
+            sourceUrl={item.sourceUrl}
+            posterUrl={item.posterUrl}
+            alt={item.filename}
+            className={COVER_MEDIA_CLASS}
+            priority={priorityMedia}
+          />
           {!overlayLabel && (
             <VideoPlayBadge className={COLLAGE_VIDEO_PLAY_BADGE_CLASS}>
               <PlayIcon className="h-3.5 w-3.5 fill-current" />
@@ -132,21 +154,43 @@ const CollageVisualItem = ({
           containerClassName="h-full w-full"
           badgeClassName="left-2 top-2 px-2 py-0.5 text-[10px]"
           mediaClassName={COVER_MEDIA_CLASS}
+          priority={priorityMedia}
         />
       ) : (
-        <img src={item.posterUrl} alt={item.filename} className={COVER_MEDIA_CLASS} loading="lazy" decoding="async" fetchPriority="low" />
+        <img
+          src={item.posterUrl}
+          alt={item.filename}
+          width={dimensions?.width}
+          height={dimensions?.height}
+          className={COVER_MEDIA_CLASS}
+          loading={loading}
+          decoding="async"
+          fetchPriority={fetchPriority}
+        />
       )}
     </VisualTile>
   );
 };
 
-const SingleVisualItem = ({ item, onPreview }: { item: VisualItem; onPreview?: () => void }) => {
+const SingleVisualItem = ({ item, onPreview, priorityMedia }: { item: VisualItem; onPreview?: () => void; priorityMedia?: boolean }) => {
   const motionPreviewProps = item.kind === "motion" ? getMotionPreviewProps(item) : undefined;
+  const dimensions = getResolvedMediaDimensions(item, priorityMedia);
+  const loading = priorityMedia ? "eager" : "lazy";
+  const fetchPriority = priorityMedia ? "high" : "low";
 
   if (item.kind === "image") {
     return (
       <VisualTile className="inline-block max-w-full" onPreview={onPreview}>
-        <img src={item.posterUrl} alt={item.filename} className={NATURAL_MEDIA_CLASS} loading="lazy" decoding="async" fetchPriority="low" />
+        <img
+          src={item.posterUrl}
+          alt={item.filename}
+          width={dimensions?.width}
+          height={dimensions?.height}
+          className={NATURAL_MEDIA_CLASS}
+          loading={loading}
+          decoding="async"
+          fetchPriority={fetchPriority}
+        />
       </VisualTile>
     );
   }
@@ -163,6 +207,7 @@ const SingleVisualItem = ({ item, onPreview }: { item: VisualItem; onPreview?: (
           posterClassName={cn(NATURAL_MEDIA_CLASS, "object-contain")}
           videoClassName={SINGLE_MOTION_VIDEO_CLASS}
           badgeClassName="left-2 top-2 px-2 py-0.5 text-[10px]"
+          priority={priorityMedia}
         />
       </VisualTile>
     );
@@ -171,7 +216,13 @@ const SingleVisualItem = ({ item, onPreview }: { item: VisualItem; onPreview?: (
   return (
     <VisualTile className={cn("block", SINGLE_VIDEO_CARD_WIDTH_CLASS)} onPreview={onPreview}>
       <div className="relative aspect-video bg-black/5">
-        <VideoPoster sourceUrl={item.sourceUrl} posterUrl={item.posterUrl} alt={item.filename} className={COVER_MEDIA_CLASS} />
+        <VideoPoster
+          sourceUrl={item.sourceUrl}
+          posterUrl={item.posterUrl}
+          alt={item.filename}
+          className={COVER_MEDIA_CLASS}
+          priority={priorityMedia}
+        />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
         <VideoPlayBadge className="bottom-3 right-3 h-9 w-9">
           <PlayIcon className="h-4 w-4 fill-current" />
@@ -181,7 +232,15 @@ const SingleVisualItem = ({ item, onPreview }: { item: VisualItem; onPreview?: (
   );
 };
 
-const VisualGallery = ({ items, onPreview }: { items: VisualItem[]; onPreview?: (itemId: string) => void }) => {
+const VisualGallery = ({
+  items,
+  onPreview,
+  priorityMedia,
+}: {
+  items: VisualItem[];
+  onPreview?: (itemId: string) => void;
+  priorityMedia?: boolean;
+}) => {
   const layout = resolveVisualGalleryLayout(items);
 
   if (!layout) {
@@ -191,7 +250,7 @@ const VisualGallery = ({ items, onPreview }: { items: VisualItem[]; onPreview?: 
   if (layout.mode === "single") {
     return (
       <div className="w-full">
-        <SingleVisualItem item={layout.item} onPreview={() => onPreview?.(layout.item.id)} />
+        <SingleVisualItem item={layout.item} onPreview={() => onPreview?.(layout.item.id)} priorityMedia={priorityMedia} />
       </div>
     );
   }
@@ -205,6 +264,7 @@ const VisualGallery = ({ items, onPreview }: { items: VisualItem[]; onPreview?: 
           className={className}
           overlayLabel={overlayLabel}
           onPreview={() => onPreview?.(item.id)}
+          priorityMedia={priorityMedia}
         />
       ))}
     </div>
@@ -238,7 +298,7 @@ const DocsList = ({ attachments }: { attachments: Attachment[] }) => (
 
 const Divider = () => <div className="border-t border-border/70 opacity-80" />;
 
-const AttachmentListView = ({ attachments, onImagePreview }: AttachmentListViewProps) => {
+const AttachmentListView = ({ attachments, onImagePreview, priorityMedia }: AttachmentListViewProps) => {
   const { visual, audio, docs } = useMemo(() => separateAttachments(attachments), [attachments]);
   const visualItems = useMemo(() => buildAttachmentVisualItems(visual), [visual]);
   const previewItems = useMemo(() => visualItems.map((item) => item.previewItem), [visualItems]);
@@ -265,7 +325,7 @@ const AttachmentListView = ({ attachments, onImagePreview }: AttachmentListViewP
     >
       {hasMedia && (
         <div className="flex flex-col gap-2">
-          {hasVisual && <VisualGallery items={visualItems} onPreview={handlePreview} />}
+          {hasVisual && <VisualGallery items={visualItems} onPreview={handlePreview} priorityMedia={priorityMedia} />}
           {hasAudio && <AudioList attachments={audio.filter(isAudioAttachment)} compact />}
         </div>
       )}
