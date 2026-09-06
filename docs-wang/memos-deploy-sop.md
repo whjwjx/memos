@@ -359,6 +359,18 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 校验：公网前端资产 `index-BuDAnneP.js` 与构建输出一致；API `/api/v1/memos?limit=1` 正常；日志无异常、**无 DB 迁移**（home 性能优化不涉及 schema 变更）；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）。
 - 清理：悬空镜像已 `docker image prune -f`（删 `5d7b5864`）；旧备份目录 `memos_data_20260902_1630` 已删，保留 `20260906_1539` 与 `20260906_1941`。
 - 备注：本次 C 盘 40.1GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.6 方案，**本次无新增踩坑**。
+
+### 8.13 部署记录（2026-09-06，夜）
+
+> 完整重新部署：纳入 memo image display size tuning（`4eedfd17` feat、`8c465cba` merge）。纯前端样式调整，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `8c465cba`（merge memo image display size tuning）。
+- 构建：`pnpm release`（资产 `index-CpimG3-J.js`，5129 modules）→ `go build`（linux/amd64，102666878 字节 / ≈97.9MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260906_2016/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `06aba0ac`），容器 recreate 时间 `2026-09-06T20:18:34+08:00`（北京时间 9-06 20:18）。
+- 校验：公网前端资产 `index-CpimG3-J.js` 与构建输出一致（该资产名含连字符 `-J`，旧校验正则 `assets/index-[a-zA-Z0-9]*\.js` 漏匹配，已改用 `assets/index-[^"]+\.js` 修正，见 9.7）；API `/api/v1/memos?limit=1` 正常；日志无异常、**无 DB 迁移**；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）。
+- 清理：悬空镜像已 `docker image prune -f`（删 `98b88bc3`）；旧备份目录 `memos_data_20260906_1539` 已删，保留 `20260906_1941` 与 `20260906_2016`。
+- 备注：本次 C 盘 40.0GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.6；**新增踩坑**：前端资产名哈希可能含连字符（见 9.7）。
 - 备注：本次 C 盘 40.9GB 充足，无需 `go clean -cache`。本次有 DB schema 迁移，回滚时须**同步回滚二进制与备份**（见 9.6）。
 
 ---
@@ -421,3 +433,11 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
   - 仅恢复旧备份（旧备份 + 当前二进制）→ 当前二进制期望新 schema，旧 DB 缺新表 → 报错。
   - 正确：旧二进制 + 对应的旧备份一起回滚。
 - **做法**：每次部署前备份即对应本次二进制；回滚时用该次备份 + 同次上传的 `memos-linux`（或上一个稳定 commit 重新构建）。
+
+### 9.7 前端资产名校验正则需覆盖连字符
+
+- **现象**：vite 构建出的主资产名哈希可能含连字符（如本次 `index-CpimG3-J.js`）。原校验正则 `assets/index-[a-zA-Z0-9]*\.js` 要求 `index-` 后全为字母数字直至 `.js`，遇到 `-J` 中的 `-` 即中断，**漏匹配**导致误判"未部署"。
+- **修正**：校验公网前端资产名改用能覆盖连字符的正则：`assets/index-[^"]+\.js`（`[^"]+` 匹配到下一个引号前的任意字符，含连字符）。
+- **做法**（PowerShell + curl）：
+  `curl.exe -s https://memos.huajiang.wang/ | Select-String -Pattern 'assets/index-[^"]+\.js' | ForEach-Object { $_.Matches.Value }`
+- **注意**：资产名是否含连字符具有随机性，前几次部署（`index-BFy8sQp8.js`、`index-CeWK1Dcs.js`、`index-BuDAnneP.js`）均不含，本次才触发；建议统一用覆盖连字符的正则以避免漏判。
