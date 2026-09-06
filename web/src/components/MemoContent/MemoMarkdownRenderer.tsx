@@ -150,13 +150,14 @@ export const MemoMarkdownRendererCore = ({
     iframe: TrustedIframe,
     img: ({ src, ...props }) => {
       const metadata = resolveManagedAttachmentImageMetadata(src, attachments);
-      const originalSrc = compact ? resolveManagedAttachmentOriginalImageSource(src, attachments) : undefined;
+      const preferThumbnail = Boolean(compact || priorityMedia);
+      const originalSrc = preferThumbnail ? resolveManagedAttachmentOriginalImageSource(src, attachments) : undefined;
       return (
         <Image
           {...props}
           width={props.width ?? metadata?.width}
           height={props.height ?? metadata?.height}
-          src={resolveManagedAttachmentImageSource(src, attachments, { preferThumbnail: Boolean(compact) })}
+          src={resolveManagedAttachmentImageSource(src, attachments, { preferThumbnail })}
           data-source-url={originalSrc}
           priority={Boolean(priorityMedia)}
         />

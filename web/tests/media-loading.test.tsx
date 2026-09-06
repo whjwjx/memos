@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { MemoMarkdownRenderer } from "@/components/MemoContent/MemoMarkdownRenderer";
 import { Image } from "@/components/MemoContent/markdown/Image";
 import AudioAttachmentItem from "@/components/MemoMetadata/Attachment/AudioAttachmentItem";
 import MotionPhotoPlayer from "@/components/MotionPhotoPlayer";
+import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
 
 describe("media loading", () => {
   it("marks markdown images for native lazy loading", () => {
@@ -11,6 +13,29 @@ describe("media loading", () => {
     const image = screen.getByRole("img", { name: "memo illustration" });
     expect(image).toHaveAttribute("loading", "lazy");
     expect(image).toHaveAttribute("decoding", "async");
+  });
+
+  it("uses thumbnails for prioritized managed markdown images while keeping the original preview URL", () => {
+    const attachment = {
+      name: "attachments/test-uid",
+      filename: "photo.png",
+      type: "image/png",
+    } as Attachment;
+
+    render(
+      <MemoMarkdownRenderer
+        content="![memo image](/file/attachments/test-uid)"
+        attachments={[attachment]}
+        resolvedMentionUsernames={new Set()}
+        priorityMedia
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "memo image" });
+    expect(image).toHaveAttribute("src", `${window.location.origin}/file/attachments/test-uid/photo.png?thumbnail=true`);
+    expect(image).toHaveAttribute("data-source-url", `${window.location.origin}/file/attachments/test-uid/photo.png`);
+    expect(image).toHaveAttribute("loading", "eager");
+    expect(image).toHaveAttribute("fetchpriority", "high");
   });
 
   it("does not bind an audio source until playback is requested", async () => {
