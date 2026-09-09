@@ -598,6 +598,7 @@
       "start-practice": "开始练习",
       "submit-review": "提交批改",
       "teacher-hint": "先不要急着翻整段。试着用一句话回答：这条 memo 最想表达的核心意思是什么？然后用 I noticed / It feels like / I want to 开头。",
+      "teacher-hint-with-phrase": "{{tip}} 下一句可以试着用「{{phrase}}」。",
       "thinking": "表达思路",
       "title": "Memo 翻译练习",
       "words": "核心词汇"

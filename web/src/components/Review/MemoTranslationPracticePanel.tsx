@@ -13,13 +13,16 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateMemo } from "@/hooks/useMemoQueries";
+import { useGenerateTranslationPracticeLesson, useReviewTranslationPracticeDraft } from "@/hooks/useTranslation";
 import { handleError } from "@/lib/error";
 import { cn } from "@/lib/utils";
+import type { TranslationPracticeFeedback, TranslationPracticeLesson } from "@/types/proto/api/v1/ai_service_pb";
 import { type Memo, MemoSchema, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
@@ -31,23 +34,6 @@ interface MemoTranslationPracticePanelProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface PracticeLesson {
-  goal: string;
-  words: string[];
-  phrases: string[];
-  patterns: string[];
-  thinking: string[];
-}
-
-interface TeacherFeedback {
-  passed: boolean;
-  summary: string;
-  strengths: string[];
-  improvements: string[];
-  nextTarget: string;
-  nativeVersion: string;
-}
-
 const compactText = (value: string, maxChars: number): string => {
   const compacted = value.trim().replace(/\s+/g, " ");
   if (compacted.length <= maxChars) {
@@ -56,58 +42,12 @@ const compactText = (value: string, maxChars: number): string => {
   return `${compacted.slice(0, maxChars).trimEnd()}...`;
 };
 
-const buildLesson = (content: string, t: ReturnType<typeof useTranslate>): PracticeLesson => {
-  const excerpt = compactText(content, 72) || t("review.translation-practice.empty-memo");
-  return {
-    goal: t("review.translation-practice.lesson-goal", { excerpt }),
-    words: [
-      t("review.translation-practice.lesson-word-1"),
-      t("review.translation-practice.lesson-word-2"),
-      t("review.translation-practice.lesson-word-3"),
-    ],
-    phrases: [
-      t("review.translation-practice.lesson-phrase-1"),
-      t("review.translation-practice.lesson-phrase-2"),
-      t("review.translation-practice.lesson-phrase-3"),
-    ],
-    patterns: [
-      t("review.translation-practice.lesson-pattern-1"),
-      t("review.translation-practice.lesson-pattern-2"),
-      t("review.translation-practice.lesson-pattern-3"),
-    ],
-    thinking: [
-      t("review.translation-practice.lesson-thinking-1"),
-      t("review.translation-practice.lesson-thinking-2"),
-      t("review.translation-practice.lesson-thinking-3"),
-    ],
-  };
-};
-
-const buildFeedback = (draft: string, attempt: number, content: string, t: ReturnType<typeof useTranslate>): TeacherFeedback => {
-  const normalizedDraft = draft.trim();
-  const passed = normalizedDraft.length >= 60 || attempt >= 2;
-  const memoExcerpt = compactText(content, 80) || t("review.translation-practice.empty-memo");
-
-  return {
-    passed,
-    summary: passed ? t("review.translation-practice.feedback-passed-summary") : t("review.translation-practice.feedback-revision-summary"),
-    strengths: [
-      normalizedDraft
-        ? t("review.translation-practice.feedback-strength-user-effort")
-        : t("review.translation-practice.feedback-strength-started"),
-      t("review.translation-practice.feedback-strength-structure"),
-    ],
-    improvements: passed
-      ? [t("review.translation-practice.feedback-polish-1"), t("review.translation-practice.feedback-polish-2")]
-      : [t("review.translation-practice.feedback-improvement-1"), t("review.translation-practice.feedback-improvement-2")],
-    nextTarget: passed
-      ? t("review.translation-practice.feedback-passed-target")
-      : t("review.translation-practice.feedback-revision-target"),
-    nativeVersion: t("review.translation-practice.native-version-placeholder", { excerpt: memoExcerpt }),
-  };
-};
-
-const formatSavedPracticeMemo = (memo: Memo, draft: string, feedback: TeacherFeedback | undefined, lesson: PracticeLesson | undefined) => {
+const formatSavedPracticeMemo = (
+  memo: Memo,
+  draft: string,
+  feedback: TranslationPracticeFeedback | undefined,
+  lesson: TranslationPracticeLesson | undefined,
+) => {
   return [
     "原始 memo：",
     memo.content.trim(),
@@ -161,12 +101,17 @@ const ToolChipGroup = ({ title, items }: { title: string; items: string[] }) => 
 
 export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoTranslationPracticePanelProps) => {
   const t = useTranslate();
+  const { i18n } = useTranslation();
   const createMemo = useCreateMemo();
+  const generateLesson = useGenerateTranslationPracticeLesson();
+  const reviewDraft = useReviewTranslationPracticeDraft();
   const draftSectionRef = useRef<HTMLElement>(null);
+  const lessonCacheRef = useRef<{ key: string; lesson: TranslationPracticeLesson } | undefined>(undefined);
+  const lessonRequestRef = useRef<{ key: string; promise: Promise<TranslationPracticeLesson> } | undefined>(undefined);
   const [phase, setPhase] = useState<PracticePhase>("idle");
-  const [lesson, setLesson] = useState<PracticeLesson>();
+  const [lesson, setLesson] = useState<TranslationPracticeLesson>();
   const [draft, setDraft] = useState("");
-  const [feedback, setFeedback] = useState<TeacherFeedback>();
+  const [feedback, setFeedback] = useState<TranslationPracticeFeedback>();
   const [attempt, setAttempt] = useState(0);
   const [hint, setHint] = useState("");
   const [lessonExpanded, setLessonExpanded] = useState(true);
@@ -190,16 +135,55 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
     setHint("");
     setLessonExpanded(true);
 
-    const timer = window.setTimeout(() => {
-      setLesson(buildLesson(memo.content, t));
+    let cancelled = false;
+    const lessonKey = `${memo.name}:${i18n.language}:${memo.content}`;
+    if (lessonCacheRef.current?.key === lessonKey) {
+      setLesson(lessonCacheRef.current.lesson);
       setPhase("lesson_ready");
-    }, 480);
+      return;
+    }
 
-    return () => window.clearTimeout(timer);
-  }, [memo, open, t]);
+    const existingRequest = lessonRequestRef.current?.key === lessonKey ? lessonRequestRef.current.promise : undefined;
+    const lessonPromise =
+      existingRequest ??
+      generateLesson.mutateAsync({
+        memoContent: memo.content,
+        locale: i18n.language,
+      });
+    lessonRequestRef.current = { key: lessonKey, promise: lessonPromise };
+
+    lessonPromise
+      .then((nextLesson) => {
+        lessonCacheRef.current = { key: lessonKey, lesson: nextLesson };
+        if (lessonRequestRef.current?.promise === lessonPromise) {
+          lessonRequestRef.current = undefined;
+        }
+        if (cancelled) {
+          return;
+        }
+        setLesson(nextLesson);
+        setPhase("lesson_ready");
+      })
+      .catch((error: unknown) => {
+        if (lessonRequestRef.current?.promise === lessonPromise) {
+          lessonRequestRef.current = undefined;
+        }
+        if (cancelled) {
+          return;
+        }
+        setPhase("idle");
+        handleError(error, toast.error, { context: "Generate translation practice lesson" });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [generateLesson.mutateAsync, i18n.language, memo, open]);
 
   const handleAskTeacher = () => {
-    setHint(t("review.translation-practice.teacher-hint"));
+    const tip = lesson?.thinking[0] ?? t("review.translation-practice.teacher-hint");
+    const phrase = lesson?.phrases[0];
+    setHint(phrase ? t("review.translation-practice.teacher-hint-with-phrase", { tip, phrase }) : tip);
   };
 
   const handleStartPractice = () => {
@@ -208,20 +192,30 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
     window.setTimeout(() => draftSectionRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 50);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) {
       return;
     }
 
+    const previousPhase = feedback?.passed ? "passed" : feedback ? "needs_revision" : "drafting";
     setPhase("reviewing");
     setHint("");
     const nextAttempt = attempt + 1;
     setAttempt(nextAttempt);
-    window.setTimeout(() => {
-      const nextFeedback = buildFeedback(draft, nextAttempt, memoContent, t);
+    try {
+      const nextFeedback = await reviewDraft.mutateAsync({
+        memoContent,
+        draft,
+        attempt: nextAttempt,
+        locale: i18n.language,
+      });
       setFeedback(nextFeedback);
       setPhase(nextFeedback.passed ? "passed" : "needs_revision");
-    }, 520);
+    } catch (error) {
+      setAttempt(nextAttempt - 1);
+      setPhase(previousPhase);
+      handleError(error, toast.error, { context: "Review translation practice draft" });
+    }
   };
 
   const handleSave = async () => {

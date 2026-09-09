@@ -41,6 +41,12 @@ const (
 	AIServiceTestAIProviderProcedure = "/memos.api.v1.AIService/TestAIProvider"
 	// AIServiceTranslateProcedure is the fully-qualified name of the AIService's Translate RPC.
 	AIServiceTranslateProcedure = "/memos.api.v1.AIService/Translate"
+	// AIServiceGenerateTranslationPracticeLessonProcedure is the fully-qualified name of the
+	// AIService's GenerateTranslationPracticeLesson RPC.
+	AIServiceGenerateTranslationPracticeLessonProcedure = "/memos.api.v1.AIService/GenerateTranslationPracticeLesson"
+	// AIServiceReviewTranslationPracticeDraftProcedure is the fully-qualified name of the AIService's
+	// ReviewTranslationPracticeDraft RPC.
+	AIServiceReviewTranslationPracticeDraftProcedure = "/memos.api.v1.AIService/ReviewTranslationPracticeDraft"
 	// AIServiceListTranslationHistoriesProcedure is the fully-qualified name of the AIService's
 	// ListTranslationHistories RPC.
 	AIServiceListTranslationHistoriesProcedure = "/memos.api.v1.AIService/ListTranslationHistories"
@@ -63,6 +69,12 @@ type AIServiceClient interface {
 	// Translate translates text between English and Chinese using the configured
 	// instance AI translation provider.
 	Translate(context.Context, *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error)
+	// GenerateTranslationPracticeLesson prepares expression tools for translating
+	// a memo during review.
+	GenerateTranslationPracticeLesson(context.Context, *connect.Request[v1.GenerateTranslationPracticeLessonRequest]) (*connect.Response[v1.GenerateTranslationPracticeLessonResponse], error)
+	// ReviewTranslationPracticeDraft reviews a user's English draft for a memo
+	// translation practice.
+	ReviewTranslationPracticeDraft(context.Context, *connect.Request[v1.ReviewTranslationPracticeDraftRequest]) (*connect.Response[v1.ReviewTranslationPracticeDraftResponse], error)
 	// ListTranslationHistories lists the current user's translation history.
 	ListTranslationHistories(context.Context, *connect.Request[v1.ListTranslationHistoriesRequest]) (*connect.Response[v1.ListTranslationHistoriesResponse], error)
 	// DeleteTranslationHistory deletes one translation history item owned by the
@@ -102,6 +114,18 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(aIServiceMethods.ByName("Translate")),
 			connect.WithClientOptions(opts...),
 		),
+		generateTranslationPracticeLesson: connect.NewClient[v1.GenerateTranslationPracticeLessonRequest, v1.GenerateTranslationPracticeLessonResponse](
+			httpClient,
+			baseURL+AIServiceGenerateTranslationPracticeLessonProcedure,
+			connect.WithSchema(aIServiceMethods.ByName("GenerateTranslationPracticeLesson")),
+			connect.WithClientOptions(opts...),
+		),
+		reviewTranslationPracticeDraft: connect.NewClient[v1.ReviewTranslationPracticeDraftRequest, v1.ReviewTranslationPracticeDraftResponse](
+			httpClient,
+			baseURL+AIServiceReviewTranslationPracticeDraftProcedure,
+			connect.WithSchema(aIServiceMethods.ByName("ReviewTranslationPracticeDraft")),
+			connect.WithClientOptions(opts...),
+		),
 		listTranslationHistories: connect.NewClient[v1.ListTranslationHistoriesRequest, v1.ListTranslationHistoriesResponse](
 			httpClient,
 			baseURL+AIServiceListTranslationHistoriesProcedure,
@@ -125,12 +149,14 @@ func NewAIServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 
 // aIServiceClient implements AIServiceClient.
 type aIServiceClient struct {
-	transcribe                *connect.Client[v1.TranscribeRequest, v1.TranscribeResponse]
-	testAIProvider            *connect.Client[v1.TestAIProviderRequest, v1.TestAIProviderResponse]
-	translate                 *connect.Client[v1.TranslateRequest, v1.TranslateResponse]
-	listTranslationHistories  *connect.Client[v1.ListTranslationHistoriesRequest, v1.ListTranslationHistoriesResponse]
-	deleteTranslationHistory  *connect.Client[v1.DeleteTranslationHistoryRequest, emptypb.Empty]
-	clearTranslationHistories *connect.Client[v1.ClearTranslationHistoriesRequest, emptypb.Empty]
+	transcribe                        *connect.Client[v1.TranscribeRequest, v1.TranscribeResponse]
+	testAIProvider                    *connect.Client[v1.TestAIProviderRequest, v1.TestAIProviderResponse]
+	translate                         *connect.Client[v1.TranslateRequest, v1.TranslateResponse]
+	generateTranslationPracticeLesson *connect.Client[v1.GenerateTranslationPracticeLessonRequest, v1.GenerateTranslationPracticeLessonResponse]
+	reviewTranslationPracticeDraft    *connect.Client[v1.ReviewTranslationPracticeDraftRequest, v1.ReviewTranslationPracticeDraftResponse]
+	listTranslationHistories          *connect.Client[v1.ListTranslationHistoriesRequest, v1.ListTranslationHistoriesResponse]
+	deleteTranslationHistory          *connect.Client[v1.DeleteTranslationHistoryRequest, emptypb.Empty]
+	clearTranslationHistories         *connect.Client[v1.ClearTranslationHistoriesRequest, emptypb.Empty]
 }
 
 // Transcribe calls memos.api.v1.AIService.Transcribe.
@@ -146,6 +172,16 @@ func (c *aIServiceClient) TestAIProvider(ctx context.Context, req *connect.Reque
 // Translate calls memos.api.v1.AIService.Translate.
 func (c *aIServiceClient) Translate(ctx context.Context, req *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error) {
 	return c.translate.CallUnary(ctx, req)
+}
+
+// GenerateTranslationPracticeLesson calls memos.api.v1.AIService.GenerateTranslationPracticeLesson.
+func (c *aIServiceClient) GenerateTranslationPracticeLesson(ctx context.Context, req *connect.Request[v1.GenerateTranslationPracticeLessonRequest]) (*connect.Response[v1.GenerateTranslationPracticeLessonResponse], error) {
+	return c.generateTranslationPracticeLesson.CallUnary(ctx, req)
+}
+
+// ReviewTranslationPracticeDraft calls memos.api.v1.AIService.ReviewTranslationPracticeDraft.
+func (c *aIServiceClient) ReviewTranslationPracticeDraft(ctx context.Context, req *connect.Request[v1.ReviewTranslationPracticeDraftRequest]) (*connect.Response[v1.ReviewTranslationPracticeDraftResponse], error) {
+	return c.reviewTranslationPracticeDraft.CallUnary(ctx, req)
 }
 
 // ListTranslationHistories calls memos.api.v1.AIService.ListTranslationHistories.
@@ -174,6 +210,12 @@ type AIServiceHandler interface {
 	// Translate translates text between English and Chinese using the configured
 	// instance AI translation provider.
 	Translate(context.Context, *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error)
+	// GenerateTranslationPracticeLesson prepares expression tools for translating
+	// a memo during review.
+	GenerateTranslationPracticeLesson(context.Context, *connect.Request[v1.GenerateTranslationPracticeLessonRequest]) (*connect.Response[v1.GenerateTranslationPracticeLessonResponse], error)
+	// ReviewTranslationPracticeDraft reviews a user's English draft for a memo
+	// translation practice.
+	ReviewTranslationPracticeDraft(context.Context, *connect.Request[v1.ReviewTranslationPracticeDraftRequest]) (*connect.Response[v1.ReviewTranslationPracticeDraftResponse], error)
 	// ListTranslationHistories lists the current user's translation history.
 	ListTranslationHistories(context.Context, *connect.Request[v1.ListTranslationHistoriesRequest]) (*connect.Response[v1.ListTranslationHistoriesResponse], error)
 	// DeleteTranslationHistory deletes one translation history item owned by the
@@ -209,6 +251,18 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(aIServiceMethods.ByName("Translate")),
 		connect.WithHandlerOptions(opts...),
 	)
+	aIServiceGenerateTranslationPracticeLessonHandler := connect.NewUnaryHandler(
+		AIServiceGenerateTranslationPracticeLessonProcedure,
+		svc.GenerateTranslationPracticeLesson,
+		connect.WithSchema(aIServiceMethods.ByName("GenerateTranslationPracticeLesson")),
+		connect.WithHandlerOptions(opts...),
+	)
+	aIServiceReviewTranslationPracticeDraftHandler := connect.NewUnaryHandler(
+		AIServiceReviewTranslationPracticeDraftProcedure,
+		svc.ReviewTranslationPracticeDraft,
+		connect.WithSchema(aIServiceMethods.ByName("ReviewTranslationPracticeDraft")),
+		connect.WithHandlerOptions(opts...),
+	)
 	aIServiceListTranslationHistoriesHandler := connect.NewUnaryHandler(
 		AIServiceListTranslationHistoriesProcedure,
 		svc.ListTranslationHistories,
@@ -235,6 +289,10 @@ func NewAIServiceHandler(svc AIServiceHandler, opts ...connect.HandlerOption) (s
 			aIServiceTestAIProviderHandler.ServeHTTP(w, r)
 		case AIServiceTranslateProcedure:
 			aIServiceTranslateHandler.ServeHTTP(w, r)
+		case AIServiceGenerateTranslationPracticeLessonProcedure:
+			aIServiceGenerateTranslationPracticeLessonHandler.ServeHTTP(w, r)
+		case AIServiceReviewTranslationPracticeDraftProcedure:
+			aIServiceReviewTranslationPracticeDraftHandler.ServeHTTP(w, r)
 		case AIServiceListTranslationHistoriesProcedure:
 			aIServiceListTranslationHistoriesHandler.ServeHTTP(w, r)
 		case AIServiceDeleteTranslationHistoryProcedure:
@@ -260,6 +318,14 @@ func (UnimplementedAIServiceHandler) TestAIProvider(context.Context, *connect.Re
 
 func (UnimplementedAIServiceHandler) Translate(context.Context, *connect.Request[v1.TranslateRequest]) (*connect.Response[v1.TranslateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.Translate is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) GenerateTranslationPracticeLesson(context.Context, *connect.Request[v1.GenerateTranslationPracticeLessonRequest]) (*connect.Response[v1.GenerateTranslationPracticeLessonResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.GenerateTranslationPracticeLesson is not implemented"))
+}
+
+func (UnimplementedAIServiceHandler) ReviewTranslationPracticeDraft(context.Context, *connect.Request[v1.ReviewTranslationPracticeDraftRequest]) (*connect.Response[v1.ReviewTranslationPracticeDraftResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIService.ReviewTranslationPracticeDraft is not implemented"))
 }
 
 func (UnimplementedAIServiceHandler) ListTranslationHistories(context.Context, *connect.Request[v1.ListTranslationHistoriesRequest]) (*connect.Response[v1.ListTranslationHistoriesResponse], error) {

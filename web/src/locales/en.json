@@ -673,6 +673,7 @@
       "start-practice": "Start practice",
       "submit-review": "Submit for feedback",
       "teacher-hint": "Do not rush into translating the whole memo. First answer in one sentence: what is the core idea? Then try starting with I noticed, It feels like, or I want to.",
+      "teacher-hint-with-phrase": "{{tip}} Try using \"{{phrase}}\" in your next sentence.",
       "thinking": "Thinking path",
       "title": "Memo translation practice",
       "words": "Core words"

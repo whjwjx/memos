@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file api/v1/ai_service.proto.
  */
 export const file_api_v1_ai_service: GenFile = /*@__PURE__*/
-  fileDesc("ChdhcGkvdjEvYWlfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIkkKEVRyYW5zY3JpYmVSZXF1ZXN0EjQKBWF1ZGlvGAEgASgLMiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpcHRpb25BdWRpb0ID4EECIncKElRyYW5zY3JpcHRpb25BdWRpbxIWCgdjb250ZW50GAEgASgMQgPgQQRIABINCgN1cmkYAiABKAlIABIVCghmaWxlbmFtZRgDIAEoCUID4EEBEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUID4EEBQggKBnNvdXJjZSIiChJUcmFuc2NyaWJlUmVzcG9uc2USDAoEdGV4dBgBIAEoCSJFChVUZXN0QUlQcm92aWRlclJlcXVlc3QSGAoLcHJvdmlkZXJfaWQYASABKAlCA+BBAhISCgVtb2RlbBgCIAEoCUID4EEBIkIKFlRlc3RBSVByb3ZpZGVyUmVzcG9uc2USCgoCb2sYASABKAgSDQoFcmVwbHkYAiABKAkSDQoFZXJyb3IYAyABKAkiYQoQVHJhbnNsYXRlUmVxdWVzdBIRCgR0ZXh0GAEgASgJQgPgQQISOgoJZGlyZWN0aW9uGAIgASgOMiIubWVtb3MuYXBpLnYxLlRyYW5zbGF0aW9uRGlyZWN0aW9uQgPgQQEikQEKEVRyYW5zbGF0ZVJlc3BvbnNlEhcKD3RyYW5zbGF0ZWRfdGV4dBgBIAEoCRIXCg9zb3VyY2VfbGFuZ3VhZ2UYAiABKAkSFwoPdGFyZ2V0X2xhbmd1YWdlGAMgASgJEjEKB2hpc3RvcnkYBCABKAsyIC5tZW1vcy5hcGkudjEuVHJhbnNsYXRpb25IaXN0b3J5IrIBChJUcmFuc2xhdGlvbkhpc3RvcnkSDwoCaWQYASABKAlCA+BBAxIRCgRuYW1lGAIgASgJQgPgQQMSEwoLc291cmNlX3RleHQYAyABKAkSFwoPdHJhbnNsYXRlZF90ZXh0GAQgASgJEhcKD3NvdXJjZV9sYW5ndWFnZRgFIAEoCRIXCg90YXJnZXRfbGFuZ3VhZ2UYBiABKAkSGAoLY3JlYXRlX3RpbWUYByABKANCA+BBAyJICh9MaXN0VHJhbnNsYXRpb25IaXN0b3JpZXNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInAKIExpc3RUcmFuc2xhdGlvbkhpc3Rvcmllc1Jlc3BvbnNlEjMKCWhpc3RvcmllcxgBIAMoCzIgLm1lbW9zLmFwaS52MS5UcmFuc2xhdGlvbkhpc3RvcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjIKH0RlbGV0ZVRyYW5zbGF0aW9uSGlzdG9yeVJlcXVlc3QSDwoCaWQYASABKAlCA+BBAiIiCiBDbGVhclRyYW5zbGF0aW9uSGlzdG9yaWVzUmVxdWVzdCpjChRUcmFuc2xhdGlvbkRpcmVjdGlvbhIlCiFUUkFOU0xBVElPTl9ESVJFQ1RJT05fVU5TUEVDSUZJRUQQABIICgRBVVRPEAESDAoIRU5fVE9fWkgQAhIMCghaSF9UT19FThADMuwGCglBSVNlcnZpY2USeQoKVHJhbnNjcmliZRIfLm1lbW9zLmFwaS52MS5UcmFuc2NyaWJlUmVxdWVzdBogLm1lbW9zLmFwaS52MS5UcmFuc2NyaWJlUmVzcG9uc2UiKNpBBWF1ZGlvgtPkkwIaOgEqIhUvYXBpL3YxL2FpOnRyYW5zY3JpYmUSlQEKDlRlc3RBSVByb3ZpZGVyEiMubWVtb3MuYXBpLnYxLlRlc3RBSVByb3ZpZGVyUmVxdWVzdBokLm1lbW9zLmFwaS52MS5UZXN0QUlQcm92aWRlclJlc3BvbnNlIjjaQRFwcm92aWRlcl9pZCxtb2RlbILT5JMCHjoBKiIZL2FwaS92MS9haS9wcm92aWRlcnM6dGVzdBJ+CglUcmFuc2xhdGUSHi5tZW1vcy5hcGkudjEuVHJhbnNsYXRlUmVxdWVzdBofLm1lbW9zLmFwaS52MS5UcmFuc2xhdGVSZXNwb25zZSIw2kEOdGV4dCxkaXJlY3Rpb26C0+STAhk6ASoiFC9hcGkvdjEvYWk6dHJhbnNsYXRlEqMBChhMaXN0VHJhbnNsYXRpb25IaXN0b3JpZXMSLS5tZW1vcy5hcGkudjEuTGlzdFRyYW5zbGF0aW9uSGlzdG9yaWVzUmVxdWVzdBouLm1lbW9zLmFwaS52MS5MaXN0VHJhbnNsYXRpb25IaXN0b3JpZXNSZXNwb25zZSIogtPkkwIiEiAvYXBpL3YxL2FpL3RyYW5zbGF0aW9uLWhpc3RvcmllcxKVAQoYRGVsZXRlVHJhbnNsYXRpb25IaXN0b3J5Ei0ubWVtb3MuYXBpLnYxLkRlbGV0ZVRyYW5zbGF0aW9uSGlzdG9yeVJlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiMtpBAmlkgtPkkwInKiUvYXBpL3YxL2FpL3RyYW5zbGF0aW9uLWhpc3Rvcmllcy97aWR9Eo0BChlDbGVhclRyYW5zbGF0aW9uSGlzdG9yaWVzEi4ubWVtb3MuYXBpLnYxLkNsZWFyVHJhbnNsYXRpb25IaXN0b3JpZXNSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IiiC0+STAiIqIC9hcGkvdjEvYWkvdHJhbnNsYXRpb24taGlzdG9yaWVzQqYBChBjb20ubWVtb3MuYXBpLnYxQg5BaVNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_protobuf_empty]);
+  fileDesc("ChdhcGkvdjEvYWlfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIkkKEVRyYW5zY3JpYmVSZXF1ZXN0EjQKBWF1ZGlvGAEgASgLMiAubWVtb3MuYXBpLnYxLlRyYW5zY3JpcHRpb25BdWRpb0ID4EECIncKElRyYW5zY3JpcHRpb25BdWRpbxIWCgdjb250ZW50GAEgASgMQgPgQQRIABINCgN1cmkYAiABKAlIABIVCghmaWxlbmFtZRgDIAEoCUID4EEBEhkKDGNvbnRlbnRfdHlwZRgEIAEoCUID4EEBQggKBnNvdXJjZSIiChJUcmFuc2NyaWJlUmVzcG9uc2USDAoEdGV4dBgBIAEoCSJFChVUZXN0QUlQcm92aWRlclJlcXVlc3QSGAoLcHJvdmlkZXJfaWQYASABKAlCA+BBAhISCgVtb2RlbBgCIAEoCUID4EEBIkIKFlRlc3RBSVByb3ZpZGVyUmVzcG9uc2USCgoCb2sYASABKAgSDQoFcmVwbHkYAiABKAkSDQoFZXJyb3IYAyABKAkiYQoQVHJhbnNsYXRlUmVxdWVzdBIRCgR0ZXh0GAEgASgJQgPgQQISOgoJZGlyZWN0aW9uGAIgASgOMiIubWVtb3MuYXBpLnYxLlRyYW5zbGF0aW9uRGlyZWN0aW9uQgPgQQEikQEKEVRyYW5zbGF0ZVJlc3BvbnNlEhcKD3RyYW5zbGF0ZWRfdGV4dBgBIAEoCRIXCg9zb3VyY2VfbGFuZ3VhZ2UYAiABKAkSFwoPdGFyZ2V0X2xhbmd1YWdlGAMgASgJEjEKB2hpc3RvcnkYBCABKAsyIC5tZW1vcy5hcGkudjEuVHJhbnNsYXRpb25IaXN0b3J5IloKKEdlbmVyYXRlVHJhbnNsYXRpb25QcmFjdGljZUxlc3NvblJlcXVlc3QSGQoMbWVtb19jb250ZW50GAEgASgJQgPgQQISEwoGbG9jYWxlGAIgASgJQgPgQQEiZAopR2VuZXJhdGVUcmFuc2xhdGlvblByYWN0aWNlTGVzc29uUmVzcG9uc2USNwoGbGVzc29uGAEgASgLMicubWVtb3MuYXBpLnYxLlRyYW5zbGF0aW9uUHJhY3RpY2VMZXNzb24igQEKJVJldmlld1RyYW5zbGF0aW9uUHJhY3RpY2VEcmFmdFJlcXVlc3QSGQoMbWVtb19jb250ZW50GAEgASgJQgPgQQISEgoFZHJhZnQYAiABKAlCA+BBAhIUCgdhdHRlbXB0GAMgASgFQgPgQQESEwoGbG9jYWxlGAQgASgJQgPgQQEiZQomUmV2aWV3VHJhbnNsYXRpb25QcmFjdGljZURyYWZ0UmVzcG9uc2USOwoIZmVlZGJhY2sYASABKAsyKS5tZW1vcy5hcGkudjEuVHJhbnNsYXRpb25QcmFjdGljZUZlZWRiYWNrIm0KGVRyYW5zbGF0aW9uUHJhY3RpY2VMZXNzb24SDAoEZ29hbBgBIAEoCRINCgV3b3JkcxgCIAMoCRIPCgdwaHJhc2VzGAMgAygJEhAKCHBhdHRlcm5zGAQgAygJEhAKCHRoaW5raW5nGAUgAygJIpQBChtUcmFuc2xhdGlvblByYWN0aWNlRmVlZGJhY2sSDgoGcGFzc2VkGAEgASgIEg8KB3N1bW1hcnkYAiABKAkSEQoJc3RyZW5ndGhzGAMgAygJEhQKDGltcHJvdmVtZW50cxgEIAMoCRITCgtuZXh0X3RhcmdldBgFIAEoCRIWCg5uYXRpdmVfdmVyc2lvbhgGIAEoCSKyAQoSVHJhbnNsYXRpb25IaXN0b3J5Eg8KAmlkGAEgASgJQgPgQQMSEQoEbmFtZRgCIAEoCUID4EEDEhMKC3NvdXJjZV90ZXh0GAMgASgJEhcKD3RyYW5zbGF0ZWRfdGV4dBgEIAEoCRIXCg9zb3VyY2VfbGFuZ3VhZ2UYBSABKAkSFwoPdGFyZ2V0X2xhbmd1YWdlGAYgASgJEhgKC2NyZWF0ZV90aW1lGAcgASgDQgPgQQMiSAofTGlzdFRyYW5zbGF0aW9uSGlzdG9yaWVzUmVxdWVzdBIRCglwYWdlX3NpemUYASABKAUSEgoKcGFnZV90b2tlbhgCIAEoCSJwCiBMaXN0VHJhbnNsYXRpb25IaXN0b3JpZXNSZXNwb25zZRIzCgloaXN0b3JpZXMYASADKAsyIC5tZW1vcy5hcGkudjEuVHJhbnNsYXRpb25IaXN0b3J5EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIyCh9EZWxldGVUcmFuc2xhdGlvbkhpc3RvcnlSZXF1ZXN0Eg8KAmlkGAEgASgJQgPgQQIiIgogQ2xlYXJUcmFuc2xhdGlvbkhpc3Rvcmllc1JlcXVlc3QqYwoUVHJhbnNsYXRpb25EaXJlY3Rpb24SJQohVFJBTlNMQVRJT05fRElSRUNUSU9OX1VOU1BFQ0lGSUVEEAASCAoEQVVUTxABEgwKCEVOX1RPX1pIEAISDAoIWkhfVE9fRU4QAzKoCgoJQUlTZXJ2aWNlEnkKClRyYW5zY3JpYmUSHy5tZW1vcy5hcGkudjEuVHJhbnNjcmliZVJlcXVlc3QaIC5tZW1vcy5hcGkudjEuVHJhbnNjcmliZVJlc3BvbnNlIijaQQVhdWRpb4LT5JMCGjoBKiIVL2FwaS92MS9haTp0cmFuc2NyaWJlEpUBCg5UZXN0QUlQcm92aWRlchIjLm1lbW9zLmFwaS52MS5UZXN0QUlQcm92aWRlclJlcXVlc3QaJC5tZW1vcy5hcGkudjEuVGVzdEFJUHJvdmlkZXJSZXNwb25zZSI42kERcHJvdmlkZXJfaWQsbW9kZWyC0+STAh46ASoiGS9hcGkvdjEvYWkvcHJvdmlkZXJzOnRlc3QSfgoJVHJhbnNsYXRlEh4ubWVtb3MuYXBpLnYxLlRyYW5zbGF0ZVJlcXVlc3QaHy5tZW1vcy5hcGkudjEuVHJhbnNsYXRlUmVzcG9uc2UiMNpBDnRleHQsZGlyZWN0aW9ugtPkkwIZOgEqIhQvYXBpL3YxL2FpOnRyYW5zbGF0ZRLeAQohR2VuZXJhdGVUcmFuc2xhdGlvblByYWN0aWNlTGVzc29uEjYubWVtb3MuYXBpLnYxLkdlbmVyYXRlVHJhbnNsYXRpb25QcmFjdGljZUxlc3NvblJlcXVlc3QaNy5tZW1vcy5hcGkudjEuR2VuZXJhdGVUcmFuc2xhdGlvblByYWN0aWNlTGVzc29uUmVzcG9uc2UiSNpBDG1lbW9fY29udGVudILT5JMCMzoBKiIuL2FwaS92MS9haS90cmFuc2xhdGlvbi1wcmFjdGljZTpnZW5lcmF0ZUxlc3NvbhLYAQoeUmV2aWV3VHJhbnNsYXRpb25QcmFjdGljZURyYWZ0EjMubWVtb3MuYXBpLnYxLlJldmlld1RyYW5zbGF0aW9uUHJhY3RpY2VEcmFmdFJlcXVlc3QaNC5tZW1vcy5hcGkudjEuUmV2aWV3VHJhbnNsYXRpb25QcmFjdGljZURyYWZ0UmVzcG9uc2UiS9pBEm1lbW9fY29udGVudCxkcmFmdILT5JMCMDoBKiIrL2FwaS92MS9haS90cmFuc2xhdGlvbi1wcmFjdGljZTpyZXZpZXdEcmFmdBKjAQoYTGlzdFRyYW5zbGF0aW9uSGlzdG9yaWVzEi0ubWVtb3MuYXBpLnYxLkxpc3RUcmFuc2xhdGlvbkhpc3Rvcmllc1JlcXVlc3QaLi5tZW1vcy5hcGkudjEuTGlzdFRyYW5zbGF0aW9uSGlzdG9yaWVzUmVzcG9uc2UiKILT5JMCIhIgL2FwaS92MS9haS90cmFuc2xhdGlvbi1oaXN0b3JpZXMSlQEKGERlbGV0ZVRyYW5zbGF0aW9uSGlzdG9yeRItLm1lbW9zLmFwaS52MS5EZWxldGVUcmFuc2xhdGlvbkhpc3RvcnlSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IjLaQQJpZILT5JMCJyolL2FwaS92MS9haS90cmFuc2xhdGlvbi1oaXN0b3JpZXMve2lkfRKNAQoZQ2xlYXJUcmFuc2xhdGlvbkhpc3RvcmllcxIuLm1lbW9zLmFwaS52MS5DbGVhclRyYW5zbGF0aW9uSGlzdG9yaWVzUmVxdWVzdBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIogtPkkwIiKiAvYXBpL3YxL2FpL3RyYW5zbGF0aW9uLWhpc3Rvcmllc0KmAQoQY29tLm1lbW9zLmFwaS52MUIOQWlTZXJ2aWNlUHJvdG9QAVowZ2l0aHViLmNvbS91c2VtZW1vcy9tZW1vcy9wcm90by9nZW4vYXBpL3YxO2FwaXYxogIDTUFYqgIMTWVtb3MuQXBpLlYxygIMTWVtb3NcQXBpXFYx4gIYTWVtb3NcQXBpXFYxXEdQQk1ldGFkYXRh6gIOTWVtb3M6OkFwaTo6VjFiBnByb3RvMw", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_protobuf_empty]);
 
 /**
  * @generated from message memos.api.v1.TranscribeRequest
@@ -221,6 +221,185 @@ export const TranslateResponseSchema: GenMessage<TranslateResponse> = /*@__PURE_
   messageDesc(file_api_v1_ai_service, 6);
 
 /**
+ * @generated from message memos.api.v1.GenerateTranslationPracticeLessonRequest
+ */
+export type GenerateTranslationPracticeLessonRequest = Message<"memos.api.v1.GenerateTranslationPracticeLessonRequest"> & {
+  /**
+   * Required. Source memo content to practice translating into English.
+   *
+   * @generated from field: string memo_content = 1;
+   */
+  memoContent: string;
+
+  /**
+   * Optional. UI locale used for teacher explanations.
+   *
+   * @generated from field: string locale = 2;
+   */
+  locale: string;
+};
+
+/**
+ * Describes the message memos.api.v1.GenerateTranslationPracticeLessonRequest.
+ * Use `create(GenerateTranslationPracticeLessonRequestSchema)` to create a new message.
+ */
+export const GenerateTranslationPracticeLessonRequestSchema: GenMessage<GenerateTranslationPracticeLessonRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 7);
+
+/**
+ * @generated from message memos.api.v1.GenerateTranslationPracticeLessonResponse
+ */
+export type GenerateTranslationPracticeLessonResponse = Message<"memos.api.v1.GenerateTranslationPracticeLessonResponse"> & {
+  /**
+   * @generated from field: memos.api.v1.TranslationPracticeLesson lesson = 1;
+   */
+  lesson?: TranslationPracticeLesson | undefined;
+};
+
+/**
+ * Describes the message memos.api.v1.GenerateTranslationPracticeLessonResponse.
+ * Use `create(GenerateTranslationPracticeLessonResponseSchema)` to create a new message.
+ */
+export const GenerateTranslationPracticeLessonResponseSchema: GenMessage<GenerateTranslationPracticeLessonResponse> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 8);
+
+/**
+ * @generated from message memos.api.v1.ReviewTranslationPracticeDraftRequest
+ */
+export type ReviewTranslationPracticeDraftRequest = Message<"memos.api.v1.ReviewTranslationPracticeDraftRequest"> & {
+  /**
+   * Required. Source memo content being practiced.
+   *
+   * @generated from field: string memo_content = 1;
+   */
+  memoContent: string;
+
+  /**
+   * Required. User's English draft.
+   *
+   * @generated from field: string draft = 2;
+   */
+  draft: string;
+
+  /**
+   * Optional. 1-based attempt count for this memo practice.
+   *
+   * @generated from field: int32 attempt = 3;
+   */
+  attempt: number;
+
+  /**
+   * Optional. UI locale used for teacher explanations.
+   *
+   * @generated from field: string locale = 4;
+   */
+  locale: string;
+};
+
+/**
+ * Describes the message memos.api.v1.ReviewTranslationPracticeDraftRequest.
+ * Use `create(ReviewTranslationPracticeDraftRequestSchema)` to create a new message.
+ */
+export const ReviewTranslationPracticeDraftRequestSchema: GenMessage<ReviewTranslationPracticeDraftRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 9);
+
+/**
+ * @generated from message memos.api.v1.ReviewTranslationPracticeDraftResponse
+ */
+export type ReviewTranslationPracticeDraftResponse = Message<"memos.api.v1.ReviewTranslationPracticeDraftResponse"> & {
+  /**
+   * @generated from field: memos.api.v1.TranslationPracticeFeedback feedback = 1;
+   */
+  feedback?: TranslationPracticeFeedback | undefined;
+};
+
+/**
+ * Describes the message memos.api.v1.ReviewTranslationPracticeDraftResponse.
+ * Use `create(ReviewTranslationPracticeDraftResponseSchema)` to create a new message.
+ */
+export const ReviewTranslationPracticeDraftResponseSchema: GenMessage<ReviewTranslationPracticeDraftResponse> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 10);
+
+/**
+ * @generated from message memos.api.v1.TranslationPracticeLesson
+ */
+export type TranslationPracticeLesson = Message<"memos.api.v1.TranslationPracticeLesson"> & {
+  /**
+   * @generated from field: string goal = 1;
+   */
+  goal: string;
+
+  /**
+   * @generated from field: repeated string words = 2;
+   */
+  words: string[];
+
+  /**
+   * @generated from field: repeated string phrases = 3;
+   */
+  phrases: string[];
+
+  /**
+   * @generated from field: repeated string patterns = 4;
+   */
+  patterns: string[];
+
+  /**
+   * @generated from field: repeated string thinking = 5;
+   */
+  thinking: string[];
+};
+
+/**
+ * Describes the message memos.api.v1.TranslationPracticeLesson.
+ * Use `create(TranslationPracticeLessonSchema)` to create a new message.
+ */
+export const TranslationPracticeLessonSchema: GenMessage<TranslationPracticeLesson> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 11);
+
+/**
+ * @generated from message memos.api.v1.TranslationPracticeFeedback
+ */
+export type TranslationPracticeFeedback = Message<"memos.api.v1.TranslationPracticeFeedback"> & {
+  /**
+   * @generated from field: bool passed = 1;
+   */
+  passed: boolean;
+
+  /**
+   * @generated from field: string summary = 2;
+   */
+  summary: string;
+
+  /**
+   * @generated from field: repeated string strengths = 3;
+   */
+  strengths: string[];
+
+  /**
+   * @generated from field: repeated string improvements = 4;
+   */
+  improvements: string[];
+
+  /**
+   * @generated from field: string next_target = 5;
+   */
+  nextTarget: string;
+
+  /**
+   * @generated from field: string native_version = 6;
+   */
+  nativeVersion: string;
+};
+
+/**
+ * Describes the message memos.api.v1.TranslationPracticeFeedback.
+ * Use `create(TranslationPracticeFeedbackSchema)` to create a new message.
+ */
+export const TranslationPracticeFeedbackSchema: GenMessage<TranslationPracticeFeedback> = /*@__PURE__*/
+  messageDesc(file_api_v1_ai_service, 12);
+
+/**
  * @generated from message memos.api.v1.TranslationHistory
  */
 export type TranslationHistory = Message<"memos.api.v1.TranslationHistory"> & {
@@ -265,7 +444,7 @@ export type TranslationHistory = Message<"memos.api.v1.TranslationHistory"> & {
  * Use `create(TranslationHistorySchema)` to create a new message.
  */
 export const TranslationHistorySchema: GenMessage<TranslationHistory> = /*@__PURE__*/
-  messageDesc(file_api_v1_ai_service, 7);
+  messageDesc(file_api_v1_ai_service, 13);
 
 /**
  * @generated from message memos.api.v1.ListTranslationHistoriesRequest
@@ -291,7 +470,7 @@ export type ListTranslationHistoriesRequest = Message<"memos.api.v1.ListTranslat
  * Use `create(ListTranslationHistoriesRequestSchema)` to create a new message.
  */
 export const ListTranslationHistoriesRequestSchema: GenMessage<ListTranslationHistoriesRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_ai_service, 8);
+  messageDesc(file_api_v1_ai_service, 14);
 
 /**
  * @generated from message memos.api.v1.ListTranslationHistoriesResponse
@@ -313,7 +492,7 @@ export type ListTranslationHistoriesResponse = Message<"memos.api.v1.ListTransla
  * Use `create(ListTranslationHistoriesResponseSchema)` to create a new message.
  */
 export const ListTranslationHistoriesResponseSchema: GenMessage<ListTranslationHistoriesResponse> = /*@__PURE__*/
-  messageDesc(file_api_v1_ai_service, 9);
+  messageDesc(file_api_v1_ai_service, 15);
 
 /**
  * @generated from message memos.api.v1.DeleteTranslationHistoryRequest
@@ -330,7 +509,7 @@ export type DeleteTranslationHistoryRequest = Message<"memos.api.v1.DeleteTransl
  * Use `create(DeleteTranslationHistoryRequestSchema)` to create a new message.
  */
 export const DeleteTranslationHistoryRequestSchema: GenMessage<DeleteTranslationHistoryRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_ai_service, 10);
+  messageDesc(file_api_v1_ai_service, 16);
 
 /**
  * @generated from message memos.api.v1.ClearTranslationHistoriesRequest
@@ -343,7 +522,7 @@ export type ClearTranslationHistoriesRequest = Message<"memos.api.v1.ClearTransl
  * Use `create(ClearTranslationHistoriesRequestSchema)` to create a new message.
  */
 export const ClearTranslationHistoriesRequestSchema: GenMessage<ClearTranslationHistoriesRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_ai_service, 11);
+  messageDesc(file_api_v1_ai_service, 17);
 
 /**
  * @generated from enum memos.api.v1.TranslationDirection
@@ -414,6 +593,28 @@ export const AIService: GenService<{
     methodKind: "unary";
     input: typeof TranslateRequestSchema;
     output: typeof TranslateResponseSchema;
+  },
+  /**
+   * GenerateTranslationPracticeLesson prepares expression tools for translating
+   * a memo during review.
+   *
+   * @generated from rpc memos.api.v1.AIService.GenerateTranslationPracticeLesson
+   */
+  generateTranslationPracticeLesson: {
+    methodKind: "unary";
+    input: typeof GenerateTranslationPracticeLessonRequestSchema;
+    output: typeof GenerateTranslationPracticeLessonResponseSchema;
+  },
+  /**
+   * ReviewTranslationPracticeDraft reviews a user's English draft for a memo
+   * translation practice.
+   *
+   * @generated from rpc memos.api.v1.AIService.ReviewTranslationPracticeDraft
+   */
+  reviewTranslationPracticeDraft: {
+    methodKind: "unary";
+    input: typeof ReviewTranslationPracticeDraftRequestSchema;
+    output: typeof ReviewTranslationPracticeDraftResponseSchema;
   },
   /**
    * ListTranslationHistories lists the current user's translation history.

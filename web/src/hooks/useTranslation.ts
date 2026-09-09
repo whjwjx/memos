@@ -3,9 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { aiServiceClient } from "@/connect";
 import {
   DeleteTranslationHistoryRequestSchema,
+  GenerateTranslationPracticeLessonRequestSchema,
   ListTranslationHistoriesRequestSchema,
+  ReviewTranslationPracticeDraftRequestSchema,
   TranslateRequestSchema,
   type TranslationDirection,
+  type TranslationPracticeFeedback,
+  type TranslationPracticeLesson,
 } from "@/types/proto/api/v1/ai_service_pb";
 
 export const translationKeys = {
@@ -40,6 +44,47 @@ export const useTranslateText = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: translationKeys.histories });
+    },
+  });
+};
+
+export const useGenerateTranslationPracticeLesson = () => {
+  return useMutation({
+    mutationFn: async (input: { memoContent: string; locale: string }): Promise<TranslationPracticeLesson> => {
+      const response = await aiServiceClient.generateTranslationPracticeLesson(
+        create(GenerateTranslationPracticeLessonRequestSchema, {
+          memoContent: input.memoContent,
+          locale: input.locale,
+        }),
+      );
+      if (!response.lesson) {
+        throw new Error("translation practice lesson response missing lesson");
+      }
+      return response.lesson;
+    },
+  });
+};
+
+export const useReviewTranslationPracticeDraft = () => {
+  return useMutation({
+    mutationFn: async (input: {
+      memoContent: string;
+      draft: string;
+      attempt: number;
+      locale: string;
+    }): Promise<TranslationPracticeFeedback> => {
+      const response = await aiServiceClient.reviewTranslationPracticeDraft(
+        create(ReviewTranslationPracticeDraftRequestSchema, {
+          memoContent: input.memoContent,
+          draft: input.draft,
+          attempt: input.attempt,
+          locale: input.locale,
+        }),
+      );
+      if (!response.feedback) {
+        throw new Error("translation practice review response missing feedback");
+      }
+      return response.feedback;
     },
   });
 };

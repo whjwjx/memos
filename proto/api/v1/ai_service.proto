@@ -40,6 +40,26 @@ service AIService {
     option (google.api.method_signature) = "text,direction";
   }
 
+  // GenerateTranslationPracticeLesson prepares expression tools for translating
+  // a memo during review.
+  rpc GenerateTranslationPracticeLesson(GenerateTranslationPracticeLessonRequest) returns (GenerateTranslationPracticeLessonResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/translation-practice:generateLesson"
+      body: "*"
+    };
+    option (google.api.method_signature) = "memo_content";
+  }
+
+  // ReviewTranslationPracticeDraft reviews a user's English draft for a memo
+  // translation practice.
+  rpc ReviewTranslationPracticeDraft(ReviewTranslationPracticeDraftRequest) returns (ReviewTranslationPracticeDraftResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/translation-practice:reviewDraft"
+      body: "*"
+    };
+    option (google.api.method_signature) = "memo_content,draft";
+  }
+
   // ListTranslationHistories lists the current user's translation history.
   rpc ListTranslationHistories(ListTranslationHistoriesRequest) returns (ListTranslationHistoriesResponse) {
     option (google.api.http) = {
@@ -132,6 +152,53 @@ message TranslateResponse {
   string source_language = 2;
   string target_language = 3;
   TranslationHistory history = 4;
+}
+
+message GenerateTranslationPracticeLessonRequest {
+  // Required. Source memo content to practice translating into English.
+  string memo_content = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. UI locale used for teacher explanations.
+  string locale = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message GenerateTranslationPracticeLessonResponse {
+  TranslationPracticeLesson lesson = 1;
+}
+
+message ReviewTranslationPracticeDraftRequest {
+  // Required. Source memo content being practiced.
+  string memo_content = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. User's English draft.
+  string draft = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. 1-based attempt count for this memo practice.
+  int32 attempt = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. UI locale used for teacher explanations.
+  string locale = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+message ReviewTranslationPracticeDraftResponse {
+  TranslationPracticeFeedback feedback = 1;
+}
+
+message TranslationPracticeLesson {
+  string goal = 1;
+  repeated string words = 2;
+  repeated string phrases = 3;
+  repeated string patterns = 4;
+  repeated string thinking = 5;
+}
+
+message TranslationPracticeFeedback {
+  bool passed = 1;
+  string summary = 2;
+  repeated string strengths = 3;
+  repeated string improvements = 4;
+  string next_target = 5;
+  string native_version = 6;
 }
 
 message TranslationHistory {
