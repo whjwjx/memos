@@ -20,12 +20,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AIService_Transcribe_FullMethodName                = "/memos.api.v1.AIService/Transcribe"
-	AIService_TestAIProvider_FullMethodName            = "/memos.api.v1.AIService/TestAIProvider"
-	AIService_Translate_FullMethodName                 = "/memos.api.v1.AIService/Translate"
-	AIService_ListTranslationHistories_FullMethodName  = "/memos.api.v1.AIService/ListTranslationHistories"
-	AIService_DeleteTranslationHistory_FullMethodName  = "/memos.api.v1.AIService/DeleteTranslationHistory"
-	AIService_ClearTranslationHistories_FullMethodName = "/memos.api.v1.AIService/ClearTranslationHistories"
+	AIService_Transcribe_FullMethodName                        = "/memos.api.v1.AIService/Transcribe"
+	AIService_TestAIProvider_FullMethodName                    = "/memos.api.v1.AIService/TestAIProvider"
+	AIService_Translate_FullMethodName                         = "/memos.api.v1.AIService/Translate"
+	AIService_GenerateTranslationPracticeLesson_FullMethodName = "/memos.api.v1.AIService/GenerateTranslationPracticeLesson"
+	AIService_ReviewTranslationPracticeDraft_FullMethodName    = "/memos.api.v1.AIService/ReviewTranslationPracticeDraft"
+	AIService_ListTranslationHistories_FullMethodName          = "/memos.api.v1.AIService/ListTranslationHistories"
+	AIService_DeleteTranslationHistory_FullMethodName          = "/memos.api.v1.AIService/DeleteTranslationHistory"
+	AIService_ClearTranslationHistories_FullMethodName         = "/memos.api.v1.AIService/ClearTranslationHistories"
 )
 
 // AIServiceClient is the client API for AIService service.
@@ -41,6 +43,12 @@ type AIServiceClient interface {
 	// Translate translates text between English and Chinese using the configured
 	// instance AI translation provider.
 	Translate(ctx context.Context, in *TranslateRequest, opts ...grpc.CallOption) (*TranslateResponse, error)
+	// GenerateTranslationPracticeLesson prepares expression tools for translating
+	// a memo during review.
+	GenerateTranslationPracticeLesson(ctx context.Context, in *GenerateTranslationPracticeLessonRequest, opts ...grpc.CallOption) (*GenerateTranslationPracticeLessonResponse, error)
+	// ReviewTranslationPracticeDraft reviews a user's English draft for a memo
+	// translation practice.
+	ReviewTranslationPracticeDraft(ctx context.Context, in *ReviewTranslationPracticeDraftRequest, opts ...grpc.CallOption) (*ReviewTranslationPracticeDraftResponse, error)
 	// ListTranslationHistories lists the current user's translation history.
 	ListTranslationHistories(ctx context.Context, in *ListTranslationHistoriesRequest, opts ...grpc.CallOption) (*ListTranslationHistoriesResponse, error)
 	// DeleteTranslationHistory deletes one translation history item owned by the
@@ -83,6 +91,26 @@ func (c *aIServiceClient) Translate(ctx context.Context, in *TranslateRequest, o
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TranslateResponse)
 	err := c.cc.Invoke(ctx, AIService_Translate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) GenerateTranslationPracticeLesson(ctx context.Context, in *GenerateTranslationPracticeLessonRequest, opts ...grpc.CallOption) (*GenerateTranslationPracticeLessonResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateTranslationPracticeLessonResponse)
+	err := c.cc.Invoke(ctx, AIService_GenerateTranslationPracticeLesson_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) ReviewTranslationPracticeDraft(ctx context.Context, in *ReviewTranslationPracticeDraftRequest, opts ...grpc.CallOption) (*ReviewTranslationPracticeDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReviewTranslationPracticeDraftResponse)
+	err := c.cc.Invoke(ctx, AIService_ReviewTranslationPracticeDraft_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +160,12 @@ type AIServiceServer interface {
 	// Translate translates text between English and Chinese using the configured
 	// instance AI translation provider.
 	Translate(context.Context, *TranslateRequest) (*TranslateResponse, error)
+	// GenerateTranslationPracticeLesson prepares expression tools for translating
+	// a memo during review.
+	GenerateTranslationPracticeLesson(context.Context, *GenerateTranslationPracticeLessonRequest) (*GenerateTranslationPracticeLessonResponse, error)
+	// ReviewTranslationPracticeDraft reviews a user's English draft for a memo
+	// translation practice.
+	ReviewTranslationPracticeDraft(context.Context, *ReviewTranslationPracticeDraftRequest) (*ReviewTranslationPracticeDraftResponse, error)
 	// ListTranslationHistories lists the current user's translation history.
 	ListTranslationHistories(context.Context, *ListTranslationHistoriesRequest) (*ListTranslationHistoriesResponse, error)
 	// DeleteTranslationHistory deletes one translation history item owned by the
@@ -158,6 +192,12 @@ func (UnimplementedAIServiceServer) TestAIProvider(context.Context, *TestAIProvi
 }
 func (UnimplementedAIServiceServer) Translate(context.Context, *TranslateRequest) (*TranslateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Translate not implemented")
+}
+func (UnimplementedAIServiceServer) GenerateTranslationPracticeLesson(context.Context, *GenerateTranslationPracticeLessonRequest) (*GenerateTranslationPracticeLessonResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateTranslationPracticeLesson not implemented")
+}
+func (UnimplementedAIServiceServer) ReviewTranslationPracticeDraft(context.Context, *ReviewTranslationPracticeDraftRequest) (*ReviewTranslationPracticeDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReviewTranslationPracticeDraft not implemented")
 }
 func (UnimplementedAIServiceServer) ListTranslationHistories(context.Context, *ListTranslationHistoriesRequest) (*ListTranslationHistoriesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTranslationHistories not implemented")
@@ -243,6 +283,42 @@ func _AIService_Translate_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AIService_GenerateTranslationPracticeLesson_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateTranslationPracticeLessonRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GenerateTranslationPracticeLesson(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_GenerateTranslationPracticeLesson_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GenerateTranslationPracticeLesson(ctx, req.(*GenerateTranslationPracticeLessonRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_ReviewTranslationPracticeDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReviewTranslationPracticeDraftRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).ReviewTranslationPracticeDraft(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_ReviewTranslationPracticeDraft_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).ReviewTranslationPracticeDraft(ctx, req.(*ReviewTranslationPracticeDraftRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AIService_ListTranslationHistories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListTranslationHistoriesRequest)
 	if err := dec(in); err != nil {
@@ -315,6 +391,14 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Translate",
 			Handler:    _AIService_Translate_Handler,
+		},
+		{
+			MethodName: "GenerateTranslationPracticeLesson",
+			Handler:    _AIService_GenerateTranslationPracticeLesson_Handler,
+		},
+		{
+			MethodName: "ReviewTranslationPracticeDraft",
+			Handler:    _AIService_ReviewTranslationPracticeDraft_Handler,
 		},
 		{
 			MethodName: "ListTranslationHistories",

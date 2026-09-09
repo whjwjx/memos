@@ -508,6 +508,380 @@ func (x *TranslateResponse) GetHistory() *TranslationHistory {
 	return nil
 }
 
+type GenerateTranslationPracticeLessonRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. Source memo content to practice translating into English.
+	MemoContent string `protobuf:"bytes,1,opt,name=memo_content,json=memoContent,proto3" json:"memo_content,omitempty"`
+	// Optional. UI locale used for teacher explanations.
+	Locale        string `protobuf:"bytes,2,opt,name=locale,proto3" json:"locale,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GenerateTranslationPracticeLessonRequest) Reset() {
+	*x = GenerateTranslationPracticeLessonRequest{}
+	mi := &file_api_v1_ai_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GenerateTranslationPracticeLessonRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GenerateTranslationPracticeLessonRequest) ProtoMessage() {}
+
+func (x *GenerateTranslationPracticeLessonRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GenerateTranslationPracticeLessonRequest.ProtoReflect.Descriptor instead.
+func (*GenerateTranslationPracticeLessonRequest) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GenerateTranslationPracticeLessonRequest) GetMemoContent() string {
+	if x != nil {
+		return x.MemoContent
+	}
+	return ""
+}
+
+func (x *GenerateTranslationPracticeLessonRequest) GetLocale() string {
+	if x != nil {
+		return x.Locale
+	}
+	return ""
+}
+
+type GenerateTranslationPracticeLessonResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Lesson        *TranslationPracticeLesson `protobuf:"bytes,1,opt,name=lesson,proto3" json:"lesson,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GenerateTranslationPracticeLessonResponse) Reset() {
+	*x = GenerateTranslationPracticeLessonResponse{}
+	mi := &file_api_v1_ai_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GenerateTranslationPracticeLessonResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GenerateTranslationPracticeLessonResponse) ProtoMessage() {}
+
+func (x *GenerateTranslationPracticeLessonResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GenerateTranslationPracticeLessonResponse.ProtoReflect.Descriptor instead.
+func (*GenerateTranslationPracticeLessonResponse) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GenerateTranslationPracticeLessonResponse) GetLesson() *TranslationPracticeLesson {
+	if x != nil {
+		return x.Lesson
+	}
+	return nil
+}
+
+type ReviewTranslationPracticeDraftRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. Source memo content being practiced.
+	MemoContent string `protobuf:"bytes,1,opt,name=memo_content,json=memoContent,proto3" json:"memo_content,omitempty"`
+	// Required. User's English draft.
+	Draft string `protobuf:"bytes,2,opt,name=draft,proto3" json:"draft,omitempty"`
+	// Optional. 1-based attempt count for this memo practice.
+	Attempt int32 `protobuf:"varint,3,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	// Optional. UI locale used for teacher explanations.
+	Locale        string `protobuf:"bytes,4,opt,name=locale,proto3" json:"locale,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewTranslationPracticeDraftRequest) Reset() {
+	*x = ReviewTranslationPracticeDraftRequest{}
+	mi := &file_api_v1_ai_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewTranslationPracticeDraftRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewTranslationPracticeDraftRequest) ProtoMessage() {}
+
+func (x *ReviewTranslationPracticeDraftRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewTranslationPracticeDraftRequest.ProtoReflect.Descriptor instead.
+func (*ReviewTranslationPracticeDraftRequest) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ReviewTranslationPracticeDraftRequest) GetMemoContent() string {
+	if x != nil {
+		return x.MemoContent
+	}
+	return ""
+}
+
+func (x *ReviewTranslationPracticeDraftRequest) GetDraft() string {
+	if x != nil {
+		return x.Draft
+	}
+	return ""
+}
+
+func (x *ReviewTranslationPracticeDraftRequest) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
+func (x *ReviewTranslationPracticeDraftRequest) GetLocale() string {
+	if x != nil {
+		return x.Locale
+	}
+	return ""
+}
+
+type ReviewTranslationPracticeDraftResponse struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Feedback      *TranslationPracticeFeedback `protobuf:"bytes,1,opt,name=feedback,proto3" json:"feedback,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewTranslationPracticeDraftResponse) Reset() {
+	*x = ReviewTranslationPracticeDraftResponse{}
+	mi := &file_api_v1_ai_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewTranslationPracticeDraftResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewTranslationPracticeDraftResponse) ProtoMessage() {}
+
+func (x *ReviewTranslationPracticeDraftResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewTranslationPracticeDraftResponse.ProtoReflect.Descriptor instead.
+func (*ReviewTranslationPracticeDraftResponse) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ReviewTranslationPracticeDraftResponse) GetFeedback() *TranslationPracticeFeedback {
+	if x != nil {
+		return x.Feedback
+	}
+	return nil
+}
+
+type TranslationPracticeLesson struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Goal          string                 `protobuf:"bytes,1,opt,name=goal,proto3" json:"goal,omitempty"`
+	Words         []string               `protobuf:"bytes,2,rep,name=words,proto3" json:"words,omitempty"`
+	Phrases       []string               `protobuf:"bytes,3,rep,name=phrases,proto3" json:"phrases,omitempty"`
+	Patterns      []string               `protobuf:"bytes,4,rep,name=patterns,proto3" json:"patterns,omitempty"`
+	Thinking      []string               `protobuf:"bytes,5,rep,name=thinking,proto3" json:"thinking,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TranslationPracticeLesson) Reset() {
+	*x = TranslationPracticeLesson{}
+	mi := &file_api_v1_ai_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TranslationPracticeLesson) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TranslationPracticeLesson) ProtoMessage() {}
+
+func (x *TranslationPracticeLesson) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TranslationPracticeLesson.ProtoReflect.Descriptor instead.
+func (*TranslationPracticeLesson) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *TranslationPracticeLesson) GetGoal() string {
+	if x != nil {
+		return x.Goal
+	}
+	return ""
+}
+
+func (x *TranslationPracticeLesson) GetWords() []string {
+	if x != nil {
+		return x.Words
+	}
+	return nil
+}
+
+func (x *TranslationPracticeLesson) GetPhrases() []string {
+	if x != nil {
+		return x.Phrases
+	}
+	return nil
+}
+
+func (x *TranslationPracticeLesson) GetPatterns() []string {
+	if x != nil {
+		return x.Patterns
+	}
+	return nil
+}
+
+func (x *TranslationPracticeLesson) GetThinking() []string {
+	if x != nil {
+		return x.Thinking
+	}
+	return nil
+}
+
+type TranslationPracticeFeedback struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Passed        bool                   `protobuf:"varint,1,opt,name=passed,proto3" json:"passed,omitempty"`
+	Summary       string                 `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
+	Strengths     []string               `protobuf:"bytes,3,rep,name=strengths,proto3" json:"strengths,omitempty"`
+	Improvements  []string               `protobuf:"bytes,4,rep,name=improvements,proto3" json:"improvements,omitempty"`
+	NextTarget    string                 `protobuf:"bytes,5,opt,name=next_target,json=nextTarget,proto3" json:"next_target,omitempty"`
+	NativeVersion string                 `protobuf:"bytes,6,opt,name=native_version,json=nativeVersion,proto3" json:"native_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TranslationPracticeFeedback) Reset() {
+	*x = TranslationPracticeFeedback{}
+	mi := &file_api_v1_ai_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TranslationPracticeFeedback) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TranslationPracticeFeedback) ProtoMessage() {}
+
+func (x *TranslationPracticeFeedback) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TranslationPracticeFeedback.ProtoReflect.Descriptor instead.
+func (*TranslationPracticeFeedback) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *TranslationPracticeFeedback) GetPassed() bool {
+	if x != nil {
+		return x.Passed
+	}
+	return false
+}
+
+func (x *TranslationPracticeFeedback) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *TranslationPracticeFeedback) GetStrengths() []string {
+	if x != nil {
+		return x.Strengths
+	}
+	return nil
+}
+
+func (x *TranslationPracticeFeedback) GetImprovements() []string {
+	if x != nil {
+		return x.Improvements
+	}
+	return nil
+}
+
+func (x *TranslationPracticeFeedback) GetNextTarget() string {
+	if x != nil {
+		return x.NextTarget
+	}
+	return ""
+}
+
+func (x *TranslationPracticeFeedback) GetNativeVersion() string {
+	if x != nil {
+		return x.NativeVersion
+	}
+	return ""
+}
+
 type TranslationHistory struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -523,7 +897,7 @@ type TranslationHistory struct {
 
 func (x *TranslationHistory) Reset() {
 	*x = TranslationHistory{}
-	mi := &file_api_v1_ai_service_proto_msgTypes[7]
+	mi := &file_api_v1_ai_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -535,7 +909,7 @@ func (x *TranslationHistory) String() string {
 func (*TranslationHistory) ProtoMessage() {}
 
 func (x *TranslationHistory) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v1_ai_service_proto_msgTypes[7]
+	mi := &file_api_v1_ai_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -548,7 +922,7 @@ func (x *TranslationHistory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TranslationHistory.ProtoReflect.Descriptor instead.
 func (*TranslationHistory) Descriptor() ([]byte, []int) {
-	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{7}
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *TranslationHistory) GetId() string {
@@ -612,7 +986,7 @@ type ListTranslationHistoriesRequest struct {
 
 func (x *ListTranslationHistoriesRequest) Reset() {
 	*x = ListTranslationHistoriesRequest{}
-	mi := &file_api_v1_ai_service_proto_msgTypes[8]
+	mi := &file_api_v1_ai_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -624,7 +998,7 @@ func (x *ListTranslationHistoriesRequest) String() string {
 func (*ListTranslationHistoriesRequest) ProtoMessage() {}
 
 func (x *ListTranslationHistoriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v1_ai_service_proto_msgTypes[8]
+	mi := &file_api_v1_ai_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -637,7 +1011,7 @@ func (x *ListTranslationHistoriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTranslationHistoriesRequest.ProtoReflect.Descriptor instead.
 func (*ListTranslationHistoriesRequest) Descriptor() ([]byte, []int) {
-	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{8}
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListTranslationHistoriesRequest) GetPageSize() int32 {
@@ -664,7 +1038,7 @@ type ListTranslationHistoriesResponse struct {
 
 func (x *ListTranslationHistoriesResponse) Reset() {
 	*x = ListTranslationHistoriesResponse{}
-	mi := &file_api_v1_ai_service_proto_msgTypes[9]
+	mi := &file_api_v1_ai_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -676,7 +1050,7 @@ func (x *ListTranslationHistoriesResponse) String() string {
 func (*ListTranslationHistoriesResponse) ProtoMessage() {}
 
 func (x *ListTranslationHistoriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v1_ai_service_proto_msgTypes[9]
+	mi := &file_api_v1_ai_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -689,7 +1063,7 @@ func (x *ListTranslationHistoriesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTranslationHistoriesResponse.ProtoReflect.Descriptor instead.
 func (*ListTranslationHistoriesResponse) Descriptor() ([]byte, []int) {
-	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{9}
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListTranslationHistoriesResponse) GetHistories() []*TranslationHistory {
@@ -715,7 +1089,7 @@ type DeleteTranslationHistoryRequest struct {
 
 func (x *DeleteTranslationHistoryRequest) Reset() {
 	*x = DeleteTranslationHistoryRequest{}
-	mi := &file_api_v1_ai_service_proto_msgTypes[10]
+	mi := &file_api_v1_ai_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -727,7 +1101,7 @@ func (x *DeleteTranslationHistoryRequest) String() string {
 func (*DeleteTranslationHistoryRequest) ProtoMessage() {}
 
 func (x *DeleteTranslationHistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v1_ai_service_proto_msgTypes[10]
+	mi := &file_api_v1_ai_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -740,7 +1114,7 @@ func (x *DeleteTranslationHistoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTranslationHistoryRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTranslationHistoryRequest) Descriptor() ([]byte, []int) {
-	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{10}
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DeleteTranslationHistoryRequest) GetId() string {
@@ -758,7 +1132,7 @@ type ClearTranslationHistoriesRequest struct {
 
 func (x *ClearTranslationHistoriesRequest) Reset() {
 	*x = ClearTranslationHistoriesRequest{}
-	mi := &file_api_v1_ai_service_proto_msgTypes[11]
+	mi := &file_api_v1_ai_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +1144,7 @@ func (x *ClearTranslationHistoriesRequest) String() string {
 func (*ClearTranslationHistoriesRequest) ProtoMessage() {}
 
 func (x *ClearTranslationHistoriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v1_ai_service_proto_msgTypes[11]
+	mi := &file_api_v1_ai_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +1157,7 @@ func (x *ClearTranslationHistoriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearTranslationHistoriesRequest.ProtoReflect.Descriptor instead.
 func (*ClearTranslationHistoriesRequest) Descriptor() ([]byte, []int) {
-	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{11}
+	return file_api_v1_ai_service_proto_rawDescGZIP(), []int{17}
 }
 
 var File_api_v1_ai_service_proto protoreflect.FileDescriptor
@@ -816,7 +1190,33 @@ const file_api_v1_ai_service_proto_rawDesc = "" +
 	"\x0ftranslated_text\x18\x01 \x01(\tR\x0etranslatedText\x12'\n" +
 	"\x0fsource_language\x18\x02 \x01(\tR\x0esourceLanguage\x12'\n" +
 	"\x0ftarget_language\x18\x03 \x01(\tR\x0etargetLanguage\x12:\n" +
-	"\ahistory\x18\x04 \x01(\v2 .memos.api.v1.TranslationHistoryR\ahistory\"\x84\x02\n" +
+	"\ahistory\x18\x04 \x01(\v2 .memos.api.v1.TranslationHistoryR\ahistory\"o\n" +
+	"(GenerateTranslationPracticeLessonRequest\x12&\n" +
+	"\fmemo_content\x18\x01 \x01(\tB\x03\xe0A\x02R\vmemoContent\x12\x1b\n" +
+	"\x06locale\x18\x02 \x01(\tB\x03\xe0A\x01R\x06locale\"l\n" +
+	")GenerateTranslationPracticeLessonResponse\x12?\n" +
+	"\x06lesson\x18\x01 \x01(\v2'.memos.api.v1.TranslationPracticeLessonR\x06lesson\"\xa6\x01\n" +
+	"%ReviewTranslationPracticeDraftRequest\x12&\n" +
+	"\fmemo_content\x18\x01 \x01(\tB\x03\xe0A\x02R\vmemoContent\x12\x19\n" +
+	"\x05draft\x18\x02 \x01(\tB\x03\xe0A\x02R\x05draft\x12\x1d\n" +
+	"\aattempt\x18\x03 \x01(\x05B\x03\xe0A\x01R\aattempt\x12\x1b\n" +
+	"\x06locale\x18\x04 \x01(\tB\x03\xe0A\x01R\x06locale\"o\n" +
+	"&ReviewTranslationPracticeDraftResponse\x12E\n" +
+	"\bfeedback\x18\x01 \x01(\v2).memos.api.v1.TranslationPracticeFeedbackR\bfeedback\"\x97\x01\n" +
+	"\x19TranslationPracticeLesson\x12\x12\n" +
+	"\x04goal\x18\x01 \x01(\tR\x04goal\x12\x14\n" +
+	"\x05words\x18\x02 \x03(\tR\x05words\x12\x18\n" +
+	"\aphrases\x18\x03 \x03(\tR\aphrases\x12\x1a\n" +
+	"\bpatterns\x18\x04 \x03(\tR\bpatterns\x12\x1a\n" +
+	"\bthinking\x18\x05 \x03(\tR\bthinking\"\xd9\x01\n" +
+	"\x1bTranslationPracticeFeedback\x12\x16\n" +
+	"\x06passed\x18\x01 \x01(\bR\x06passed\x12\x18\n" +
+	"\asummary\x18\x02 \x01(\tR\asummary\x12\x1c\n" +
+	"\tstrengths\x18\x03 \x03(\tR\tstrengths\x12\"\n" +
+	"\fimprovements\x18\x04 \x03(\tR\fimprovements\x12\x1f\n" +
+	"\vnext_target\x18\x05 \x01(\tR\n" +
+	"nextTarget\x12%\n" +
+	"\x0enative_version\x18\x06 \x01(\tR\rnativeVersion\"\x84\x02\n" +
 	"\x12TranslationHistory\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tB\x03\xe0A\x03R\x04name\x12\x1f\n" +
@@ -841,12 +1241,15 @@ const file_api_v1_ai_service_proto_rawDesc = "" +
 	"!TRANSLATION_DIRECTION_UNSPECIFIED\x10\x00\x12\b\n" +
 	"\x04AUTO\x10\x01\x12\f\n" +
 	"\bEN_TO_ZH\x10\x02\x12\f\n" +
-	"\bZH_TO_EN\x10\x032\xec\x06\n" +
+	"\bZH_TO_EN\x10\x032\xa8\n" +
+	"\n" +
 	"\tAIService\x12y\n" +
 	"\n" +
 	"Transcribe\x12\x1f.memos.api.v1.TranscribeRequest\x1a .memos.api.v1.TranscribeResponse\"(\xdaA\x05audio\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/ai:transcribe\x12\x95\x01\n" +
 	"\x0eTestAIProvider\x12#.memos.api.v1.TestAIProviderRequest\x1a$.memos.api.v1.TestAIProviderResponse\"8\xdaA\x11provider_id,model\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/api/v1/ai/providers:test\x12~\n" +
-	"\tTranslate\x12\x1e.memos.api.v1.TranslateRequest\x1a\x1f.memos.api.v1.TranslateResponse\"0\xdaA\x0etext,direction\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/ai:translate\x12\xa3\x01\n" +
+	"\tTranslate\x12\x1e.memos.api.v1.TranslateRequest\x1a\x1f.memos.api.v1.TranslateResponse\"0\xdaA\x0etext,direction\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/ai:translate\x12\xde\x01\n" +
+	"!GenerateTranslationPracticeLesson\x126.memos.api.v1.GenerateTranslationPracticeLessonRequest\x1a7.memos.api.v1.GenerateTranslationPracticeLessonResponse\"H\xdaA\fmemo_content\x82\xd3\xe4\x93\x023:\x01*\"./api/v1/ai/translation-practice:generateLesson\x12\xd8\x01\n" +
+	"\x1eReviewTranslationPracticeDraft\x123.memos.api.v1.ReviewTranslationPracticeDraftRequest\x1a4.memos.api.v1.ReviewTranslationPracticeDraftResponse\"K\xdaA\x12memo_content,draft\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/ai/translation-practice:reviewDraft\x12\xa3\x01\n" +
 	"\x18ListTranslationHistories\x12-.memos.api.v1.ListTranslationHistoriesRequest\x1a..memos.api.v1.ListTranslationHistoriesResponse\"(\x82\xd3\xe4\x93\x02\"\x12 /api/v1/ai/translation-histories\x12\x95\x01\n" +
 	"\x18DeleteTranslationHistory\x12-.memos.api.v1.DeleteTranslationHistoryRequest\x1a\x16.google.protobuf.Empty\"2\xdaA\x02id\x82\xd3\xe4\x93\x02'*%/api/v1/ai/translation-histories/{id}\x12\x8d\x01\n" +
 	"\x19ClearTranslationHistories\x12..memos.api.v1.ClearTranslationHistoriesRequest\x1a\x16.google.protobuf.Empty\"(\x82\xd3\xe4\x93\x02\"* /api/v1/ai/translation-historiesB\xa6\x01\n" +
@@ -865,45 +1268,57 @@ func file_api_v1_ai_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v1_ai_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_v1_ai_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_api_v1_ai_service_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_api_v1_ai_service_proto_goTypes = []any{
-	(TranslationDirection)(0),                // 0: memos.api.v1.TranslationDirection
-	(*TranscribeRequest)(nil),                // 1: memos.api.v1.TranscribeRequest
-	(*TranscriptionAudio)(nil),               // 2: memos.api.v1.TranscriptionAudio
-	(*TranscribeResponse)(nil),               // 3: memos.api.v1.TranscribeResponse
-	(*TestAIProviderRequest)(nil),            // 4: memos.api.v1.TestAIProviderRequest
-	(*TestAIProviderResponse)(nil),           // 5: memos.api.v1.TestAIProviderResponse
-	(*TranslateRequest)(nil),                 // 6: memos.api.v1.TranslateRequest
-	(*TranslateResponse)(nil),                // 7: memos.api.v1.TranslateResponse
-	(*TranslationHistory)(nil),               // 8: memos.api.v1.TranslationHistory
-	(*ListTranslationHistoriesRequest)(nil),  // 9: memos.api.v1.ListTranslationHistoriesRequest
-	(*ListTranslationHistoriesResponse)(nil), // 10: memos.api.v1.ListTranslationHistoriesResponse
-	(*DeleteTranslationHistoryRequest)(nil),  // 11: memos.api.v1.DeleteTranslationHistoryRequest
-	(*ClearTranslationHistoriesRequest)(nil), // 12: memos.api.v1.ClearTranslationHistoriesRequest
-	(*emptypb.Empty)(nil),                    // 13: google.protobuf.Empty
+	(TranslationDirection)(0),                         // 0: memos.api.v1.TranslationDirection
+	(*TranscribeRequest)(nil),                         // 1: memos.api.v1.TranscribeRequest
+	(*TranscriptionAudio)(nil),                        // 2: memos.api.v1.TranscriptionAudio
+	(*TranscribeResponse)(nil),                        // 3: memos.api.v1.TranscribeResponse
+	(*TestAIProviderRequest)(nil),                     // 4: memos.api.v1.TestAIProviderRequest
+	(*TestAIProviderResponse)(nil),                    // 5: memos.api.v1.TestAIProviderResponse
+	(*TranslateRequest)(nil),                          // 6: memos.api.v1.TranslateRequest
+	(*TranslateResponse)(nil),                         // 7: memos.api.v1.TranslateResponse
+	(*GenerateTranslationPracticeLessonRequest)(nil),  // 8: memos.api.v1.GenerateTranslationPracticeLessonRequest
+	(*GenerateTranslationPracticeLessonResponse)(nil), // 9: memos.api.v1.GenerateTranslationPracticeLessonResponse
+	(*ReviewTranslationPracticeDraftRequest)(nil),     // 10: memos.api.v1.ReviewTranslationPracticeDraftRequest
+	(*ReviewTranslationPracticeDraftResponse)(nil),    // 11: memos.api.v1.ReviewTranslationPracticeDraftResponse
+	(*TranslationPracticeLesson)(nil),                 // 12: memos.api.v1.TranslationPracticeLesson
+	(*TranslationPracticeFeedback)(nil),               // 13: memos.api.v1.TranslationPracticeFeedback
+	(*TranslationHistory)(nil),                        // 14: memos.api.v1.TranslationHistory
+	(*ListTranslationHistoriesRequest)(nil),           // 15: memos.api.v1.ListTranslationHistoriesRequest
+	(*ListTranslationHistoriesResponse)(nil),          // 16: memos.api.v1.ListTranslationHistoriesResponse
+	(*DeleteTranslationHistoryRequest)(nil),           // 17: memos.api.v1.DeleteTranslationHistoryRequest
+	(*ClearTranslationHistoriesRequest)(nil),          // 18: memos.api.v1.ClearTranslationHistoriesRequest
+	(*emptypb.Empty)(nil),                             // 19: google.protobuf.Empty
 }
 var file_api_v1_ai_service_proto_depIdxs = []int32{
 	2,  // 0: memos.api.v1.TranscribeRequest.audio:type_name -> memos.api.v1.TranscriptionAudio
 	0,  // 1: memos.api.v1.TranslateRequest.direction:type_name -> memos.api.v1.TranslationDirection
-	8,  // 2: memos.api.v1.TranslateResponse.history:type_name -> memos.api.v1.TranslationHistory
-	8,  // 3: memos.api.v1.ListTranslationHistoriesResponse.histories:type_name -> memos.api.v1.TranslationHistory
-	1,  // 4: memos.api.v1.AIService.Transcribe:input_type -> memos.api.v1.TranscribeRequest
-	4,  // 5: memos.api.v1.AIService.TestAIProvider:input_type -> memos.api.v1.TestAIProviderRequest
-	6,  // 6: memos.api.v1.AIService.Translate:input_type -> memos.api.v1.TranslateRequest
-	9,  // 7: memos.api.v1.AIService.ListTranslationHistories:input_type -> memos.api.v1.ListTranslationHistoriesRequest
-	11, // 8: memos.api.v1.AIService.DeleteTranslationHistory:input_type -> memos.api.v1.DeleteTranslationHistoryRequest
-	12, // 9: memos.api.v1.AIService.ClearTranslationHistories:input_type -> memos.api.v1.ClearTranslationHistoriesRequest
-	3,  // 10: memos.api.v1.AIService.Transcribe:output_type -> memos.api.v1.TranscribeResponse
-	5,  // 11: memos.api.v1.AIService.TestAIProvider:output_type -> memos.api.v1.TestAIProviderResponse
-	7,  // 12: memos.api.v1.AIService.Translate:output_type -> memos.api.v1.TranslateResponse
-	10, // 13: memos.api.v1.AIService.ListTranslationHistories:output_type -> memos.api.v1.ListTranslationHistoriesResponse
-	13, // 14: memos.api.v1.AIService.DeleteTranslationHistory:output_type -> google.protobuf.Empty
-	13, // 15: memos.api.v1.AIService.ClearTranslationHistories:output_type -> google.protobuf.Empty
-	10, // [10:16] is the sub-list for method output_type
-	4,  // [4:10] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	14, // 2: memos.api.v1.TranslateResponse.history:type_name -> memos.api.v1.TranslationHistory
+	12, // 3: memos.api.v1.GenerateTranslationPracticeLessonResponse.lesson:type_name -> memos.api.v1.TranslationPracticeLesson
+	13, // 4: memos.api.v1.ReviewTranslationPracticeDraftResponse.feedback:type_name -> memos.api.v1.TranslationPracticeFeedback
+	14, // 5: memos.api.v1.ListTranslationHistoriesResponse.histories:type_name -> memos.api.v1.TranslationHistory
+	1,  // 6: memos.api.v1.AIService.Transcribe:input_type -> memos.api.v1.TranscribeRequest
+	4,  // 7: memos.api.v1.AIService.TestAIProvider:input_type -> memos.api.v1.TestAIProviderRequest
+	6,  // 8: memos.api.v1.AIService.Translate:input_type -> memos.api.v1.TranslateRequest
+	8,  // 9: memos.api.v1.AIService.GenerateTranslationPracticeLesson:input_type -> memos.api.v1.GenerateTranslationPracticeLessonRequest
+	10, // 10: memos.api.v1.AIService.ReviewTranslationPracticeDraft:input_type -> memos.api.v1.ReviewTranslationPracticeDraftRequest
+	15, // 11: memos.api.v1.AIService.ListTranslationHistories:input_type -> memos.api.v1.ListTranslationHistoriesRequest
+	17, // 12: memos.api.v1.AIService.DeleteTranslationHistory:input_type -> memos.api.v1.DeleteTranslationHistoryRequest
+	18, // 13: memos.api.v1.AIService.ClearTranslationHistories:input_type -> memos.api.v1.ClearTranslationHistoriesRequest
+	3,  // 14: memos.api.v1.AIService.Transcribe:output_type -> memos.api.v1.TranscribeResponse
+	5,  // 15: memos.api.v1.AIService.TestAIProvider:output_type -> memos.api.v1.TestAIProviderResponse
+	7,  // 16: memos.api.v1.AIService.Translate:output_type -> memos.api.v1.TranslateResponse
+	9,  // 17: memos.api.v1.AIService.GenerateTranslationPracticeLesson:output_type -> memos.api.v1.GenerateTranslationPracticeLessonResponse
+	11, // 18: memos.api.v1.AIService.ReviewTranslationPracticeDraft:output_type -> memos.api.v1.ReviewTranslationPracticeDraftResponse
+	16, // 19: memos.api.v1.AIService.ListTranslationHistories:output_type -> memos.api.v1.ListTranslationHistoriesResponse
+	19, // 20: memos.api.v1.AIService.DeleteTranslationHistory:output_type -> google.protobuf.Empty
+	19, // 21: memos.api.v1.AIService.ClearTranslationHistories:output_type -> google.protobuf.Empty
+	14, // [14:22] is the sub-list for method output_type
+	6,  // [6:14] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_api_v1_ai_service_proto_init() }
@@ -921,7 +1336,7 @@ func file_api_v1_ai_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v1_ai_service_proto_rawDesc), len(file_api_v1_ai_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

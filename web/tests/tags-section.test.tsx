@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,12 +18,16 @@ describe("TagsSection", () => {
   });
 
   it("keeps the title count-free and uses the shared section action grammar", () => {
+    const queryClient = new QueryClient();
+
     render(
-      <MemoryRouter>
-        <MemoFilterProvider>
-          <TagsSection tagCount={{ a: 2, "a/b": 1 }} scope="home" />
-        </MemoFilterProvider>
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <MemoFilterProvider>
+            <TagsSection tagCount={{ a: 2, "a/b": 1 }} scope="home" />
+          </MemoFilterProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     const heading = screen.getByRole("heading", { name: "common.tags", level: 2 });

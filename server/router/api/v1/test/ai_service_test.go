@@ -187,3 +187,123 @@ func TestTranslate(t *testing.T) {
 		require.Contains(t, err.Error(), "text is too long")
 	})
 }
+
+func TestTranslationPractice(t *testing.T) {
+	ctx := context.Background()
+	ts := NewTestService(t)
+	defer ts.Cleanup()
+
+	user, err := ts.CreateRegularUser(ctx, "translation-practice-alice")
+	require.NoError(t, err)
+	userCtx := ts.CreateUserContext(ctx, user.ID)
+
+	requestCount := 0
+	openAIServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/chat/completions", r.URL.Path)
+		require.Equal(t, "Bearer sk-test", r.Header.Get("Authorization"))
+
+		var request struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
+		require.Equal(t, "gpt-4o-mini", request.Model)
+		require.Len(t, request.Messages, 2)
+		require.Equal(t, "system", request.Messages[0].Role)
+		require.Equal(t, "user", request.Messages[1].Role)
+
+		requestCount++
+		var content string
+		switch requestCount {
+		case 1:
+			require.Contains(t, request.Messages[0].Content, "Prepare a short translation practice lesson")
+			require.Contains(t, request.Messages[1].Content, "今天想整理英语单词")
+			content = `{
+				"goal": "先把想法拆成自然英文。",
+				"words": ["notice: 注意到", "review: 回顾"],
+				"phrases": ["turn this into practice", "make it easier to remember"],
+				"patterns": ["I noticed that ...", "I want to ..."],
+				"thinking": ["先找主语", "再找动作"]
+			}`
+		case 2:
+			require.Contains(t, request.Messages[0].Content, "Review the user's English draft")
+			require.Contains(t, request.Messages[1].Content, "I want to review English words today.")
+			content = `{
+				"passed": true,
+				"summary": "这版已经表达清楚。",
+				"strengths": ["主语清楚"],
+				"improvements": ["可以让动词更具体"],
+				"next_target": "继续保留自然语序。",
+				"native_version": "I want to turn today's English words into a small review practice."
+			}`
+		default:
+			t.Fatalf("unexpected request count %d", requestCount)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message":       map[string]any{"role": "assistant", "content": content},
+					"finish_reason": "stop",
+				},
+			},
+		}))
+	}))
+	defer openAIServer.Close()
+
+	_, err = ts.Store.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
+		Key: storepb.InstanceSettingKey_AI,
+		Value: &storepb.InstanceSetting_AiSetting{
+			AiSetting: &storepb.InstanceAISetting{
+				Providers: []*storepb.AIProviderConfig{
+					{
+						Id:       "openai-main",
+						Title:    "OpenAI",
+						Type:     storepb.AIProviderType_OPENAI,
+						Endpoint: openAIServer.URL,
+						ApiKey:   "sk-test",
+					},
+				},
+				Llms: []*storepb.LLMConfig{
+					{
+						Id:         "teacher-llm",
+						Title:      "Teacher",
+						ProviderId: "openai-main",
+						Model:      "gpt-4o-mini",
+						Enabled:    true,
+					},
+				},
+				Translation: &storepb.TranslationConfig{
+					Enabled:       true,
+					LlmId:         "teacher-llm",
+					MaxTextLength: 200,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	lessonResp, err := ts.Service.GenerateTranslationPracticeLesson(userCtx, &v1pb.GenerateTranslationPracticeLessonRequest{
+		MemoContent: "今天想整理英语单词",
+		Locale:      "zh-Hans",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "先把想法拆成自然英文。", lessonResp.GetLesson().GetGoal())
+	require.Contains(t, lessonResp.GetLesson().GetPatterns(), "I noticed that ...")
+
+	feedbackResp, err := ts.Service.ReviewTranslationPracticeDraft(userCtx, &v1pb.ReviewTranslationPracticeDraftRequest{
+		MemoContent: "今天想整理英语单词",
+		Draft:       "I want to review English words today.",
+		Attempt:     1,
+		Locale:      "zh-Hans",
+	})
+	require.NoError(t, err)
+	require.True(t, feedbackResp.GetFeedback().GetPassed())
+	require.Contains(t, feedbackResp.GetFeedback().GetNativeVersion(), "small review practice")
+	require.Equal(t, 2, requestCount)
+}

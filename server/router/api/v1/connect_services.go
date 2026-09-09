@@ -619,6 +619,22 @@ func (s *ConnectServiceHandler) Translate(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) GenerateTranslationPracticeLesson(ctx context.Context, req *connect.Request[v1pb.GenerateTranslationPracticeLessonRequest]) (*connect.Response[v1pb.GenerateTranslationPracticeLessonResponse], error) {
+	resp, err := s.APIV1Service.GenerateTranslationPracticeLesson(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ReviewTranslationPracticeDraft(ctx context.Context, req *connect.Request[v1pb.ReviewTranslationPracticeDraftRequest]) (*connect.Response[v1pb.ReviewTranslationPracticeDraftResponse], error) {
+	resp, err := s.APIV1Service.ReviewTranslationPracticeDraft(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 func (s *ConnectServiceHandler) ListTranslationHistories(ctx context.Context, req *connect.Request[v1pb.ListTranslationHistoriesRequest]) (*connect.Response[v1pb.ListTranslationHistoriesResponse], error) {
 	resp, err := s.APIV1Service.ListTranslationHistories(ctx, req.Msg)
 	if err != nil {
