@@ -173,6 +173,7 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
   const memoExcerpt = useMemo(() => compactText(memoContent, 180), [memoContent]);
   const canSubmit = draft.trim().length > 0 && phase !== "reviewing";
   const canSave = memo && feedback?.passed && phase !== "saved" && !createMemo.isPending;
+  const showFooter = phase === "passed" || phase === "saved";
 
   useEffect(() => {
     if (!open || !memo) {
@@ -366,17 +367,14 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
           )}
         </div>
 
-        <SheetFooter className="border-t border-border/70 p-4">
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={handleSave} disabled={!canSave}>
+        {showFooter && (
+          <SheetFooter className="border-t border-border/70 p-4">
+            <Button className="w-full" onClick={handleSave} disabled={!canSave}>
               {createMemo.isPending ? <LoaderCircleIcon className="size-4 animate-spin" /> : <SaveIcon className="size-4" />}
               {phase === "saved" ? t("review.translation-practice.saved") : t("review.translation-practice.save-material")}
             </Button>
-          </div>
-        </SheetFooter>
+          </SheetFooter>
+        )}
       </SheetContent>
     </Sheet>
   );
