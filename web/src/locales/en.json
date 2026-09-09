@@ -620,11 +620,13 @@
     "today-count": "{{count}} today",
     "translation-practice": {
       "ask-teacher": "Ask teacher",
+      "collapse-tips": "Collapse",
       "current-memo": "Current memo",
       "description": "Learn a few usable expressions, then write your version.",
       "draft-placeholder": "Try expressing this memo in English. It does not need to be perfect yet. Focus on using the words, phrases, and patterns above.",
       "empty-memo": "this memo",
       "entry": "Translation practice",
+      "expand-tips": "Expand",
       "feedback-improvement-1": "For the next version, split long Chinese-style thoughts into 2 or 3 shorter English sentences.",
       "feedback-improvement-2": "Avoid word-for-word translation. Prioritize the real meaning and tone.",
       "feedback-improvements": "What to improve",

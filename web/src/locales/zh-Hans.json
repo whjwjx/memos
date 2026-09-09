@@ -545,11 +545,13 @@
     "today-count": "今日 {{count}} 条",
     "translation-practice": {
       "ask-teacher": "问一下老师",
+      "collapse-tips": "收起",
       "current-memo": "当前 memo",
       "description": "先学几个可用表达，再写一版。",
       "draft-placeholder": "试着把这条 memo 用英文表达出来。先不用完美，重点是用上上面的词、短语和句型。",
       "empty-memo": "这条 memo",
       "entry": "翻译练习",
+      "expand-tips": "展开",
       "feedback-improvement-1": "下一版先把中文长句拆成 2 到 3 个英文短句。",
       "feedback-improvement-2": "尽量少逐字翻译，优先表达真实意思和语气。",
       "feedback-improvements": "可以优化",

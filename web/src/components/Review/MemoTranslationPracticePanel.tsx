@@ -3,6 +3,7 @@ import {
   ArrowRightIcon,
   BookOpenTextIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   GraduationCapIcon,
   HelpCircleIcon,
   LightbulbIcon,
@@ -168,6 +169,7 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
   const [feedback, setFeedback] = useState<TeacherFeedback>();
   const [attempt, setAttempt] = useState(0);
   const [hint, setHint] = useState("");
+  const [lessonExpanded, setLessonExpanded] = useState(true);
 
   const memoContent = memo?.content ?? "";
   const memoExcerpt = useMemo(() => compactText(memoContent, 180), [memoContent]);
@@ -186,6 +188,7 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
     setFeedback(undefined);
     setAttempt(0);
     setHint("");
+    setLessonExpanded(true);
 
     const timer = window.setTimeout(() => {
       setLesson(buildLesson(memo.content, t));
@@ -201,6 +204,7 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
 
   const handleStartPractice = () => {
     setPhase("drafting");
+    setLessonExpanded(false);
     window.setTimeout(() => draftSectionRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 50);
   };
 
@@ -286,19 +290,44 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
                       <LightbulbIcon className="size-4 text-primary" />
                       {t("review.translation-practice.lesson-title")}
                     </div>
-                    {!showDraft && (
-                      <Badge variant="secondary" shape="pill">
-                        {t("review.translation-practice.phase-lesson")}
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {!showDraft && (
+                        <Badge variant="secondary" shape="pill">
+                          {t("review.translation-practice.phase-lesson")}
+                        </Badge>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-muted-foreground"
+                        aria-expanded={lessonExpanded}
+                        onClick={() => setLessonExpanded((expanded) => !expanded)}
+                      >
+                        <span>
+                          {lessonExpanded ? t("review.translation-practice.collapse-tips") : t("review.translation-practice.expand-tips")}
+                        </span>
+                        <ChevronDownIcon className={cn("size-3.5 transition-transform", lessonExpanded && "rotate-180")} />
+                      </Button>
+                    </div>
                   </div>
-                  {!showDraft && <p className="text-sm leading-6 text-foreground">{lesson.goal}</p>}
-                  <div className="grid gap-2">
-                    <ToolChipGroup title={t("review.translation-practice.words")} items={lesson.words.slice(0, showDraft ? 2 : 3)} />
-                    <ToolChipGroup title={t("review.translation-practice.phrases")} items={lesson.phrases.slice(0, showDraft ? 2 : 3)} />
-                    <ToolChipGroup title={t("review.translation-practice.patterns")} items={lesson.patterns.slice(0, showDraft ? 1 : 2)} />
-                  </div>
-                  <p className="rounded-lg bg-background/60 px-3 py-2 text-xs leading-5 text-muted-foreground">{lesson.thinking[0]}</p>
+                  {lessonExpanded && (
+                    <>
+                      {!showDraft && <p className="text-sm leading-6 text-foreground">{lesson.goal}</p>}
+                      <div className="grid gap-2">
+                        <ToolChipGroup title={t("review.translation-practice.words")} items={lesson.words.slice(0, showDraft ? 2 : 3)} />
+                        <ToolChipGroup
+                          title={t("review.translation-practice.phrases")}
+                          items={lesson.phrases.slice(0, showDraft ? 2 : 3)}
+                        />
+                        <ToolChipGroup
+                          title={t("review.translation-practice.patterns")}
+                          items={lesson.patterns.slice(0, showDraft ? 1 : 2)}
+                        />
+                      </div>
+                      <p className="rounded-lg bg-background/60 px-3 py-2 text-xs leading-5 text-muted-foreground">{lesson.thinking[0]}</p>
+                    </>
+                  )}
                 </section>
               )}
 
