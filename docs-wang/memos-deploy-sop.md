@@ -373,6 +373,18 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 备注：本次 C 盘 40.0GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.6；**新增踩坑**：前端资产名哈希可能含连字符（见 9.7）。
 - 备注：本次 C 盘 40.9GB 充足，无需 `go clean -cache`。本次有 DB schema 迁移，回滚时须**同步回滚二进制与备份**（见 9.6）。
 
+### 8.14 部署记录（2026-09-10，凌晨）
+
+> 完整重新部署：纳入 memo translation practice panel（翻译练习面板，含 AI 连接）（`f6d2faef` 流程、`fd2d43f5`/`40919a51` 重构、`c8102851` 可折叠、`64b0bc3c` 接 AI、`5467484f` 打磨、`d12d37d2` merge）。纯前端面板 + 复用现有 AI 接口，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `d12d37d2`（merge memo translation practice panel）。
+- 构建：`pnpm release`（资产 `index-DEhqqfz3.js`，5129 modules）→ `go build`（linux/amd64，102845243 字节 / ≈98.0MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260910_0008/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `bec4bba4`），容器 recreate 时间 `2026-09-10T00:10:22+08:00`（北京时间 9-10 00:10）。
+- 校验：公网前端资产 `index-DEhqqfz3.js` 与构建输出一致（用 9.7 正则 `assets/index-[^"]+\.js`，本次资产名不含连字符，匹配正常）；API `/api/v1/memos?limit=1` 正常；日志无异常、**无 DB 迁移**；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）。
+- 清理：悬空镜像已 `docker image prune -f`（删 `06aba0ac`）；旧备份目录 `memos_data_20260906_1941` 因审批超时未删除（后续手动确认），保留 `20260906_2016` 与 `20260910_0008`。
+- 备注：本次 C 盘 31.5GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.7；**本次无新增踩坑**（9.7 正则校验正常）。
+
 ---
 
 ## 9. 部署踩坑与注意事项
