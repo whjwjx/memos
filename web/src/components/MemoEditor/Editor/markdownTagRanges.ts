@@ -159,8 +159,20 @@ function collectRejectedURLLiteralRanges(
 
   const offset = node.from - REJECTED_URL_PREFIX.length;
   const projected = urlRanges.map((range) => ({ from: range.from + offset, to: range.to + offset }));
+  const rejectedURLSource = source.slice(node.from, node.to);
+  const protocolSeparatorIndex = rejectedURLSource.indexOf("://");
+  const domainDotIndex = rejectedURLSource.indexOf(".");
+  const pathSeparatorIndex = rejectedURLSource.indexOf("/");
+  const urlBoundaryIndex =
+    protocolSeparatorIndex > 0
+      ? protocolSeparatorIndex
+      : domainDotIndex > 0 && (pathSeparatorIndex < 0 || domainDotIndex < pathSeparatorIndex)
+        ? domainDotIndex
+        : -1;
+  const urlBoundaryMarks: SourceRange[] =
+    urlBoundaryIndex > 0 ? [{ from: node.from + urlBoundaryIndex, to: node.from + urlBoundaryIndex + 1 }] : [];
   const emphasisMarks: SourceRange[] = [];
-  if (source.slice(node.from, node.to).includes("_") && source.slice(parent.from, node.from).includes("_")) {
+  if (rejectedURLSource.includes("_") && source.slice(parent.from, node.from).includes("_")) {
     const insertion = node.from - parent.from;
     const contextualSource = source.slice(parent.from, node.from) + REJECTED_URL_PREFIX + source.slice(node.from, node.to);
     const contentFrom = insertion + REJECTED_URL_PREFIX.length;
@@ -175,7 +187,8 @@ function collectRejectedURLLiteralRanges(
       },
     });
   }
-  for (const range of subtractRanges(projected, emphasisMarks)) {
+  const opaqueMarks = [...emphasisMarks, ...urlBoundaryMarks].sort((left, right) => left.from - right.from || left.to - right.to);
+  for (const range of subtractRanges(projected, opaqueMarks)) {
     addClampedRange(ranges, range.from, range.to, from, to);
   }
 }

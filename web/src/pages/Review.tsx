@@ -1,8 +1,18 @@
 import { useDirection } from "@base-ui/react/direction-provider";
-import { ChevronLeftIcon, ChevronRightIcon, LoaderCircleIcon, RefreshCwIcon, Settings2Icon, TagsIcon, TrophyIcon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  LanguagesIcon,
+  LoaderCircleIcon,
+  RefreshCwIcon,
+  Settings2Icon,
+  TagsIcon,
+  TrophyIcon,
+} from "lucide-react";
 import { type CSSProperties, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { MentionResolutionProvider } from "@/components/MemoContent/MentionResolutionContext";
 import MemoView from "@/components/MemoView";
+import { MemoTranslationPracticePanel } from "@/components/Review/MemoTranslationPracticePanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -499,6 +509,7 @@ const Review = () => {
   const reviewSession = useMemo(() => normalizeReviewSession(storedSession), [storedSession]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [translationPracticeOpen, setTranslationPracticeOpen] = useState(false);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const restoredSessionKeyRef = useRef<string | null>(null);
   const pendingSessionRestoreKeyRef = useRef<string | null>(null);
@@ -908,6 +919,17 @@ const Review = () => {
             >
               <Settings2Icon className="size-4" />
             </Button>
+            {activeMemo && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-9 rounded-full bg-background px-3 shadow-xs"
+                onClick={() => setTranslationPracticeOpen(true)}
+              >
+                <LanguagesIcon className="size-4" />
+                {t("review.translation-practice.entry")}
+              </Button>
+            )}
           </div>
 
           <div className="flex h-9 items-center justify-center gap-2">
@@ -947,6 +969,7 @@ const Review = () => {
         onSettingsChange={updateSettings}
         onTagModeChange={handleTagModeChange}
       />
+      <MemoTranslationPracticePanel memo={activeMemo} open={translationPracticeOpen} onOpenChange={setTranslationPracticeOpen} />
     </section>
   );
 };
