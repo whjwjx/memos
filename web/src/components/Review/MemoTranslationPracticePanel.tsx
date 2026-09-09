@@ -10,7 +10,7 @@ import {
   SaveIcon,
   SendIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,9 +145,23 @@ const LessonList = ({ title, items }: { title: string; items: string[] }) => (
   </div>
 );
 
+const ToolChipGroup = ({ title, items }: { title: string; items: string[] }) => (
+  <div>
+    <div className="text-xs font-medium text-muted-foreground">{title}</div>
+    <div className="mt-1.5 flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <span key={item} className="rounded-full border border-border/70 bg-background/80 px-2 py-1 text-xs leading-5 text-foreground">
+          {item}
+        </span>
+      ))}
+    </div>
+  </div>
+);
+
 export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoTranslationPracticePanelProps) => {
   const t = useTranslate();
   const createMemo = useCreateMemo();
+  const draftSectionRef = useRef<HTMLElement>(null);
   const [phase, setPhase] = useState<PracticePhase>("idle");
   const [lesson, setLesson] = useState<PracticeLesson>();
   const [draft, setDraft] = useState("");
@@ -182,6 +196,11 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
 
   const handleAskTeacher = () => {
     setHint(t("review.translation-practice.teacher-hint"));
+  };
+
+  const handleStartPractice = () => {
+    setPhase("drafting");
+    window.setTimeout(() => draftSectionRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 50);
   };
 
   const handleSubmit = () => {
@@ -228,7 +247,7 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
         side="bottom"
         className="h-[88dvh] gap-0 rounded-t-2xl p-0 md:inset-y-0 md:right-0 md:left-auto md:h-full md:w-[30rem] md:max-w-[30rem] md:translate-y-0 md:rounded-none md:border-t-0 md:border-l md:data-ending-style:translate-x-full md:data-starting-style:translate-x-full"
       >
-        <SheetHeader className="border-b border-border/70 px-5 py-4 text-left">
+        <SheetHeader className="border-b border-border/70 px-5 py-3 text-left">
           <div className="flex items-center gap-2 pr-8">
             <GraduationCapIcon className="size-5 text-primary" />
             <SheetTitle>{t("review.translation-practice.title")}</SheetTitle>
@@ -242,17 +261,17 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
               {t("review.translation-practice.no-memo")}
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-                <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border/70 bg-muted/25 px-3 py-2.5">
+                <div className="mb-1.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <BookOpenTextIcon className="size-3.5" />
                   {t("review.translation-practice.current-memo")}
                 </div>
-                <p className="max-h-28 overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{memoExcerpt}</p>
+                <p className="max-h-14 overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{memoExcerpt}</p>
               </div>
 
               {phase === "preparing" && (
-                <div className="flex flex-col items-center rounded-xl border border-border/70 bg-background px-4 py-10 text-center">
+                <div className="flex flex-col items-center rounded-xl border border-border/70 bg-background px-4 py-8 text-center">
                   <LoaderCircleIcon className="size-5 animate-spin text-primary" />
                   <p className="mt-3 text-sm font-medium text-foreground">{t("review.translation-practice.preparing-title")}</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("review.translation-practice.preparing-description")}</p>
@@ -260,37 +279,37 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
               )}
 
               {lesson && phase !== "preparing" && (
-                <section className="space-y-3">
+                <section className={cn("rounded-xl border border-primary/20 bg-primary/5 p-3", showDraft ? "space-y-2" : "space-y-3")}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <LightbulbIcon className="size-4 text-primary" />
                       {t("review.translation-practice.lesson-title")}
                     </div>
-                    <Badge variant="secondary" shape="pill">
-                      {t("review.translation-practice.phase-lesson")}
-                    </Badge>
+                    {!showDraft && (
+                      <Badge variant="secondary" shape="pill">
+                        {t("review.translation-practice.phase-lesson")}
+                      </Badge>
+                    )}
                   </div>
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm leading-6 text-foreground">
-                    {lesson.goal}
+                  {!showDraft && <p className="text-sm leading-6 text-foreground">{lesson.goal}</p>}
+                  <div className="grid gap-2">
+                    <ToolChipGroup title={t("review.translation-practice.words")} items={lesson.words.slice(0, showDraft ? 2 : 3)} />
+                    <ToolChipGroup title={t("review.translation-practice.phrases")} items={lesson.phrases.slice(0, showDraft ? 2 : 3)} />
+                    <ToolChipGroup title={t("review.translation-practice.patterns")} items={lesson.patterns.slice(0, showDraft ? 1 : 2)} />
                   </div>
-                  <div className="grid gap-3">
-                    <LessonList title={t("review.translation-practice.words")} items={lesson.words} />
-                    <LessonList title={t("review.translation-practice.phrases")} items={lesson.phrases} />
-                    <LessonList title={t("review.translation-practice.patterns")} items={lesson.patterns} />
-                    <LessonList title={t("review.translation-practice.thinking")} items={lesson.thinking} />
-                  </div>
+                  <p className="rounded-lg bg-background/60 px-3 py-2 text-xs leading-5 text-muted-foreground">{lesson.thinking[0]}</p>
                 </section>
               )}
 
               {phase === "lesson_ready" && (
-                <Button className="w-full" onClick={() => setPhase("drafting")}>
+                <Button className="w-full" onClick={handleStartPractice}>
                   <ArrowRightIcon className="size-4" />
                   {t("review.translation-practice.start-practice")}
                 </Button>
               )}
 
               {showDraft && (
-                <section className="space-y-3">
+                <section ref={draftSectionRef} className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-medium text-foreground">{t("review.translation-practice.my-draft")}</div>
                     <Badge variant={feedback?.passed ? "default" : "outline"} shape="pill">

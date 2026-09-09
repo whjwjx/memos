@@ -546,7 +546,7 @@
     "translation-practice": {
       "ask-teacher": "问一下老师",
       "current-memo": "当前 memo",
-      "description": "先学表达工具，再自己翻译，最后让 AI 老师批改。",
+      "description": "先学几个可用表达，再写一版。",
       "draft-placeholder": "试着把这条 memo 用英文表达出来。先不用完美，重点是用上上面的词、短语和句型。",
       "empty-memo": "这条 memo",
       "entry": "翻译练习",
@@ -573,7 +573,7 @@
       "lesson-thinking-1": "先找主语：是 I、this、it，还是 the idea。",
       "lesson-thinking-2": "再找动作：noticed、felt、realized、want to、decided to。",
       "lesson-thinking-3": "最后补原因或结果，不要把中文语序原样搬过去。",
-      "lesson-title": "AI 老师备课",
+      "lesson-title": "AI 老师先教你",
       "lesson-word-1": "notice：注意到、意识到",
       "lesson-word-2": "reminder：提醒、值得记住的点",
       "lesson-word-3": "approach：做事方式、处理思路",

@@ -621,7 +621,7 @@
     "translation-practice": {
       "ask-teacher": "Ask teacher",
       "current-memo": "Current memo",
-      "description": "Learn the expression tools first, write your own version, then get teacher feedback.",
+      "description": "Learn a few usable expressions, then write your version.",
       "draft-placeholder": "Try expressing this memo in English. It does not need to be perfect yet. Focus on using the words, phrases, and patterns above.",
       "empty-memo": "this memo",
       "entry": "Translation practice",
@@ -648,7 +648,7 @@
       "lesson-thinking-1": "Find the subject first: I, this, it, or the idea.",
       "lesson-thinking-2": "Then find the action: noticed, felt, realized, want to, decided to.",
       "lesson-thinking-3": "Finally add the reason or result instead of copying Chinese word order.",
-      "lesson-title": "AI teacher prep",
+      "lesson-title": "Teacher tips",
       "lesson-word-1": "notice: to become aware of something",
       "lesson-word-2": "reminder: something worth keeping in mind",
       "lesson-word-3": "approach: a way of handling something",
