@@ -1,6 +1,5 @@
 import { create } from "@bufbuild/protobuf";
 import {
-  ArrowRightIcon,
   BookOpenTextIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
@@ -8,8 +7,8 @@ import {
   HelpCircleIcon,
   LightbulbIcon,
   LoaderCircleIcon,
+  RotateCcwIcon,
   SaveIcon,
-  SendIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -17,16 +16,25 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
 import { useCreateMemo } from "@/hooks/useMemoQueries";
-import { useGenerateTranslationPracticeLesson, useReviewTranslationPracticeDraft } from "@/hooks/useTranslation";
+import { useGenerateTranslationPracticeLesson } from "@/hooks/useTranslation";
 import { handleError } from "@/lib/error";
 import { cn } from "@/lib/utils";
-import type { TranslationPracticeFeedback, TranslationPracticeLesson } from "@/types/proto/api/v1/ai_service_pb";
+import {
+  type TranslationPracticeBlock,
+  TranslationPracticeBlockSchema,
+  type TranslationPracticeLesson,
+} from "@/types/proto/api/v1/ai_service_pb";
 import { type Memo, MemoSchema, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
-type PracticePhase = "idle" | "preparing" | "lesson_ready" | "drafting" | "reviewing" | "needs_revision" | "passed" | "saved";
+type PracticePhase = "idle" | "preparing" | "building" | "passed" | "saved";
+type MatchedVersion = "basic" | "native";
+type PracticeLessonView = Omit<TranslationPracticeLesson, "basicBlocks" | "nativeBlocks" | "optionBlocks"> & {
+  basicBlocks: TranslationPracticeBlock[];
+  nativeBlocks: TranslationPracticeBlock[];
+  optionBlocks: TranslationPracticeBlock[];
+};
 
 interface MemoTranslationPracticePanelProps {
   memo?: Memo;
@@ -147,194 +155,357 @@ const compactText = (value: string, maxChars: number): string => {
   return `${compacted.slice(0, maxChars).trimEnd()}...`;
 };
 
+const cleanLessonItemLabel = (item: string) => {
+  const [label] = item.split(/\s+[—-]\s+|：/);
+  return (label || item).trim();
+};
+
+const makePracticeBlock = (id: string, text: string, explanation = "") =>
+  create(TranslationPracticeBlockSchema, {
+    id,
+    text: text.trim(),
+    explanation: explanation.trim(),
+  });
+
+const buildFallbackBlocksFromVersion = (version: string, prefix: string) => {
+  const words = version.trim().replace(/\s+/g, " ").split(" ").filter(Boolean);
+  if (words.length === 0) {
+    return [];
+  }
+
+  const chunkSize = words.length <= 6 ? 2 : 3;
+  const blocks: TranslationPracticeBlock[] = [];
+  for (let index = 0; index < words.length; index += chunkSize) {
+    const text = words.slice(index, index + chunkSize).join(" ");
+    blocks.push(makePracticeBlock(`${prefix}_${blocks.length + 1}`, text));
+  }
+  return blocks;
+};
+
+const mergePracticeBlocks = (...blockGroups: TranslationPracticeBlock[][]) => {
+  const seen = new Set<string>();
+  const blocks: TranslationPracticeBlock[] = [];
+
+  for (const block of blockGroups.flat()) {
+    const text = block.text.trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    blocks.push(block);
+  }
+
+  return blocks.map((block, index) => (block.id ? block : makePracticeBlock(`option_${index + 1}`, block.text, block.explanation)));
+};
+
+const alignBlocksToOptions = (blocks: TranslationPracticeBlock[], options: TranslationPracticeBlock[]) => {
+  const optionByText = new Map(options.map((block) => [block.text.trim().toLowerCase(), block]));
+  return blocks.map((block) => optionByText.get(block.text.trim().toLowerCase()) ?? block);
+};
+
+const normalizePracticeLessonForBuilder = (lesson: TranslationPracticeLesson): PracticeLessonView => {
+  const phraseLabels = lesson.phrases.map(cleanLessonItemLabel).filter(Boolean);
+  const wordLabels = lesson.words.map(cleanLessonItemLabel).filter(Boolean);
+  const fallbackVersion = phraseLabels.length > 0 ? phraseLabels.join(" ") : wordLabels.join(" ");
+  const basicVersion = lesson.basicVersion.trim() || fallbackVersion;
+  const nativeVersion = lesson.nativeVersion.trim() || fallbackVersion || basicVersion;
+  const basicBlocks = lesson.basicBlocks.length > 0 ? lesson.basicBlocks : buildFallbackBlocksFromVersion(basicVersion, "basic");
+  const nativeBlocks = lesson.nativeBlocks.length > 0 ? lesson.nativeBlocks : buildFallbackBlocksFromVersion(nativeVersion, "native");
+  const extraBlocks =
+    lesson.optionBlocks.length > 0
+      ? []
+      : [...phraseLabels, ...wordLabels].map((text, index) =>
+          makePracticeBlock(`extra_${index + 1}`, text, lesson.phrases[index] || lesson.words[index] || ""),
+        );
+  const optionBlocks =
+    lesson.optionBlocks.length > 0 ? mergePracticeBlocks(lesson.optionBlocks) : mergePracticeBlocks(basicBlocks, nativeBlocks, extraBlocks);
+
+  return {
+    ...lesson,
+    basicVersion,
+    nativeVersion,
+    basicBlocks: alignBlocksToOptions(basicBlocks, optionBlocks),
+    nativeBlocks: alignBlocksToOptions(nativeBlocks, optionBlocks),
+    optionBlocks,
+  };
+};
+
+const normalizeSentence = (blocks: TranslationPracticeBlock[]) => {
+  return blocks
+    .map((block) => block.text.trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+([,.!?;:])/g, "$1")
+    .replace(/\s+'/g, "'")
+    .trim();
+};
+
+const sequenceKey = (blocks: TranslationPracticeBlock[]) => blocks.map((block) => block.id).join("|");
+
+const getAvailableBlocksForVersion = (
+  versionBlocks: TranslationPracticeBlock[],
+  optionBlocks: TranslationPracticeBlock[],
+  selectedIds: Set<string>,
+) => {
+  const versionIds = new Set(versionBlocks.map((block) => block.id));
+  const seen = new Set<string>();
+  const availableBlocks: TranslationPracticeBlock[] = [];
+
+  const addBlock = (block: TranslationPracticeBlock) => {
+    if (!versionIds.has(block.id) || selectedIds.has(block.id) || seen.has(block.id)) {
+      return;
+    }
+    seen.add(block.id);
+    availableBlocks.push(block);
+  };
+
+  for (const block of optionBlocks) {
+    addBlock(block);
+  }
+  for (const block of versionBlocks) {
+    addBlock(block);
+  }
+
+  return availableBlocks;
+};
+
 const formatSavedPracticeMemo = (
   memo: Memo,
-  draft: string,
-  feedback: TranslationPracticeFeedback | undefined,
-  lesson: TranslationPracticeLesson | undefined,
+  lesson: PracticeLessonView,
+  selectedBlocks: TranslationPracticeBlock[],
+  matchedVersion: MatchedVersion | undefined,
 ) => {
+  const masteredBlocks = selectedBlocks.length > 0 ? selectedBlocks : lesson.basicBlocks;
   return [
     "原始 memo：",
     memo.content.trim(),
     "",
-    "我的最终版本：",
-    draft.trim(),
+    "基础表达：",
+    lesson.basicVersion,
     "",
-    "AI 地道版本：",
-    feedback?.nativeVersion ?? "",
+    "地道表达：",
+    lesson.nativeVersion,
     "",
-    "本次学到的表达：",
-    ...(lesson?.phrases ?? []).map((item) => `- ${item}`),
-    ...(lesson?.patterns ?? []).map((item) => `- ${item}`),
+    "我的拼句：",
+    normalizeSentence(masteredBlocks),
     "",
-    "批改总结：",
-    feedback?.summary ?? "",
-    feedback?.nextTarget ?? "",
+    "通过版本：",
+    matchedVersion === "native" ? "地道表达" : "基础表达",
     "",
-    `来源：${memo.name}`,
+    "本次掌握的表达块：",
+    ...masteredBlocks.map((block) => `- ${block.text}${block.explanation ? `：${block.explanation}` : ""}`),
+    "",
+    "来源：",
+    memo.name,
     "",
     "#english #translation-practice #review",
   ].join("\n");
 };
 
-const LessonList = ({ title, items }: { title: string; items: string[] }) => (
-  <div className="rounded-lg border border-border/70 bg-background/70 p-3">
-    <div className="text-xs font-medium text-muted-foreground">{title}</div>
-    <ul className="mt-2 space-y-1.5 text-sm leading-6 text-foreground">
-      {items.map((item) => (
-        <li key={item} className="flex gap-2">
-          <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary/70" />
-          <span>{item}</span>
-        </li>
-      ))}
-    </ul>
-  </div>
-);
-
-const splitLessonToolItem = (item: string) => {
-  const exampleMatch = item.match(/^(.+?)\s*(\((?:e\.g\.|for example|例如|比如)[^)]+\))$/i);
-  if (exampleMatch) {
-    return { term: exampleMatch[1].trim(), description: exampleMatch[2].trim() };
-  }
-
-  const match = item.match(/^(.+?)\s+(?:[-–—])\s+(.+)$/) ?? item.match(/^(.+?)[:：]\s*(.+)$/);
+const splitToolkitItem = (item: string) => {
+  const match = item.match(/^(.+?)\s+[—-]\s+(.+)$/) ?? item.match(/^(.+?)[:：]\s*(.+)$/);
   if (!match) {
-    return { term: item };
+    return { label: item.trim(), explanation: "" };
   }
-  return { term: match[1].trim(), description: match[2].trim() };
+  return { label: match[1].trim(), explanation: match[2].trim() };
 };
 
-const ExpandableLessonTool = ({ item, variant = "row" }: { item: string; variant?: "row" | "chip" }) => {
+const ToolkitItem = ({ item }: { item: string }) => {
   const [expanded, setExpanded] = useState(false);
-  const { term, description } = splitLessonToolItem(item);
-  const canExpand = Boolean(description);
+  const { label, explanation } = splitToolkitItem(item);
 
-  if (variant === "chip") {
-    if (!canExpand) {
-      return (
-        <span className="inline-flex max-w-full rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-xs leading-5 text-foreground shadow-xs">
-          <span className="truncate">{term}</span>
-        </span>
-      );
-    }
-
-    return (
-      <div className="max-w-full">
-        <button
-          type="button"
-          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-left text-xs leading-5 text-foreground shadow-xs hover:bg-muted/50"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((current) => !current)}
-        >
-          <span className="truncate">{term}</span>
-          <ChevronDownIcon className={cn("size-3 shrink-0 transition-transform", expanded && "rotate-180")} />
-        </button>
-        {expanded && <p className="mt-1.5 rounded-md bg-muted/35 px-2.5 py-1.5 text-xs leading-5 text-muted-foreground">{description}</p>}
-      </div>
-    );
+  if (!label) {
+    return null;
   }
 
-  if (!canExpand) {
+  if (!explanation) {
     return (
-      <div className="flex items-center gap-2 rounded-md bg-muted/30 px-2.5 py-2 text-sm leading-5">
-        <span className="size-1.5 shrink-0 rounded-full bg-primary/70" />
-        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{term}</span>
-      </div>
+      <span className="inline-flex max-w-full rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs leading-5 text-foreground">
+        <span className="truncate">{label}</span>
+      </span>
     );
   }
 
   return (
-    <div className="rounded-md bg-muted/30">
+    <div className="max-w-full">
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm leading-5 hover:bg-muted/50"
+        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background px-2.5 py-1 text-left text-xs leading-5 text-foreground shadow-xs hover:bg-muted/50"
         aria-expanded={expanded}
         onClick={() => setExpanded((current) => !current)}
       >
-        <span className="size-1.5 shrink-0 rounded-full bg-primary/70" />
-        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{term}</span>
-        <ChevronDownIcon className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />
+        <span className="truncate">{label}</span>
+        <ChevronDownIcon className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />
       </button>
-      {expanded && <p className="px-6 pb-2 text-sm leading-6 text-muted-foreground">{description}</p>}
+      {expanded && <p className="mt-1.5 rounded-md bg-muted/40 px-2.5 py-1.5 text-xs leading-5 text-muted-foreground">{explanation}</p>}
     </div>
   );
 };
 
-const LessonToolGroup = ({ title, items, variant = "row" }: { title: string; items: string[]; variant?: "row" | "chip" }) => (
-  <div className={cn(variant === "row" && "rounded-lg border border-border/70 bg-background/80 p-3")}>
-    <div className="text-xs font-medium text-muted-foreground">{title}</div>
-    <div className={cn("mt-2", variant === "chip" ? "flex flex-wrap gap-1.5" : "space-y-1.5")}>
-      {items.map((item) => (
-        <ExpandableLessonTool key={item} item={item} variant={variant} />
-      ))}
+const ToolkitGroup = ({ title, items }: { title: string; items: string[] }) => {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div>
+      <div className="text-xs font-medium text-muted-foreground">{title}</div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {items.map((item) => (
+          <ToolkitItem key={item} item={item} />
+        ))}
+      </div>
     </div>
+  );
+};
+
+const ExpressionToolkit = ({
+  lesson,
+  wordsTitle,
+  phrasesTitle,
+  patternsTitle,
+}: {
+  lesson: PracticeLessonView;
+  wordsTitle: string;
+  phrasesTitle: string;
+  patternsTitle: string;
+}) => (
+  <div className="space-y-3 rounded-lg border border-border/70 bg-background/80 p-3">
+    <ToolkitGroup title={wordsTitle} items={lesson.words} />
+    <ToolkitGroup title={phrasesTitle} items={lesson.phrases} />
+    <ToolkitGroup title={patternsTitle} items={lesson.patterns} />
   </div>
 );
 
-const ExpandableLessonNote = ({ title, text }: { title: string; text: string }) => {
-  const [expanded, setExpanded] = useState(false);
-  const preview = compactText(text, 64);
-  const canExpand = preview !== text;
-
-  if (!canExpand) {
-    return (
-      <div className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2.5">
-        <div className="text-xs font-medium text-primary">{title}</div>
-        <p className="mt-1 text-sm leading-6 text-foreground">{text}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-primary/15 bg-primary/5">
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
-      >
-        <span className="min-w-0 flex-1 text-xs font-medium text-primary">{title}</span>
-        <ChevronDownIcon className={cn("size-3.5 shrink-0 text-primary transition-transform", expanded && "rotate-180")} />
-      </button>
-      <p className="px-3 pb-2.5 text-sm leading-6 text-foreground">{expanded ? text : preview}</p>
+const VersionCard = ({ label, value, tone }: { label: string; value: string; tone: "basic" | "native" }) => (
+  <div
+    className={cn(
+      "rounded-lg border p-3",
+      tone === "basic"
+        ? "border-sky-200/80 bg-sky-50/70 dark:border-sky-900/70 dark:bg-sky-950/20"
+        : "border-emerald-200/80 bg-emerald-50/70 dark:border-emerald-900/70 dark:bg-emerald-950/20",
+    )}
+  >
+    <div
+      className={cn("text-xs font-medium", tone === "basic" ? "text-sky-700 dark:text-sky-300" : "text-emerald-700 dark:text-emerald-300")}
+    >
+      {label}
     </div>
-  );
-};
+    <p className="mt-1.5 text-sm leading-6 text-foreground">{value}</p>
+  </div>
+);
+
+const PracticeBlockButton = ({
+  block,
+  selected,
+  disabled,
+  onClick,
+}: {
+  block: TranslationPracticeBlock;
+  selected?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    className={cn(
+      "inline-flex min-h-9 max-w-full items-center rounded-full border px-3 py-1.5 text-left text-sm leading-5 shadow-xs transition",
+      selected
+        ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
+        : "border-border/80 bg-background text-foreground hover:border-primary/40 hover:bg-primary/5",
+      disabled && "cursor-not-allowed opacity-55 hover:border-border/80 hover:bg-background",
+    )}
+    disabled={disabled}
+    onClick={onClick}
+  >
+    <span className="truncate">{block.text}</span>
+  </button>
+);
+
+const AvailableBlockGroup = ({
+  title,
+  blocks,
+  disabled,
+  emptyLabel,
+  onSelect,
+}: {
+  title: string;
+  blocks: TranslationPracticeBlock[];
+  disabled?: boolean;
+  emptyLabel: string;
+  onSelect: (blockId: string) => void;
+}) => (
+  <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-2.5">
+    <div className="flex items-center justify-between gap-2">
+      <div className="text-xs font-medium text-foreground">{title}</div>
+      <Badge variant="secondary" shape="pill">
+        {blocks.length}
+      </Badge>
+    </div>
+    {blocks.length > 0 ? (
+      <div className="flex flex-wrap gap-1.5">
+        {blocks.map((block) => (
+          <PracticeBlockButton key={block.id} block={block} disabled={disabled} onClick={() => onSelect(block.id)} />
+        ))}
+      </div>
+    ) : (
+      <div className="rounded-md bg-background/70 px-2.5 py-2 text-xs text-muted-foreground">{emptyLabel}</div>
+    )}
+  </div>
+);
 
 export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoTranslationPracticePanelProps) => {
   const t = useTranslate();
   const { i18n } = useTranslation();
   const createMemo = useCreateMemo();
   const generateLesson = useGenerateTranslationPracticeLesson();
-  const reviewDraft = useReviewTranslationPracticeDraft();
-  const draftSectionRef = useRef<HTMLElement>(null);
   const lessonCacheRef = useRef<{ key: string; lesson: TranslationPracticeLesson } | undefined>(undefined);
   const lessonRequestRef = useRef<{ key: string; promise: Promise<TranslationPracticeLesson> } | undefined>(undefined);
   const [phase, setPhase] = useState<PracticePhase>("idle");
   const [lesson, setLesson] = useState<TranslationPracticeLesson>();
-  const [draft, setDraft] = useState("");
-  const [feedback, setFeedback] = useState<TranslationPracticeFeedback>();
-  const [attempt, setAttempt] = useState(0);
+  const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([]);
+  const [matchedVersion, setMatchedVersion] = useState<MatchedVersion>();
   const [hint, setHint] = useState("");
   const [lessonExpanded, setLessonExpanded] = useState(true);
-  const [celebrationAttempt, setCelebrationAttempt] = useState(0);
+  const [celebrationRun, setCelebrationRun] = useState(0);
 
   const memoContent = memo?.content ?? "";
-  const memoExcerpt = useMemo(() => compactText(memoContent, 180), [memoContent]);
-  const canSubmit = draft.trim().length > 0 && phase !== "reviewing";
-  const canSave = memo && feedback?.passed && phase !== "saved" && !createMemo.isPending;
+  const memoExcerpt = useMemo(() => compactText(memoContent, 160), [memoContent]);
+  const practiceLesson = useMemo(() => (lesson ? normalizePracticeLessonForBuilder(lesson) : undefined), [lesson]);
+  const optionBlocks = useMemo(() => practiceLesson?.optionBlocks ?? [], [practiceLesson]);
+  const blockById = useMemo(() => {
+    const blocks = practiceLesson
+      ? [...practiceLesson.optionBlocks, ...practiceLesson.basicBlocks, ...practiceLesson.nativeBlocks]
+      : optionBlocks;
+    return new Map(blocks.map((block) => [block.id, block]));
+  }, [optionBlocks, practiceLesson]);
+  const selectedBlocks = useMemo(
+    () => selectedBlockIds.map((id) => blockById.get(id)).filter((block): block is TranslationPracticeBlock => Boolean(block)),
+    [blockById, selectedBlockIds],
+  );
+  const selectedIdSet = useMemo(() => new Set(selectedBlockIds), [selectedBlockIds]);
+  const basicAvailableBlocks = useMemo(
+    () => (practiceLesson ? getAvailableBlocksForVersion(practiceLesson.basicBlocks, optionBlocks, selectedIdSet) : []),
+    [optionBlocks, practiceLesson, selectedIdSet],
+  );
+  const nativeAvailableBlocks = useMemo(
+    () => (practiceLesson ? getAvailableBlocksForVersion(practiceLesson.nativeBlocks, optionBlocks, selectedIdSet) : []),
+    [optionBlocks, practiceLesson, selectedIdSet],
+  );
+  const answerText = useMemo(() => normalizeSentence(selectedBlocks), [selectedBlocks]);
+  const basicAnswerKey = useMemo(() => sequenceKey(practiceLesson?.basicBlocks ?? []), [practiceLesson]);
+  const nativeAnswerKey = useMemo(() => sequenceKey(practiceLesson?.nativeBlocks ?? []), [practiceLesson]);
+  const selectedAnswerKey = selectedBlockIds.join("|");
+  const canCheck = phase === "building" && selectedBlockIds.length > 0;
+  const canSave = memo && practiceLesson && phase !== "saved" && !createMemo.isPending;
   const showFooter = phase === "passed" || phase === "saved";
-  const showDraft = phase === "drafting" || phase === "needs_revision" || phase === "passed" || phase === "saved" || phase === "reviewing";
-  const showFeedback = Boolean(feedback) && (phase === "needs_revision" || phase === "passed" || phase === "saved");
-  const visibleLessonWords = useMemo(() => lesson?.words.slice(0, showDraft ? 2 : 3) ?? [], [lesson, showDraft]);
-  const visibleLessonPhrases = useMemo(() => lesson?.phrases.slice(0, showDraft ? 2 : 3) ?? [], [lesson, showDraft]);
-  const visibleLessonPatterns = useMemo(() => lesson?.patterns.slice(0, showDraft ? 1 : 2) ?? [], [lesson, showDraft]);
-  const lessonSummary = t("review.translation-practice.lesson-summary", {
-    words: visibleLessonWords.length,
-    phrases: visibleLessonPhrases.length,
-    patterns: visibleLessonPatterns.length,
+  const showPassedCelebration = phase === "passed" && celebrationRun > 0;
+  const toolkitSummary = t("review.translation-practice.lesson-summary", {
+    words: practiceLesson?.words.length ?? 0,
+    phrases: practiceLesson?.phrases.length ?? 0,
+    patterns: practiceLesson?.patterns.length ?? 0,
   });
-  const showPassedCelebration = feedback?.passed && phase === "passed" && celebrationAttempt === attempt;
 
   useEffect(() => {
     if (!open || !memo) {
@@ -343,18 +514,17 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
 
     setPhase("preparing");
     setLesson(undefined);
-    setDraft("");
-    setFeedback(undefined);
-    setAttempt(0);
+    setSelectedBlockIds([]);
+    setMatchedVersion(undefined);
     setHint("");
     setLessonExpanded(true);
-    setCelebrationAttempt(0);
+    setCelebrationRun(0);
 
     let cancelled = false;
     const lessonKey = `${memo.name}:${i18n.language}:${memo.content}`;
     if (lessonCacheRef.current?.key === lessonKey) {
       setLesson(lessonCacheRef.current.lesson);
-      setPhase("lesson_ready");
+      setPhase("building");
       return;
     }
 
@@ -377,7 +547,7 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
           return;
         }
         setLesson(nextLesson);
-        setPhase("lesson_ready");
+        setPhase("building");
       })
       .catch((error: unknown) => {
         if (lessonRequestRef.current?.promise === lessonPromise) {
@@ -395,54 +565,82 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
     };
   }, [generateLesson.mutateAsync, i18n.language, memo, open]);
 
-  const handleAskTeacher = () => {
-    const tip = lesson?.thinking[0] ?? t("review.translation-practice.teacher-hint");
-    const phrase = lesson?.phrases[0];
-    setHint(phrase ? t("review.translation-practice.teacher-hint-with-phrase", { tip, phrase }) : tip);
+  const handleSelectBlock = (blockId: string) => {
+    if (phase === "saved") {
+      return;
+    }
+    setSelectedBlockIds((current) => [...current, blockId]);
+    setHint("");
+    if (phase === "passed") {
+      setPhase("building");
+      setMatchedVersion(undefined);
+    }
   };
 
-  const handleStartPractice = () => {
-    setPhase("drafting");
-    setLessonExpanded(false);
-    window.setTimeout(() => draftSectionRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 50);
+  const handleRemoveSelectedBlock = (index: number) => {
+    if (phase === "saved") {
+      return;
+    }
+    setSelectedBlockIds((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setHint("");
+    if (phase === "passed") {
+      setPhase("building");
+      setMatchedVersion(undefined);
+    }
   };
 
-  const handleSubmit = async () => {
-    if (!canSubmit) {
+  const handleReset = () => {
+    if (phase === "saved") {
+      return;
+    }
+    setSelectedBlockIds([]);
+    setMatchedVersion(undefined);
+    setHint("");
+    setPhase("building");
+  };
+
+  const handleHint = () => {
+    setHint(practiceLesson?.quickTip || practiceLesson?.thinking[0] || t("review.translation-practice.builder-default-hint"));
+  };
+
+  const handleCheck = () => {
+    if (!practiceLesson || !canCheck) {
       return;
     }
 
-    const previousPhase = feedback?.passed ? "passed" : feedback ? "needs_revision" : "drafting";
-    setPhase("reviewing");
-    setHint("");
-    const nextAttempt = attempt + 1;
-    setAttempt(nextAttempt);
-    try {
-      const nextFeedback = await reviewDraft.mutateAsync({
-        memoContent,
-        draft,
-        attempt: nextAttempt,
-        locale: i18n.language,
-      });
-      setFeedback(nextFeedback);
-      setCelebrationAttempt(nextFeedback.passed ? nextAttempt : 0);
-      setPhase(nextFeedback.passed ? "passed" : "needs_revision");
-    } catch (error) {
-      setAttempt(nextAttempt - 1);
-      setPhase(previousPhase);
-      handleError(error, toast.error, { context: "Review translation practice draft" });
+    if (selectedAnswerKey === basicAnswerKey) {
+      setMatchedVersion("basic");
+      setHint("");
+      setPhase("passed");
+      setCelebrationRun((current) => current + 1);
+      return;
     }
+
+    if (selectedAnswerKey === nativeAnswerKey) {
+      setMatchedVersion("native");
+      setHint("");
+      setPhase("passed");
+      setCelebrationRun((current) => current + 1);
+      return;
+    }
+
+    setMatchedVersion(undefined);
+    setHint(
+      t("review.translation-practice.builder-try-again-hint", {
+        tip: practiceLesson.quickTip || practiceLesson.thinking[0] || t("review.translation-practice.builder-default-hint"),
+      }),
+    );
   };
 
   const handleSave = async () => {
-    if (!memo || !feedback || !lesson) {
+    if (!memo || !practiceLesson) {
       return;
     }
 
     try {
       await createMemo.mutateAsync(
         create(MemoSchema, {
-          content: formatSavedPracticeMemo(memo, draft, feedback, lesson),
+          content: formatSavedPracticeMemo(memo, practiceLesson, selectedBlocks, matchedVersion),
           visibility: Visibility.PRIVATE,
         }),
       );
@@ -481,7 +679,7 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
                     <BookOpenTextIcon className="size-3.5" />
                     {t("review.translation-practice.current-memo")}
                   </div>
-                  <p className="max-h-14 overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{memoExcerpt}</p>
+                  <p className="line-clamp-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{memoExcerpt}</p>
                 </div>
 
                 {phase === "preparing" && (
@@ -492,116 +690,156 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
                   </div>
                 )}
 
-                {lesson && phase !== "preparing" && (
-                  <section
-                    className={cn(
-                      "overflow-hidden rounded-xl border border-border/80 bg-background shadow-xs",
-                      showDraft ? "space-y-0" : "space-y-1",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 px-3 py-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <LightbulbIcon className="size-4" />
-                          </span>
-                          {t("review.translation-practice.lesson-title")}
+                {practiceLesson && phase !== "preparing" && (
+                  <>
+                    <section className="overflow-hidden rounded-xl border border-border/80 bg-background shadow-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 px-3 py-3">
+                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                              <LightbulbIcon className="size-4" />
+                            </span>
+                            {t("review.translation-practice.lesson-title")}
+                          </div>
+                          <p className="mt-1 truncate pl-9 text-xs text-muted-foreground">{toolkitSummary}</p>
                         </div>
-                        <p className="mt-1 truncate pl-9 text-xs text-muted-foreground">{lessonSummary}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5 pr-2">
-                        {!showDraft && (
+                        <div className="flex shrink-0 items-center gap-1.5 pr-2">
                           <Badge variant="secondary" shape="pill">
                             {t("review.translation-practice.phase-lesson")}
                           </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-muted-foreground"
+                            aria-expanded={lessonExpanded}
+                            onClick={() => setLessonExpanded((expanded) => !expanded)}
+                          >
+                            <span>
+                              {lessonExpanded
+                                ? t("review.translation-practice.collapse-tips")
+                                : t("review.translation-practice.expand-tips")}
+                            </span>
+                            <ChevronDownIcon className={cn("size-3.5 transition-transform", lessonExpanded && "rotate-180")} />
+                          </Button>
+                        </div>
+                      </div>
+                      {lessonExpanded && (
+                        <div className="space-y-3 border-t border-border/70 bg-muted/15 p-3">
+                          <div className="grid gap-2">
+                            <VersionCard
+                              label={t("review.translation-practice.basic-version")}
+                              value={practiceLesson.basicVersion}
+                              tone="basic"
+                            />
+                            <VersionCard
+                              label={t("review.translation-practice.native-version")}
+                              value={practiceLesson.nativeVersion}
+                              tone="native"
+                            />
+                          </div>
+                          <ExpressionToolkit
+                            lesson={practiceLesson}
+                            wordsTitle={t("review.translation-practice.words")}
+                            phrasesTitle={t("review.translation-practice.phrases")}
+                            patternsTitle={t("review.translation-practice.patterns")}
+                          />
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="space-y-3 rounded-xl border border-border/80 bg-background p-3 shadow-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-foreground">{t("review.translation-practice.build-answer")}</div>
+                        <Badge variant={phase === "passed" || phase === "saved" ? "default" : "outline"} shape="pill">
+                          {phase === "passed" || phase === "saved"
+                            ? t("review.translation-practice.phase-passed")
+                            : t("review.translation-practice.phase-building")}
+                        </Badge>
+                      </div>
+
+                      <div className="min-h-16 rounded-lg border border-dashed border-border bg-muted/20 p-2">
+                        {selectedBlocks.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedBlocks.map((block, index) => (
+                              <PracticeBlockButton
+                                key={`${block.id}-${index}`}
+                                block={block}
+                                selected
+                                disabled={phase === "saved"}
+                                onClick={() => handleRemoveSelectedBlock(index)}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex min-h-11 items-center px-1 text-sm text-muted-foreground">
+                            {t("review.translation-practice.empty-answer")}
+                          </div>
                         )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground"
-                          aria-expanded={lessonExpanded}
-                          onClick={() => setLessonExpanded((expanded) => !expanded)}
-                        >
-                          <span>
-                            {lessonExpanded ? t("review.translation-practice.collapse-tips") : t("review.translation-practice.expand-tips")}
+                      </div>
+
+                      {answerText && (
+                        <div className="rounded-lg bg-muted/25 px-3 py-2 text-sm leading-6 text-foreground">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {t("review.translation-practice.preview-answer")}
                           </span>
-                          <ChevronDownIcon className={cn("size-3.5 transition-transform", lessonExpanded && "rotate-180")} />
+                          <p className="mt-1">{answerText}</p>
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="mb-2 text-xs font-medium text-muted-foreground">
+                          {t("review.translation-practice.available-blocks")}
+                        </div>
+                        <div className="space-y-2">
+                          <AvailableBlockGroup
+                            title={t("review.translation-practice.basic-version")}
+                            blocks={basicAvailableBlocks}
+                            disabled={phase === "saved"}
+                            emptyLabel={t("review.translation-practice.all-blocks-selected")}
+                            onSelect={handleSelectBlock}
+                          />
+                          <AvailableBlockGroup
+                            title={t("review.translation-practice.native-version")}
+                            blocks={nativeAvailableBlocks}
+                            disabled={phase === "saved"}
+                            emptyLabel={t("review.translation-practice.all-blocks-selected")}
+                            onSelect={handleSelectBlock}
+                          />
+                        </div>
+                      </div>
+
+                      {hint && (
+                        <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                          {hint}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2">
+                        <Button variant="outline" onClick={handleHint} disabled={phase === "saved"}>
+                          <HelpCircleIcon className="size-4" />
+                          {t("review.translation-practice.hint")}
+                        </Button>
+                        <Button variant="outline" onClick={handleReset} disabled={selectedBlockIds.length === 0 || phase === "saved"}>
+                          <RotateCcwIcon className="size-4" />
+                          {t("review.translation-practice.reset-answer")}
+                        </Button>
+                        <Button onClick={handleCheck} disabled={!canCheck}>
+                          <CheckCircle2Icon className="size-4" />
+                          {t("review.translation-practice.check-answer")}
                         </Button>
                       </div>
-                    </div>
-                    {lessonExpanded && (
-                      <div className="space-y-3 border-t border-border/70 bg-muted/15 p-3">
-                        {!showDraft && (
-                          <div className="rounded-lg bg-background/80 px-3 py-2.5 text-sm leading-6 text-foreground">{lesson.goal}</div>
-                        )}
-                        <LessonToolGroup title={t("review.translation-practice.words")} items={visibleLessonWords} />
-                        <div className="grid gap-3 rounded-lg border border-border/70 bg-background/80 p-3">
-                          <LessonToolGroup title={t("review.translation-practice.phrases")} items={visibleLessonPhrases} variant="chip" />
-                          <LessonToolGroup title={t("review.translation-practice.patterns")} items={visibleLessonPatterns} variant="chip" />
-                        </div>
-                        <ExpandableLessonNote title={t("review.translation-practice.thinking")} text={lesson.thinking[0]} />
-                      </div>
-                    )}
-                  </section>
+                    </section>
+                  </>
                 )}
 
-                {phase === "lesson_ready" && (
-                  <Button className="w-full" onClick={handleStartPractice}>
-                    <ArrowRightIcon className="size-4" />
-                    {t("review.translation-practice.start-practice")}
-                  </Button>
-                )}
-
-                {showDraft && (
-                  <section ref={draftSectionRef} className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-medium text-foreground">{t("review.translation-practice.my-draft")}</div>
-                      <Badge variant={feedback?.passed ? "default" : "outline"} shape="pill">
-                        {feedback?.passed ? t("review.translation-practice.phase-passed") : t("review.translation-practice.phase-drafting")}
-                      </Badge>
+                {phase === "passed" && practiceLesson && (
+                  <section className="relative overflow-hidden rounded-xl border border-emerald-300/70 bg-emerald-50/60 p-3 dark:border-emerald-800/70 dark:bg-emerald-950/20">
+                    <div className="pointer-events-none absolute top-3 right-4 z-10 flex items-start gap-1.5" aria-hidden="true">
+                      {TRANSLATION_PRACTICE_CELEBRATION_ACCENT_CLASSES.map((className) => (
+                        <span key={className} className={cn("translation-practice-celebration-accent shadow-sm", className)} />
+                      ))}
                     </div>
-                    <Textarea
-                      value={draft}
-                      onChange={(event) => setDraft(event.target.value)}
-                      placeholder={t("review.translation-practice.draft-placeholder")}
-                      className="min-h-36 resize-none bg-background text-sm leading-6"
-                      disabled={phase === "reviewing" || phase === "saved"}
-                    />
-                    {hint && (
-                      <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                        {hint}
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={handleAskTeacher} disabled={phase === "reviewing" || phase === "saved"}>
-                        <HelpCircleIcon className="size-4" />
-                        {t("review.translation-practice.ask-teacher")}
-                      </Button>
-                      <Button onClick={handleSubmit} disabled={!canSubmit || phase === "saved"}>
-                        {phase === "reviewing" ? <LoaderCircleIcon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
-                        {t("review.translation-practice.submit-review")}
-                      </Button>
-                    </div>
-                  </section>
-                )}
-
-                {showFeedback && feedback && (
-                  <section
-                    className={cn(
-                      "relative overflow-hidden rounded-xl border p-3",
-                      feedback.passed
-                        ? "border-emerald-300/70 bg-emerald-50/60 dark:border-emerald-800/70 dark:bg-emerald-950/20"
-                        : "space-y-3 border-border bg-background",
-                    )}
-                  >
-                    {feedback.passed && (
-                      <div className="pointer-events-none absolute top-3 right-4 z-10 flex items-start gap-1.5" aria-hidden="true">
-                        {TRANSLATION_PRACTICE_CELEBRATION_ACCENT_CLASSES.map((className) => (
-                          <span key={className} className={cn("translation-practice-celebration-accent shadow-sm", className)} />
-                        ))}
-                      </div>
-                    )}
                     {showPassedCelebration && (
                       <div className="pointer-events-none absolute inset-x-0 top-0 h-28 overflow-hidden" aria-hidden="true">
                         {TRANSLATION_PRACTICE_CONFETTI_CLASSES.map((className) => (
@@ -609,63 +847,21 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
                         ))}
                       </div>
                     )}
-                    <div className={cn("relative", feedback.passed && "space-y-3")}>
-                      <div
-                        className={cn(
-                          "flex gap-3 rounded-lg px-3 py-3",
-                          feedback.passed ? "bg-background/90 shadow-xs" : "bg-muted/30",
-                          showPassedCelebration && "translation-practice-pass-pop",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "flex size-9 shrink-0 items-center justify-center rounded-full",
-                            feedback.passed ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary",
-                          )}
-                        >
-                          <CheckCircle2Icon className="size-5" />
-                        </span>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-foreground">
-                            {feedback.passed
-                              ? t("review.translation-practice.passed-title")
-                              : t("review.translation-practice.revision-title")}
-                          </div>
-                          <p className="mt-1 text-sm leading-6 text-foreground">{feedback.summary}</p>
-                        </div>
+                    <div className="translation-practice-pass-pop relative flex gap-3 rounded-lg bg-background/90 px-3 py-3 shadow-xs">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                        <CheckCircle2Icon className="size-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground">{t("review.translation-practice.passed-title")}</div>
+                        <p className="mt-1 text-sm leading-6 text-foreground">
+                          {t("review.translation-practice.builder-passed-summary", {
+                            version:
+                              matchedVersion === "native"
+                                ? t("review.translation-practice.native-version")
+                                : t("review.translation-practice.basic-version"),
+                          })}
+                        </p>
                       </div>
-
-                      {feedback.passed ? (
-                        <>
-                          <div className="rounded-lg border border-emerald-200/80 bg-background p-3 shadow-xs dark:border-emerald-900/70">
-                            <div className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                              {t("review.translation-practice.native-version")}
-                            </div>
-                            <p className="mt-2 text-base leading-7 text-foreground">{feedback.nativeVersion}</p>
-                          </div>
-                          <div className="grid gap-3">
-                            <LessonList title={t("review.translation-practice.feedback-strengths")} items={feedback.strengths} />
-                            <LessonList title={t("review.translation-practice.feedback-polish")} items={feedback.improvements} />
-                          </div>
-                          <div className="rounded-lg bg-background/80 px-3 py-2 text-sm leading-6 text-foreground">
-                            {feedback.nextTarget}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <LessonList title={t("review.translation-practice.feedback-strengths")} items={feedback.strengths} />
-                          <LessonList title={t("review.translation-practice.feedback-improvements")} items={feedback.improvements} />
-                          <div className="rounded-lg border border-border/70 bg-background/80 p-3">
-                            <div className="text-xs font-medium text-muted-foreground">
-                              {t("review.translation-practice.native-version")}
-                            </div>
-                            <p className="mt-2 text-sm leading-6 text-foreground">{feedback.nativeVersion}</p>
-                          </div>
-                          <div className="rounded-lg bg-background/70 px-3 py-2 text-sm leading-6 text-foreground">
-                            {feedback.nextTarget}
-                          </div>
-                        </>
-                      )}
                     </div>
                   </section>
                 )}

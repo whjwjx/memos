@@ -220,14 +220,29 @@ func TestTranslationPractice(t *testing.T) {
 		var content string
 		switch requestCount {
 		case 1:
-			require.Contains(t, request.Messages[0].Content, "Prepare a short translation practice lesson")
+			require.Contains(t, request.Messages[0].Content, "Prepare a mobile-friendly English expression builder practice")
 			require.Contains(t, request.Messages[1].Content, "今天想整理英语单词")
 			content = `{
-				"goal": "先把想法拆成自然英文。",
-				"words": ["notice: 注意到", "review: 回顾"],
-				"phrases": ["turn this into practice", "make it easier to remember"],
-				"patterns": ["I noticed that ...", "I want to ..."],
-				"thinking": ["先找主语", "再找动作"]
+				"goal": "把整理英语单词这件事说清楚。",
+				"basic_version": "I want to review English words today.",
+				"native_version": "I want to turn today's English words into a small review practice.",
+				"basic_blocks": [
+					{"text": "I want to", "explanation": "表达想做某事"},
+					{"text": "review English words", "explanation": "复习英语单词"},
+					{"text": "today", "explanation": "时间放在句末也自然"}
+				],
+				"native_blocks": [
+					{"text": "I want to", "explanation": "表达想做某事"},
+					{"text": "turn today's English words into", "explanation": "把某物转化成某种练习"},
+					{"text": "a small review practice", "explanation": "一个小复习练习"}
+				],
+				"extra_blocks": [
+					{"text": "memorize", "explanation": "更偏死记硬背"}
+				],
+				"words": ["review — 复习、回顾", "practice — 练习"],
+				"phrases": ["turn ... into ... — 把某事变成练习", "a small review practice — 一个轻量复习练习"],
+				"patterns": ["I want to ... — 用来表达今天想做的事"],
+				"thinking": ["先说 I want to，再补动作和时间。"]
 			}`
 		case 2:
 			require.Contains(t, request.Messages[0].Content, "Review the user's English draft")
@@ -293,8 +308,15 @@ func TestTranslationPractice(t *testing.T) {
 		Locale:      "zh-Hans",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "先把想法拆成自然英文。", lessonResp.GetLesson().GetGoal())
-	require.Contains(t, lessonResp.GetLesson().GetPatterns(), "I noticed that ...")
+	require.Equal(t, "把整理英语单词这件事说清楚。", lessonResp.GetLesson().GetGoal())
+	require.Equal(t, "I want to review English words today.", lessonResp.GetLesson().GetBasicVersion())
+	require.Equal(t, "I want to turn today's English words into a small review practice.", lessonResp.GetLesson().GetNativeVersion())
+	require.Len(t, lessonResp.GetLesson().GetBasicBlocks(), 3)
+	require.Len(t, lessonResp.GetLesson().GetNativeBlocks(), 3)
+	require.Len(t, lessonResp.GetLesson().GetOptionBlocks(), 6)
+	require.Equal(t, lessonResp.GetLesson().GetBasicBlocks()[0].GetId(), lessonResp.GetLesson().GetNativeBlocks()[0].GetId())
+	require.Contains(t, lessonResp.GetLesson().GetPatterns(), "I want to ... — 用来表达今天想做的事")
+	require.Equal(t, "先说 I want to，再补动作和时间。", lessonResp.GetLesson().GetQuickTip())
 
 	feedbackResp, err := ts.Service.ReviewTranslationPracticeDraft(userCtx, &v1pb.ReviewTranslationPracticeDraftRequest{
 		MemoContent: "今天想整理英语单词",

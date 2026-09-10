@@ -190,6 +190,18 @@ message TranslationPracticeLesson {
   repeated string phrases = 3;
   repeated string patterns = 4;
   repeated string thinking = 5;
+  string basic_version = 6;
+  string native_version = 7;
+  repeated TranslationPracticeBlock basic_blocks = 8;
+  repeated TranslationPracticeBlock native_blocks = 9;
+  repeated TranslationPracticeBlock option_blocks = 10;
+  string quick_tip = 11;
+}
+
+message TranslationPracticeBlock {
+  string id = 1;
+  string text = 2;
+  string explanation = 3;
 }
 
 message TranslationPracticeFeedback {

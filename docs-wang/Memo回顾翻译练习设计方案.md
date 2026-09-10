@@ -310,6 +310,254 @@ saved
 - 开始练习后，教学卡片收缩为参考条，优先露出输入框。
 - 思路提示只显示 1 条，更多细节留给“问老师”和批改反馈。
 
+## 第 2 批：手机端轻量拼句版
+
+### 背景
+
+第 1 批已经跑通了“AI 备课 -> 用户输入翻译 -> AI 批改 -> 保存素材”的完整闭环，但实际体验偏重：
+
+- 手机端打英文不方便，输入成本高。
+- 回顾场景本身是轻量浏览，用户不一定愿意进入完整写作练习。
+- 教学、输入、批改、保存全部放在一个面板里，容易让用户感觉像一节正式课程，而不是“顺手练一下”。
+
+因此第 2 批建议把 user story 简化为：
+
+```text
+用户回顾 memo 时，顺便了解这条 memo 的基础英文表达和更地道英文表达。
+AI 先给出两个版本及其必要的字词句工具。
+用户不用手动输入英文，只需要点击表达块，把表达块拼成完整句子。
+只要拼出基础版本或地道版本之一，就算通过。
+拼错时给一个简短 AI 提示；通过后可以保存为素材 memo，方便以后回顾。
+```
+
+### 推荐交互
+
+入口仍放在 Review 当前 memo 卡片下方，按钮文案可以从“翻译练习”改为“表达练习”或“拼表达”。
+
+面板打开后的流程：
+
+```text
+当前 memo
+下周二下午2点有个线上会议
+
+表达参考
+基础表达：There is an online meeting next Tuesday at 2 PM.
+地道表达：We have an online meeting scheduled for next Tuesday at 2 PM.
+
+拼一句
+[ There is ] [ an online meeting ] [ next Tuesday ] [ at 2 PM ]
+
+可选表达
+[ scheduled for ] [ at 2 PM ] [ There is ] [ next Tuesday ]
+[ We have ] [ an online meeting ] [ there is ] [ online ]
+
+[提示] [重置] [检查]
+```
+
+用户行为：
+
+- 点击“可选表达”里的 chip，加入“拼一句”区域。
+- 点击“拼一句”里的 chip，将其移回可选区。
+- 用户可以自由选择拼基础版本，也可以拼地道版本。
+- 点击“检查”后，前端把用户选择的表达块顺序提交给后端。
+- 后端判断是否等于任一可接受答案；通过则展示轻庆祝和“保存为 memo”。
+- 未通过则展示 1 条短提示，不展示长篇批改。
+
+### 可选表达区设计
+
+可选表达区可以同时放入两个版本的表达块。
+
+推荐规则：
+
+- `basic_blocks`：基础版本表达块。
+- `native_blocks`：地道版本表达块。
+- `extra_blocks`：可选干扰块，第一版可以不做，避免挫败感。
+- 前端合并 `basic_blocks + native_blocks + extra_blocks` 后去重并打乱。
+- 用户拼出的答案只要匹配 `basic_blocks` 或 `native_blocks` 的顺序，就通过。
+
+这样设计的好处：
+
+- 用户不会被迫选择“标准答案只有一个”的死板体验。
+- 基础弱的用户可以先拼基础表达。
+- 有能力的用户可以尝试拼更地道表达。
+- 两套表达块混在一起，本身就是一次“表达选择”的训练。
+
+需要注意：
+
+- 两个版本不要差异过大，否则可选区 chip 太多，手机端会拥挤。
+- 每条 memo 第一版建议控制在 4-8 个 chip。
+- 如果 memo 内容太长，AI 应只抽取一个核心句做练习，不要要求用户拼完整长 memo。
+- 同义表达可能很多，第一版先只接受 AI 给出的两个目标版本，避免校验逻辑复杂化。
+
+### 手机端 UI 原则
+
+- 不再默认显示长解释。
+- 顶部只保留当前 memo 摘要，超过 2 行折叠。
+- “基础表达 / 地道表达”默认可见，但解释默认隐藏。
+- 表达块详情按需展开：用户点某个 chip 后，在底部或就近弹出简短说明。
+- 主操作区固定为“拼一句 + 可选表达 + 检查按钮”。
+- 不优先做拖拽。手机端 bottom sheet 里拖拽容易和滚动、关闭手势冲突，第一版点击拼句更稳。
+- 错误反馈只给一条最关键提示，例如“时间表达通常放在句末”。
+
+### 接口设计建议
+
+现有接口：
+
+- `GenerateTranslationPracticeLesson`
+- `ReviewTranslationPracticeDraft`
+
+它们偏向“自由输入 + AI 批改”。第 2 批可以新增一组更贴合拼句的接口，避免把老接口语义越改越混：
+
+```proto
+rpc GenerateTranslationBuilderPractice(GenerateTranslationBuilderPracticeRequest) returns (GenerateTranslationBuilderPracticeResponse)
+rpc ReviewTranslationBuilderPractice(ReviewTranslationBuilderPracticeRequest) returns (ReviewTranslationBuilderPracticeResponse)
+```
+
+当前落地第一步采用更小的兼容方案：先扩展现有 `GenerateTranslationPracticeLesson` 的返回结构，增加 `basic_version`、`native_version`、`basic_blocks`、`native_blocks`、`option_blocks` 和 `quick_tip`；前端默认使用这些字段做点击拼句。旧的 `ReviewTranslationPracticeDraft` 暂时保留，但新的默认 UI 不再调用它。等后续确认不会恢复自由输入批改模式，再单独收敛或重命名接口。
+
+建议返回结构：
+
+```proto
+message TranslationBuilderPractice {
+  string source_text = 1;
+  string basic_version = 2;
+  string native_version = 3;
+  repeated TranslationBuilderBlock basic_blocks = 4;
+  repeated TranslationBuilderBlock native_blocks = 5;
+  repeated TranslationBuilderBlock option_blocks = 6;
+  string quick_tip = 7;
+}
+
+message TranslationBuilderBlock {
+  string id = 1;
+  string text = 2;
+  string explanation = 3;
+}
+```
+
+校验请求：
+
+```proto
+message ReviewTranslationBuilderPracticeRequest {
+  string memo_content = 1;
+  repeated string selected_block_ids = 2;
+  string locale = 3;
+}
+```
+
+校验响应：
+
+```proto
+message ReviewTranslationBuilderPracticeResponse {
+  bool passed = 1;
+  string matched_version = 2; // basic / native / empty
+  string hint = 3;
+  string explanation = 4;
+}
+```
+
+第一版也可以不让 AI 重新判断答案，而是在生成时由后端保存/返回两个正确 block id 序列，前端提交后后端做确定性比较：
+
+- 与 `basic_blocks` id 顺序完全一致：通过。
+- 与 `native_blocks` id 顺序完全一致：通过。
+- 否则调用 AI 生成一条短提示，或先用本地规则返回通用提示。
+
+这比每次“检查”都让 AI 判分更稳定，也更省 token。
+
+### 保存为 memo
+
+通过后仍复用现有创建 memo 能力，不新增素材表。
+
+推荐保存格式：
+
+```text
+原始 memo：
+下周二下午2点有个线上会议
+
+基础表达：
+There is an online meeting next Tuesday at 2 PM.
+
+地道表达：
+We have an online meeting scheduled for next Tuesday at 2 PM.
+
+本次掌握的表达块：
+- There is
+- an online meeting
+- next Tuesday
+- at 2 PM
+- scheduled for
+
+来源：memos/xxx
+
+#english #translation-practice #review
+```
+
+### 可行性分析
+
+可行性较高，原因：
+
+- Review 页已有当前 `activeMemo`，入口和面板容器可以继续复用。
+- `MemoTranslationPracticePanel` 已经具备 bottom sheet / desktop right panel 的响应式基础。
+- 当前已接入真实 AI provider，生成结构化练习内容的后端路径已经跑通。
+- 保存素材 memo 已经实现，可以继续复用 `useCreateMemo`。
+- 新方案减少用户输入，前端状态机可以比第 1 批更简单。
+
+主要改动：
+
+- 前端需要把 `Textarea + Ask teacher + Submit for feedback` 改为 `answer chips + option chips + check/reset/hint`。
+- 后端需要新增或重命名 proto 消息，生成拼句练习结构。
+- 生成 prompt 需要约束输出短句、短 chip、两个可接受版本。
+- 测试需要覆盖“基础版本通过”“地道版本通过”“顺序错误不通过”。
+
+### 影响性分析
+
+正向影响：
+
+- 手机端操作成本明显降低。
+- 更符合 Review 场景，不会打断回顾节奏。
+- 用户不需要凭空写英文，而是从“可用表达块”中做选择和组合。
+- 同时支持基础表达和地道表达，适合不同水平用户。
+- 检查逻辑可确定化，减少 AI 批改不稳定。
+
+风险与代价：
+
+- 当前第 1 批自由输入练习会被弱化，喜欢完整写作训练的用户可能觉得不够自由。
+- 如果两个版本的表达块都放入可选区，chip 数量控制不好会显得乱。
+- 只接受两个目标版本会牺牲开放性，但这是第一版为了稳定体验的合理取舍。
+- 需要新增 proto 和生成文件，改动面会覆盖后端、前端类型和 OpenAPI。
+
+推荐取舍：
+
+- 第 2 批先保留旧接口和旧保存格式兼容，但前端默认切到“点击拼句版”。
+- 不做拖拽，只做点击拼句。
+- 不做复杂成绩/历史表。
+- 不做多句长 memo，AI 只抽取当前 memo 的核心表达。
+- 等轻量版体验稳定后，再考虑在面板里增加“高级：自己输入翻译”入口。
+
+### 第 2 批验收标准
+
+- 手机端打开练习面板后，不需要弹出键盘即可完成一次练习。
+- 可选表达区同时包含基础版本和地道版本的表达块。
+- 用户拼出基础版本时通过。
+- 用户拼出地道版本时通过。
+- 用户拼错时只展示一条短提示，不进入长篇批改。
+- 通过后可以保存为素材 memo。
+- 保存后的 memo 包含原始 memo、基础表达、地道表达、表达块和标签。
+- Review 左右滑动不被练习面板内的操作误触发。
+
+### 第 2 批本轮 UI/Prompt 调整
+
+本轮把教学区进一步收敛为两个版本 + 一个表达工具箱：
+
+- `Basic version`：只给基于当前 memo 内容的最基础、最简单表达。它的目标是降低门槛，让基础用户先知道“这条 memo 至少可以怎样说”。
+- `Natural AI version`：给进阶表达。根据 memo 内容动态决定升级方式，可以是同义词替换、更自然的句式、更地道的口语表达，或更符合英文习惯的信息重组。
+- `Expression toolkit`：替代原来容易重复的 `Expression blocks` / `Core words` / `Useful phrases` 三段展示。工具箱内只保留可用的字、词、短语块和句式。
+- 工具箱默认只显示表达本身，解释默认收起；用户需要时点击展开。
+- 拼句区继续单独展示 `Available blocks`，它服务于操作，不再承担教学解释展示。
+- `Available blocks` 按 `Basic version` 和 `Natural AI version` 分成两个区域。两个区域内部可以打乱，但区域之间不混在一起，让用户清楚自己是在拼基础版还是进阶版。
+
+这样可以减少文字负担，尤其适合手机端回顾时顺手练习：用户先看两个答案版本，再按需展开工具解释，最后用可选块完成拼句。
+
 ## 后续增强
 
 第二期可以考虑：
