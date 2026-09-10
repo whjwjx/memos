@@ -243,6 +243,33 @@ const normalizeSentence = (blocks: TranslationPracticeBlock[]) => {
 
 const sequenceKey = (blocks: TranslationPracticeBlock[]) => blocks.map((block) => block.id).join("|");
 
+const getAvailableBlocksForVersion = (
+  versionBlocks: TranslationPracticeBlock[],
+  optionBlocks: TranslationPracticeBlock[],
+  selectedIds: Set<string>,
+) => {
+  const versionIds = new Set(versionBlocks.map((block) => block.id));
+  const seen = new Set<string>();
+  const availableBlocks: TranslationPracticeBlock[] = [];
+
+  const addBlock = (block: TranslationPracticeBlock) => {
+    if (!versionIds.has(block.id) || selectedIds.has(block.id) || seen.has(block.id)) {
+      return;
+    }
+    seen.add(block.id);
+    availableBlocks.push(block);
+  };
+
+  for (const block of optionBlocks) {
+    addBlock(block);
+  }
+  for (const block of versionBlocks) {
+    addBlock(block);
+  }
+
+  return availableBlocks;
+};
+
 const formatSavedPracticeMemo = (
   memo: Memo,
   lesson: PracticeLessonView,
@@ -396,6 +423,38 @@ const PracticeBlockButton = ({
   </button>
 );
 
+const AvailableBlockGroup = ({
+  title,
+  blocks,
+  disabled,
+  emptyLabel,
+  onSelect,
+}: {
+  title: string;
+  blocks: TranslationPracticeBlock[];
+  disabled?: boolean;
+  emptyLabel: string;
+  onSelect: (blockId: string) => void;
+}) => (
+  <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-2.5">
+    <div className="flex items-center justify-between gap-2">
+      <div className="text-xs font-medium text-foreground">{title}</div>
+      <Badge variant="secondary" shape="pill">
+        {blocks.length}
+      </Badge>
+    </div>
+    {blocks.length > 0 ? (
+      <div className="flex flex-wrap gap-1.5">
+        {blocks.map((block) => (
+          <PracticeBlockButton key={block.id} block={block} disabled={disabled} onClick={() => onSelect(block.id)} />
+        ))}
+      </div>
+    ) : (
+      <div className="rounded-md bg-background/70 px-2.5 py-2 text-xs text-muted-foreground">{emptyLabel}</div>
+    )}
+  </div>
+);
+
 export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoTranslationPracticePanelProps) => {
   const t = useTranslate();
   const { i18n } = useTranslation();
@@ -415,15 +474,25 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
   const memoExcerpt = useMemo(() => compactText(memoContent, 160), [memoContent]);
   const practiceLesson = useMemo(() => (lesson ? normalizePracticeLessonForBuilder(lesson) : undefined), [lesson]);
   const optionBlocks = useMemo(() => practiceLesson?.optionBlocks ?? [], [practiceLesson]);
-  const blockById = useMemo(() => new Map(optionBlocks.map((block) => [block.id, block])), [optionBlocks]);
+  const blockById = useMemo(() => {
+    const blocks = practiceLesson
+      ? [...practiceLesson.optionBlocks, ...practiceLesson.basicBlocks, ...practiceLesson.nativeBlocks]
+      : optionBlocks;
+    return new Map(blocks.map((block) => [block.id, block]));
+  }, [optionBlocks, practiceLesson]);
   const selectedBlocks = useMemo(
     () => selectedBlockIds.map((id) => blockById.get(id)).filter((block): block is TranslationPracticeBlock => Boolean(block)),
     [blockById, selectedBlockIds],
   );
-  const availableBlocks = useMemo(() => {
-    const selectedIds = new Set(selectedBlockIds);
-    return optionBlocks.filter((block) => !selectedIds.has(block.id));
-  }, [optionBlocks, selectedBlockIds]);
+  const selectedIdSet = useMemo(() => new Set(selectedBlockIds), [selectedBlockIds]);
+  const basicAvailableBlocks = useMemo(
+    () => (practiceLesson ? getAvailableBlocksForVersion(practiceLesson.basicBlocks, optionBlocks, selectedIdSet) : []),
+    [optionBlocks, practiceLesson, selectedIdSet],
+  );
+  const nativeAvailableBlocks = useMemo(
+    () => (practiceLesson ? getAvailableBlocksForVersion(practiceLesson.nativeBlocks, optionBlocks, selectedIdSet) : []),
+    [optionBlocks, practiceLesson, selectedIdSet],
+  );
   const answerText = useMemo(() => normalizeSentence(selectedBlocks), [selectedBlocks]);
   const basicAnswerKey = useMemo(() => sequenceKey(practiceLesson?.basicBlocks ?? []), [practiceLesson]);
   const nativeAnswerKey = useMemo(() => sequenceKey(practiceLesson?.nativeBlocks ?? []), [practiceLesson]);
@@ -722,15 +791,21 @@ export const MemoTranslationPracticePanel = ({ memo, open, onOpenChange }: MemoT
                         <div className="mb-2 text-xs font-medium text-muted-foreground">
                           {t("review.translation-practice.available-blocks")}
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {availableBlocks.map((block) => (
-                            <PracticeBlockButton
-                              key={block.id}
-                              block={block}
-                              disabled={phase === "saved"}
-                              onClick={() => handleSelectBlock(block.id)}
-                            />
-                          ))}
+                        <div className="space-y-2">
+                          <AvailableBlockGroup
+                            title={t("review.translation-practice.basic-version")}
+                            blocks={basicAvailableBlocks}
+                            disabled={phase === "saved"}
+                            emptyLabel={t("review.translation-practice.all-blocks-selected")}
+                            onSelect={handleSelectBlock}
+                          />
+                          <AvailableBlockGroup
+                            title={t("review.translation-practice.native-version")}
+                            blocks={nativeAvailableBlocks}
+                            disabled={phase === "saved"}
+                            emptyLabel={t("review.translation-practice.all-blocks-selected")}
+                            onSelect={handleSelectBlock}
+                          />
                         </div>
                       </div>
 

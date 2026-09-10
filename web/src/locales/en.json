@@ -620,6 +620,7 @@
     "today-count": "{{count}} today",
     "translation-practice": {
       "ask-teacher": "Ask teacher",
+      "all-blocks-selected": "All blocks from this version are selected.",
       "available-blocks": "Available blocks",
       "basic-version": "Basic version",
       "build-answer": "Build a sentence",

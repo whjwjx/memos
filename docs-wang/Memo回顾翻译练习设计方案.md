@@ -554,6 +554,7 @@ We have an online meeting scheduled for next Tuesday at 2 PM.
 - `Expression toolkit`：替代原来容易重复的 `Expression blocks` / `Core words` / `Useful phrases` 三段展示。工具箱内只保留可用的字、词、短语块和句式。
 - 工具箱默认只显示表达本身，解释默认收起；用户需要时点击展开。
 - 拼句区继续单独展示 `Available blocks`，它服务于操作，不再承担教学解释展示。
+- `Available blocks` 按 `Basic version` 和 `Natural AI version` 分成两个区域。两个区域内部可以打乱，但区域之间不混在一起，让用户清楚自己是在拼基础版还是进阶版。
 
 这样可以减少文字负担，尤其适合手机端回顾时顺手练习：用户先看两个答案版本，再按需展开工具解释，最后用可选块完成拼句。
 

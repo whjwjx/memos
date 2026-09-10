@@ -545,6 +545,7 @@
     "today-count": "今日 {{count}} 条",
     "translation-practice": {
       "ask-teacher": "问一下老师",
+      "all-blocks-selected": "这个版本的表达已经全部选完。",
       "available-blocks": "可选表达",
       "basic-version": "基础表达",
       "build-answer": "拼一句",
