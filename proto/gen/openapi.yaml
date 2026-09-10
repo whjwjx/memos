@@ -5220,6 +5220,15 @@ components:
                 createTime:
                     readOnly: true
                     type: string
+        TranslationPracticeBlock:
+            type: object
+            properties:
+                id:
+                    type: string
+                text:
+                    type: string
+                explanation:
+                    type: string
         TranslationPracticeFeedback:
             type: object
             properties:
@@ -5260,6 +5269,24 @@ components:
                     type: array
                     items:
                         type: string
+                basicVersion:
+                    type: string
+                nativeVersion:
+                    type: string
+                basicBlocks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/TranslationPracticeBlock'
+                nativeBlocks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/TranslationPracticeBlock'
+                optionBlocks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/TranslationPracticeBlock'
+                quickTip:
+                    type: string
         UpdateConversationRequest:
             required:
                 - conversation
