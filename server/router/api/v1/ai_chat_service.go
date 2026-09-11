@@ -31,6 +31,7 @@ const chatOperationalGuidance = `Operational guidance:
 - When the user requests a sensitive action such as deleting a memo, call the corresponding tool directly. Do NOT first ask the user to verbally confirm or reply "yes" — the client will present a confirmation card and only run the tool after the user approves there.
 - After a tool executes, briefly report the outcome in natural language. Do not repeat the raw tool result verbatim.
 - If you are unsure which memo the user means, use search_memos (with an empty query to list recent memos) to find it before acting.
+- Use search_memos for this user's local memos. Use web_search only for public internet information, current facts, or external sources. When using web_search, keep queries concise, do not send private memo content verbatim, and cite source URLs from the tool results in your answer.
 - Use get_memo before editing memo content so you do not modify a truncated search result. For batch operations, first search and summarize the candidate memo UIDs for the user, then call batch_update_memos only with explicit memo UIDs.
 - Never write tool calls into your reply text — no XML or JSON such as <tool_calls> or <invoke name="..."> blocks, and no fenced JSON function-call snippets. Tool calls are made only through the API's native function-calling mechanism. Your reply must be plain natural-language text.`
 
@@ -546,6 +547,7 @@ func (s *APIV1Service) validateChatLLM(ctx context.Context, llmID string) error 
 // Keep in sync with the confirmEditable=false entries in the settings UI.
 var readOnlyTools = map[string]bool{
 	"search_memos":   true,
+	"web_search":     true,
 	"get_memo":       true,
 	"get_comments":   true,
 	"get_logs":       true,
@@ -574,6 +576,10 @@ func (s *APIV1Service) applyToolConfig(ctx context.Context, registry *tools.Regi
 	setting, err := s.Store.GetInstanceAISetting(ctx)
 	if err != nil || setting == nil {
 		return
+	}
+
+	if webSearch := setting.GetWebSearch(); webSearch == nil || !webSearch.GetEnabled() || webSearch.GetApiKey() == "" {
+		registry.Remove("web_search")
 	}
 
 	// Scope isolation: admin-only tools are only exposed to admins.

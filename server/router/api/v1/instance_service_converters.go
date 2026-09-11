@@ -390,6 +390,7 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 		Memory:        convertMemoryConfigFromStore(setting.GetMemory()),
 		Translation:   convertTranslationConfigFromStore(setting.GetTranslation()),
 		Llms:          make([]*v1pb.InstanceSetting_LLMConfig, 0, len(setting.GetLlms())),
+		WebSearch:     convertWebSearchConfigFromStore(setting.GetWebSearch()),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -489,6 +490,7 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 		Memory:        convertMemoryConfigToStore(setting.GetMemory()),
 		Translation:   convertTranslationConfigToStore(setting.GetTranslation()),
 		Llms:          make([]*storepb.LLMConfig, 0, len(setting.GetLlms())),
+		WebSearch:     convertWebSearchConfigToStore(setting.GetWebSearch()),
 	}
 	for _, provider := range setting.Providers {
 		if provider == nil {
@@ -664,5 +666,37 @@ func convertTranslationConfigToStore(setting *v1pb.InstanceSetting_TranslationCo
 		Model:         setting.GetModel(),
 		MaxTextLength: setting.GetMaxTextLength(),
 		LlmId:         setting.GetLlmId(),
+	}
+}
+
+func convertWebSearchConfigFromStore(setting *storepb.WebSearchConfig) *v1pb.InstanceSetting_WebSearchConfig {
+	if setting == nil {
+		return nil
+	}
+	apiKey := setting.GetApiKey()
+	return &v1pb.InstanceSetting_WebSearchConfig{
+		Provider:      v1pb.InstanceSetting_WebSearchProvider(setting.GetProvider()),
+		Enabled:       setting.GetEnabled(),
+		Endpoint:      setting.GetEndpoint(),
+		MaxResults:    setting.GetMaxResults(),
+		SearchDepth:   setting.GetSearchDepth(),
+		IncludeAnswer: setting.GetIncludeAnswer(),
+		ApiKeySet:     apiKey != "",
+		ApiKeyHint:    maskAPIKey(apiKey),
+	}
+}
+
+func convertWebSearchConfigToStore(setting *v1pb.InstanceSetting_WebSearchConfig) *storepb.WebSearchConfig {
+	if setting == nil {
+		return nil
+	}
+	return &storepb.WebSearchConfig{
+		Provider:      storepb.WebSearchConfig_Provider(setting.GetProvider()),
+		Enabled:       setting.GetEnabled(),
+		Endpoint:      setting.GetEndpoint(),
+		ApiKey:        setting.GetApiKey(),
+		MaxResults:    setting.GetMaxResults(),
+		SearchDepth:   setting.GetSearchDepth(),
+		IncludeAnswer: setting.GetIncludeAnswer(),
 	}
 }

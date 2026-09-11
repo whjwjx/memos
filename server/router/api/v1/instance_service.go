@@ -23,7 +23,13 @@ const (
 	maxTranslationConfigModelLength      = 256
 	maxTranslationConfigMaxTextLength    = 100000
 	maxLLMConfigModelLength              = 256
+	maxWebSearchConfigEndpointLength     = 512
+	defaultWebSearchMaxResults           = 5
+	maxWebSearchMaxResults               = 10
 	maxBatchGetInstanceSettings          = 100
+	defaultTavilyEndpoint                = "https://api.tavily.com"
+	tavilySearchDepthBasic               = "basic"
+	tavilySearchDepthAdvanced            = "advanced"
 )
 
 type instanceSettingCaller struct {

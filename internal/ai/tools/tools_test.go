@@ -2,11 +2,15 @@ package tools_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/usememos/memos/internal/ai/tools"
+	storepb "github.com/usememos/memos/proto/gen/store"
 )
 
 func TestRegistryContainsConversationalTools(t *testing.T) {
@@ -18,6 +22,7 @@ func TestRegistryContainsConversationalTools(t *testing.T) {
 	}
 	for _, name := range []string{
 		"search_memos",
+		"web_search",
 		"get_memo",
 		"get_comments",
 		"create_memo",
@@ -63,6 +68,7 @@ func TestToolsRejectMissingRequiredArgs(t *testing.T) {
 		args string
 	}{
 		{"get_comments", `{"limit":5}`},            // missing memoUid
+		{"web_search", `{}`},                       // missing query
 		{"get_memo", `{}`},                         // missing memoUid
 		{"create_memo", `{"visibility":"PUBLIC"}`}, // missing content
 		{"update_memo", `{}`},                      // missing memoUid
@@ -86,4 +92,56 @@ func TestManageSettingsRejectsUnknownKey(t *testing.T) {
 	require.NotNil(t, tool)
 	_, err := tool.Run(context.Background(), tools.ToolContext{UserID: 1, Store: nil}, `{"action":"get","key":"NOPE"}`)
 	require.Error(t, err)
+}
+
+func TestWebSearchToolCallsTavily(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/search", r.URL.Path)
+		require.Equal(t, "Bearer tvly-test", r.Header.Get("Authorization"))
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "memos tavily", body["query"])
+		require.Equal(t, "advanced", body["search_depth"])
+		require.Equal(t, float64(3), body["max_results"])
+		require.Equal(t, true, body["include_answer"])
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"query":"memos tavily",
+			"answer":"Tavily can search the web for AI agents.",
+			"response_time":0.12,
+			"results":[
+				{"title":"Tavily Docs","url":"https://docs.tavily.com/","content":"Search API documentation","score":0.95,"published_date":"2026-09-12"}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	tool := &tools.WebSearchTool{
+		HTTPClient: server.Client(),
+		Config: &storepb.WebSearchConfig{
+			Enabled:       true,
+			Provider:      storepb.WebSearchConfig_TAVILY,
+			Endpoint:      server.URL,
+			ApiKey:        "tvly-test",
+			MaxResults:    5,
+			SearchDepth:   "basic",
+			IncludeAnswer: false,
+		},
+	}
+
+	result, err := tool.Run(context.Background(), tools.ToolContext{}, `{
+		"query":"memos tavily",
+		"maxResults":3,
+		"searchDepth":"advanced",
+		"includeAnswer":true
+	}`)
+	require.NoError(t, err)
+	require.Contains(t, result, "Web search results:")
+	require.Contains(t, result, "Tavily can search the web for AI agents.")
+	require.Contains(t, result, "https://docs.tavily.com/")
 }

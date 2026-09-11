@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"math"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -106,6 +107,9 @@ func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, se
 		return err
 	}
 	if err := preparePersistedTranslationConfig(setting, existing, providersByID, llmsByID); err != nil {
+		return err
+	}
+	if err := preparePersistedWebSearchConfig(setting, existing); err != nil {
 		return err
 	}
 	return nil
@@ -293,6 +297,61 @@ func preparePersistedToolConfigs(setting *storepb.InstanceAISetting) error {
 		if tool == nil {
 			return errors.Errorf("tool %q cannot be nil", name)
 		}
+	}
+	return nil
+}
+
+func preparePersistedWebSearchConfig(setting *storepb.InstanceAISetting, existing *storepb.InstanceAISetting) error {
+	if setting.WebSearch == nil && existing != nil {
+		setting.WebSearch = existing.GetWebSearch()
+	}
+	if setting.WebSearch == nil {
+		return nil
+	}
+
+	cfg := setting.WebSearch
+	if cfg.Provider == storepb.WebSearchConfig_PROVIDER_UNSPECIFIED {
+		cfg.Provider = storepb.WebSearchConfig_TAVILY
+	}
+	if cfg.Provider != storepb.WebSearchConfig_TAVILY {
+		return errors.New("web search provider is unsupported")
+	}
+
+	cfg.Endpoint = strings.TrimSpace(cfg.Endpoint)
+	if cfg.Endpoint == "" {
+		cfg.Endpoint = defaultTavilyEndpoint
+	}
+	if len(cfg.Endpoint) > maxWebSearchConfigEndpointLength {
+		return errors.Errorf("web search endpoint is too long; maximum length is %d characters", maxWebSearchConfigEndpointLength)
+	}
+	parsed, err := url.ParseRequestURI(cfg.Endpoint)
+	if err != nil {
+		return errors.Wrap(err, "web search endpoint is invalid")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New("web search endpoint must use http or https")
+	}
+
+	cfg.SearchDepth = strings.ToLower(strings.TrimSpace(cfg.SearchDepth))
+	if cfg.SearchDepth == "" {
+		cfg.SearchDepth = tavilySearchDepthBasic
+	}
+	if cfg.SearchDepth != tavilySearchDepthBasic && cfg.SearchDepth != tavilySearchDepthAdvanced {
+		return errors.New("web search depth must be basic or advanced")
+	}
+	if cfg.MaxResults <= 0 {
+		cfg.MaxResults = defaultWebSearchMaxResults
+	}
+	if cfg.MaxResults > maxWebSearchMaxResults {
+		cfg.MaxResults = maxWebSearchMaxResults
+	}
+
+	cfg.ApiKey = strings.TrimSpace(cfg.ApiKey)
+	if cfg.ApiKey == "" && existing != nil && existing.GetWebSearch() != nil {
+		cfg.ApiKey = existing.GetWebSearch().GetApiKey()
+	}
+	if cfg.Enabled && cfg.ApiKey == "" {
+		return errors.New("web search API key is required when web search is enabled")
 	}
 	return nil
 }
