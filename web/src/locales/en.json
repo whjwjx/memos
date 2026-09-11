@@ -1461,6 +1461,13 @@
     "memo-context-label": "Discussing this memo",
     "memo-context-loading": "Loading memo...",
     "memo-context-unavailable": "This memo is unavailable or you do not have access.",
-    "agent-fallback-label": "Assistant"
+    "agent-fallback-label": "Assistant",
+    "tool-activity-summary": "Used {{count}} tool(s): {{names}}",
+    "tool-activity-arguments": "Arguments",
+    "tool-activity-result": "Result",
+    "tool-activity-status-completed": "Completed",
+    "tool-activity-status-error": "Error",
+    "tool-activity-status-pending": "Pending",
+    "tool-activity-status-skipped": "Skipped"
   }
 }

@@ -74,6 +74,14 @@ func TestRunLoopExecutesToolThenAnswers(t *testing.T) {
 	require.True(t, executed)
 	require.Equal(t, "here are your notes", resp.Content)
 	require.False(t, resp.RequiresConfirmation)
+	require.Len(t, resp.Messages, 3)
+	require.Equal(t, chat.RoleAssistant, resp.Messages[0].Role)
+	require.Len(t, resp.Messages[0].ToolCalls, 1)
+	require.Equal(t, chat.RoleTool, resp.Messages[1].Role)
+	require.Equal(t, "c1", resp.Messages[1].ToolCallID)
+	require.Equal(t, "ok", resp.Messages[1].Content)
+	require.Equal(t, chat.RoleAssistant, resp.Messages[2].Role)
+	require.Equal(t, "here are your notes", resp.Messages[2].Content)
 }
 
 func TestRunLoopStopsAtConfirmation(t *testing.T) {
@@ -92,6 +100,11 @@ func TestRunLoopStopsAtConfirmation(t *testing.T) {
 	require.True(t, resp.RequiresConfirmation)
 	require.Len(t, resp.ToolCalls, 1)
 	require.Equal(t, "manage_settings", resp.ToolCalls[0].Name)
+	require.Len(t, resp.Messages, 2)
+	require.Equal(t, chat.RoleAssistant, resp.Messages[0].Role)
+	require.Len(t, resp.Messages[0].ToolCalls, 1)
+	require.Equal(t, chat.RoleTool, resp.Messages[1].Role)
+	require.Equal(t, "awaiting user confirmation", resp.Messages[1].Content)
 }
 
 func TestRunLoopContinuesAfterApproval(t *testing.T) {
@@ -118,6 +131,11 @@ func TestRunLoopContinuesAfterApproval(t *testing.T) {
 	require.True(t, executed)
 	require.False(t, resp.RequiresConfirmation)
 	require.Equal(t, "settings updated", resp.Content)
+	require.Len(t, resp.Messages, 2)
+	require.Equal(t, chat.RoleTool, resp.Messages[0].Role)
+	require.Equal(t, "ok", resp.Messages[0].Content)
+	require.Equal(t, chat.RoleAssistant, resp.Messages[1].Role)
+	require.Equal(t, "settings updated", resp.Messages[1].Content)
 	// The approval continuation strips every function-calling trace: no tool
 	// definitions are sent (so no tool_choice is issued at all) and the history
 	// is flattened so the model cannot mimic pseudo-XML tool calls.

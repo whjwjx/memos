@@ -74,6 +74,10 @@ type AssistantResponse struct {
 	// calls). The caller must persist these so that subsequent turns can rebuild
 	// a complete message history for the model.
 	ToolMessages []chat.Message
+	// Messages are the assistant and tool messages that should be persisted for
+	// this request, in conversation order. It includes automatic tool-call turns
+	// and their results, plus the final assistant answer when one exists.
+	Messages []chat.Message
 	// RequiresConfirmation is true when the assistant requested a sensitive tool
 	// the user has not yet approved.
 	RequiresConfirmation bool
@@ -89,6 +93,8 @@ func ToolLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*As
 func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*AssistantResponse, error) {
 	approved := toSet(req.ApprovedToolCallIDs)
 	rejected := toSet(req.RejectedToolCallIDs)
+	emittedMessages := make([]chat.Message, 0)
+	emittedToolMessages := make([]chat.Message, 0)
 
 	// Build the working message list: history + new user turn.
 	messages := make([]chat.Message, 0, len(req.History)+2)
@@ -133,7 +139,12 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 			if content == "" {
 				content = summarizeApproved(updated)
 			}
-			return &AssistantResponse{Content: content, ToolMessages: updated}, nil
+			finalMessage := chat.Message{Role: chat.RoleAssistant, Content: content}
+			return &AssistantResponse{
+				Content:      content,
+				ToolMessages: updated,
+				Messages:     append(append([]chat.Message{}, updated...), finalMessage),
+			}, nil
 		}
 	}
 
@@ -157,7 +168,12 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 
 		// No tool calls → final answer.
 		if len(resp.ToolCalls) == 0 {
-			return &AssistantResponse{Content: resp.Text}, nil
+			finalMessage := chat.Message{Role: chat.RoleAssistant, Content: resp.Text}
+			return &AssistantResponse{
+				Content:      resp.Text,
+				ToolMessages: emittedToolMessages,
+				Messages:     append(emittedMessages, finalMessage),
+			}, nil
 		}
 
 		// Execute each requested tool and collect results.
@@ -212,6 +228,9 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 		assistantMsg := chat.Message{Role: chat.RoleAssistant, Content: resp.Text, ToolCalls: resp.ToolCalls}
 		messages = append(messages, assistantMsg)
 		messages = append(messages, toolMessages...)
+		emittedMessages = append(emittedMessages, assistantMsg)
+		emittedMessages = append(emittedMessages, toolMessages...)
+		emittedToolMessages = append(emittedToolMessages, toolMessages...)
 
 		if hitConfirmation {
 			// Return the pending calls so the caller can ask for confirmation.
@@ -221,6 +240,7 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 			return &AssistantResponse{
 				ToolCalls:            pending,
 				ToolMessages:         toolMessages,
+				Messages:             emittedMessages,
 				RequiresConfirmation: true,
 			}, nil
 		}
@@ -229,7 +249,9 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 
 	// Exhausted rounds without a final answer.
 	return &AssistantResponse{
-		ToolCalls: respToolCallsFromMessages(messages),
+		ToolCalls:    respToolCallsFromMessages(messages),
+		ToolMessages: emittedToolMessages,
+		Messages:     emittedMessages,
 	}, nil
 }
 

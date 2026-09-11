@@ -1,6 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { BotIcon, BrainCircuitIcon, CheckIcon, ChevronDownIcon, MessageSquareTextIcon, SendIcon, UserIcon, XIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  BotIcon,
+  BrainCircuitIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  MessageSquareTextIcon,
+  SendIcon,
+  UserIcon,
+  WrenchIcon,
+  XIcon,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChatMarkdown } from "@/components/ChatMarkdown";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +84,131 @@ const stripFakeToolCalls = (content: string): string => {
   cleaned = cleaned.replace(/<invoke\b[^>]*>[\s\S]*?<\/invoke>/gi, "");
   cleaned = cleaned.trim();
   return cleaned || "Done.";
+};
+
+type ToolActivityCall = {
+  id: string;
+  name: string;
+  arguments: string;
+  result: string;
+  status: "pending" | "completed" | "error" | "skipped";
+};
+
+type ConversationTimelineItem =
+  | { kind: "message"; message: ConversationMessage }
+  | { kind: "toolActivity"; id: string; calls: ToolActivityCall[] };
+
+const SENSITIVE_KEY_RE = /api[_-]?key|authorization|bearer|password|secret|token/i;
+
+const redactSensitiveValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveValue);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
+        key,
+        SENSITIVE_KEY_RE.test(key) ? "[redacted]" : redactSensitiveValue(nested),
+      ]),
+    );
+  }
+  if (typeof value === "string") {
+    return value.replace(/(api[_-]?key|authorization|bearer|password|secret|token)(["'\s:=]+)([^"'\s,}]+)/gi, "$1$2[redacted]");
+  }
+  return value;
+};
+
+const parseToolPayload = (value: string): unknown => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const firstObject = trimmed.indexOf("{");
+  const firstArray = trimmed.indexOf("[");
+  const firstJSONChar = firstObject < 0 ? firstArray : firstArray < 0 ? firstObject : Math.min(firstObject, firstArray);
+  const payload = firstJSONChar > 0 ? trimmed.slice(firstJSONChar) : trimmed;
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return undefined;
+  }
+};
+
+const formatToolPayload = (value: string, maxChars = 2400): string => {
+  const parsed = parseToolPayload(value);
+  const formatted =
+    parsed === undefined ? String(redactSensitiveValue(value.trim())) : JSON.stringify(redactSensitiveValue(parsed), undefined, 2);
+  return truncateText(formatted, maxChars);
+};
+
+const getToolResultStatus = (content: string): ToolActivityCall["status"] => {
+  const normalized = content.trim();
+  if (normalized === AWAITING_PLACEHOLDER) {
+    return "pending";
+  }
+  if (normalized.startsWith("error:")) {
+    return "error";
+  }
+  if (normalized.includes("拒绝") || normalized.toLowerCase().includes("rejected") || normalized.toLowerCase().includes("skipped")) {
+    return "skipped";
+  }
+  return "completed";
+};
+
+const getToolResultSummary = (content: string): string => {
+  const parsed = parseToolPayload(content);
+  if (parsed && typeof parsed === "object") {
+    const obj = parsed as Record<string, unknown>;
+    if (Array.isArray(obj.results)) {
+      return `${obj.results.length} result${obj.results.length === 1 ? "" : "s"}`;
+    }
+    if (typeof obj.answer === "string" && obj.answer.trim()) {
+      return compactText(obj.answer, 160);
+    }
+  }
+  return compactText(content, 180);
+};
+
+const buildConversationTimeline = (messages: ConversationMessage[]): ConversationTimelineItem[] => {
+  const toolResultByID = new Map<string, ConversationMessage>();
+  for (const message of messages) {
+    if (message.role === "tool" && message.toolCallId) {
+      toolResultByID.set(message.toolCallId, message);
+    }
+  }
+
+  const timeline: ConversationTimelineItem[] = [];
+  for (const message of messages) {
+    if (message.role === "tool") {
+      continue;
+    }
+    if (message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0) {
+      timeline.push({
+        kind: "toolActivity",
+        id: `tools-${message.id}`,
+        calls: message.toolCalls.map((call) => {
+          const result = toolResultByID.get(call.id)?.content ?? "";
+          return {
+            id: call.id,
+            name: call.name,
+            arguments: call.arguments,
+            result,
+            status: result ? getToolResultStatus(result) : "pending",
+          };
+        }),
+      });
+      if (!message.content.trim()) {
+        continue;
+      }
+      timeline.push({ kind: "message", message: { ...message, toolCalls: [] } });
+      continue;
+    }
+    if (message.role === "assistant" && !message.content.trim()) {
+      continue;
+    }
+    timeline.push({ kind: "message", message });
+  }
+  return timeline;
 };
 
 const AgentPill = ({
@@ -176,17 +311,7 @@ const LLMPill = ({
 
 const MessageBubble = ({ msg }: { msg: ConversationMessage }) => {
   if (msg.role === "tool") {
-    // Pending placeholders are surfaced via the confirmation card instead.
-    if (msg.content === AWAITING_PLACEHOLDER) return null;
-    return (
-      <div className="flex flex-col gap-1 items-start">
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <BotIcon className="w-3 h-auto" />
-          <span>{msg.name || "tool"}</span>
-        </div>
-        <div className="max-w-[80%] rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">{msg.content}</div>
-      </div>
-    );
+    return null;
   }
 
   const isUser = msg.role === "user";
@@ -236,6 +361,8 @@ const summarizeToolCall = (name: string, argsJSON: string): string => {
       return `查看评论：${String(args.memoUid ?? "")}`;
     case "search_memos":
       return `搜索：${String(args.query ?? "")}`;
+    case "web_search":
+      return `联网搜索：${String(args.query ?? "")}`;
     case "query_db":
       return `数据库操作：${String(args.operation ?? "")} ${String(args.table ?? "")}${args.operation === "select" ? `，最多 ${String(args.limit ?? 10)} 行` : ""}`;
     case "get_logs":
@@ -243,6 +370,71 @@ const summarizeToolCall = (name: string, argsJSON: string): string => {
     default:
       return preview(argsJSON);
   }
+};
+
+const ToolActivity = ({ calls }: { calls: ToolActivityCall[] }) => {
+  const t = useTranslate();
+  const [expanded, setExpanded] = useState(false);
+  const names = Array.from(new Set(calls.map((call) => call.name))).join(", ");
+  const hasError = calls.some((call) => call.status === "error");
+  const pendingCount = calls.filter((call) => call.status === "pending").length;
+  const statusLabel = hasError
+    ? t("aiChat.tool-activity-status-error")
+    : pendingCount > 0
+      ? t("aiChat.tool-activity-status-pending")
+      : t("aiChat.tool-activity-status-completed");
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        className="group flex max-w-[82%] items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((open) => !open)}
+      >
+        <WrenchIcon className="size-3.5 shrink-0" strokeWidth={1.8} />
+        <span className="min-w-0 flex-1 truncate">{t("aiChat.tool-activity-summary", { count: calls.length, names })}</span>
+        <Badge variant={hasError ? "warning" : "secondary"} shape="pill" className="hidden text-[11px] sm:inline-flex">
+          {statusLabel}
+        </Badge>
+        <ChevronDownIcon className={cn("size-3.5 shrink-0 transition-transform", expanded && "rotate-180")} strokeWidth={1.8} />
+      </button>
+
+      {expanded && (
+        <div className="flex w-full max-w-[82%] flex-col gap-2 rounded-xl border border-border bg-background px-3 py-3 text-xs">
+          {calls.map((call) => (
+            <div key={call.id} className="flex flex-col gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-primary">{call.name}</code>
+                <Badge variant={call.status === "error" ? "warning" : call.status === "pending" ? "outline" : "secondary"} shape="pill">
+                  {t(`aiChat.tool-activity-status-${call.status}` as Parameters<typeof t>[0])}
+                </Badge>
+              </div>
+              <div className="text-sm text-foreground">{summarizeToolCall(call.name, call.arguments)}</div>
+              <div className="grid gap-2">
+                <div>
+                  <div className="mb-1 font-medium text-muted-foreground">{t("aiChat.tool-activity-arguments")}</div>
+                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                    {formatToolPayload(call.arguments)}
+                  </pre>
+                </div>
+                {call.result && call.result !== AWAITING_PLACEHOLDER && (
+                  <div>
+                    <div className="mb-1 font-medium text-muted-foreground">
+                      {t("aiChat.tool-activity-result")} · {getToolResultSummary(call.result)}
+                    </div>
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                      {formatToolPayload(call.result)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 // queryDBWriteOps are the query_db operations that mutate the database and are
@@ -417,6 +609,7 @@ const AIChat = () => {
   const activeLLMId = conversationId ? conversationLLMId || selectedLLMValue : selectedLLMValue;
   const activeAgentLabel = activeAgentId ? (agentNameById.get(activeAgentId) ?? activeAgentId) : t("aiChat.agent-fallback-label");
   const activeLLMLabel = activeLLMId ? (llmNameById.get(activeLLMId) ?? activeLLMId) : "LLM";
+  const timeline = useMemo(() => buildConversationTimeline(history), [history]);
   const composerDisabled =
     isPending ||
     createConversation.isPending ||
@@ -697,9 +890,13 @@ const AIChat = () => {
         {history.length === 0 && (
           <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">{t("aiChat.start-hint")}</div>
         )}
-        {history.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} />
-        ))}
+        {timeline.map((item) =>
+          item.kind === "message" ? (
+            <MessageBubble key={item.message.id} msg={item.message} />
+          ) : (
+            <ToolActivity key={item.id} calls={item.calls} />
+          ),
+        )}
 
         {isPending && history.length > 0 && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
