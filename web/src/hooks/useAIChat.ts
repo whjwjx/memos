@@ -146,6 +146,8 @@ interface SendMessageState {
   toolCalls: ResolvedToolCall[];
 }
 
+type SendMessagePhase = "idle" | "thinking" | "using_tools" | "responding";
+
 const emptyState: SendMessageState = {
   requiresConfirmation: false,
   toolCalls: [],
@@ -207,6 +209,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
   const queryClient = useQueryClient();
   const [state, setState] = useState<SendMessageState>(emptyState);
   const [isPending, setIsPending] = useState(false);
+  const [phase, setPhase] = useState<SendMessagePhase>("idle");
   const [error, setError] = useState<unknown>(null);
   const updateTitle = useUpdateConversationTitle(conversationId);
   const abortRef = useRef<AbortController | null>(null);
@@ -293,6 +296,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
       setError(null);
 
       const hasDecisions = hasToolDecisions(input);
+      setPhase(hasDecisions ? "using_tools" : "thinking");
       await queryClient.cancelQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
       const prev = queryClient.getQueryData<ConversationCache>(["ai-chat", "conversation", conversationId]);
       if (hasDecisions) {
@@ -452,11 +456,13 @@ export const useSendMessage = (conversationId: string | undefined) => {
               if (!event.delta) {
                 break;
               }
+              setPhase("responding");
               queueAssistantDelta(event.delta);
               break;
             }
             case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL:
               if (event.toolCall) {
+                setPhase("using_tools");
                 discardAssistantDeltaQueue();
                 localAssistantIdRef.current = "";
                 if (!localToolAssistantIdRef.current) {
@@ -478,6 +484,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
               }
               break;
             case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT:
+              setPhase("using_tools");
               if (event.message?.toolCallId) {
                 const id = `local-tool-${event.message.toolCallId}`;
                 localTurnIdsRef.current.add(id);
@@ -561,6 +568,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
         }
         cleanupAssistantDeltaRenderer();
         setIsPending(false);
+        setPhase("idle");
         if (abortRef.current === controller) {
           abortRef.current = null;
         }
@@ -594,6 +602,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
     abortRef.current = null;
     streamRenderCleanupRef.current?.();
     streamRenderCleanupRef.current = null;
+    setPhase("idle");
     localTurnIdsRef.current = new Set();
     localAssistantIdRef.current = "";
     localToolAssistantIdRef.current = "";
@@ -650,8 +659,9 @@ export const useSendMessage = (conversationId: string | undefined) => {
     send,
     resolveToolCall,
     isPending,
+    phase,
     error,
   };
 };
 
-export type { Conversation, ConversationMessage };
+export type { Conversation, ConversationMessage, SendMessagePhase };

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  type SendMessagePhase,
   useConversation,
   useConversations,
   useCreateConversation,
@@ -97,7 +98,8 @@ type ToolActivityCall = {
 
 type ConversationTimelineItem =
   | { kind: "message"; message: ConversationMessage }
-  | { kind: "toolActivity"; id: string; calls: ToolActivityCall[] };
+  | { kind: "toolActivity"; id: string; calls: ToolActivityCall[] }
+  | { kind: "runtimeStatus"; id: string; label: string };
 
 const SENSITIVE_KEY_RE = /api[_-]?key|authorization|bearer|password|secret|token/i;
 
@@ -209,6 +211,56 @@ const buildConversationTimeline = (messages: ConversationMessage[]): Conversatio
     timeline.push({ kind: "message", message });
   }
   return timeline;
+};
+
+const hasVisibleStreamingAssistantMessage = (timeline: ConversationTimelineItem[]): boolean =>
+  timeline.some(
+    (item) =>
+      item.kind === "message" &&
+      item.message.role === "assistant" &&
+      item.message.id.startsWith("local-assistant-") &&
+      item.message.content.trim().length > 0,
+  );
+
+const insertRuntimeStatus = (timeline: ConversationTimelineItem[], label: string): ConversationTimelineItem[] => {
+  if (!label) {
+    return timeline;
+  }
+
+  let lastUserMessageIndex = -1;
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const item = timeline[i];
+    if (item.kind === "message" && item.message.role === "user") {
+      lastUserMessageIndex = i;
+      break;
+    }
+  }
+
+  const statusItem: ConversationTimelineItem = { kind: "runtimeStatus", id: "runtime-status", label };
+  if (lastUserMessageIndex < 0) {
+    return [...timeline, statusItem];
+  }
+  return [...timeline.slice(0, lastUserMessageIndex + 1), statusItem, ...timeline.slice(lastUserMessageIndex + 1)];
+};
+
+const getRuntimeStatusLabel = (
+  phase: SendMessagePhase,
+  timeline: ConversationTimelineItem[],
+  translate: ReturnType<typeof useTranslate>,
+): string => {
+  if (phase === "idle") {
+    return "";
+  }
+  if (phase === "responding" && hasVisibleStreamingAssistantMessage(timeline)) {
+    return "";
+  }
+  if (phase === "using_tools") {
+    return translate("aiChat.status-using-tools");
+  }
+  if (phase === "responding") {
+    return translate("aiChat.status-responding");
+  }
+  return translate("aiChat.status-thinking");
 };
 
 const AgentPill = ({
@@ -371,6 +423,13 @@ const summarizeToolCall = (name: string, argsJSON: string): string => {
       return preview(argsJSON);
   }
 };
+
+const RuntimeStatusRow = ({ label }: { label: string }) => (
+  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <BotIcon className="h-4 w-auto animate-pulse" />
+    <span>{label}</span>
+  </div>
+);
 
 const ToolActivity = ({ calls }: { calls: ToolActivityCall[] }) => {
   const t = useTranslate();
@@ -603,7 +662,7 @@ const AIChat = () => {
   const { agentNameById, defaultAgent, defaultLLM, enabledChatAgents, enabledLLMs, llmNameById } = useAIChatAgents();
   const updateConversationAgent = useUpdateConversationAgent(conversationId);
   const updateConversationLLM = useUpdateConversationLLM(conversationId);
-  const { requiresConfirmation, toolCalls, send, resolveToolCall, isPending, error } = useSendMessage(conversationId);
+  const { requiresConfirmation, toolCalls, send, resolveToolCall, isPending, phase, error } = useSendMessage(conversationId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -621,6 +680,8 @@ const AIChat = () => {
   const activeAgentLabel = activeAgentId ? (agentNameById.get(activeAgentId) ?? activeAgentId) : t("aiChat.agent-fallback-label");
   const activeLLMLabel = activeLLMId ? (llmNameById.get(activeLLMId) ?? activeLLMId) : "LLM";
   const timeline = useMemo(() => buildConversationTimeline(history), [history]);
+  const runtimeStatusLabel = useMemo(() => getRuntimeStatusLabel(phase, timeline, t), [phase, timeline, t]);
+  const timelineWithRuntimeStatus = useMemo(() => insertRuntimeStatus(timeline, runtimeStatusLabel), [runtimeStatusLabel, timeline]);
   const historyRenderKey = useMemo(
     () => history.map((msg) => `${msg.id}:${msg.content?.length ?? 0}:${msg.toolCalls?.length ?? 0}`).join("|"),
     [history],
@@ -680,7 +741,7 @@ const AIChat = () => {
   // Smoothly scroll to the newest message when content changes.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [historyRenderKey, requiresConfirmation, isPending]);
+  }, [historyRenderKey, requiresConfirmation, isPending, phase]);
 
   // Jump (not smooth) to the bottom when the composer is focused, so the input
   // is never hidden behind the mobile keyboard and the latest message stays in view.
@@ -905,19 +966,14 @@ const AIChat = () => {
         {history.length === 0 && (
           <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">{t("aiChat.start-hint")}</div>
         )}
-        {timeline.map((item) =>
+        {timelineWithRuntimeStatus.map((item) =>
           item.kind === "message" ? (
             <MessageBubble key={item.message.id} msg={item.message} />
-          ) : (
+          ) : item.kind === "toolActivity" ? (
             <ToolActivity key={item.id} calls={item.calls} />
+          ) : (
+            <RuntimeStatusRow key={item.id} label={item.label} />
           ),
-        )}
-
-        {isPending && history.length > 0 && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <BotIcon className="h-4 w-auto animate-pulse" />
-            <span>正在思考…</span>
-          </div>
         )}
 
         {requiresConfirmation && toolCalls.length > 0 && (
