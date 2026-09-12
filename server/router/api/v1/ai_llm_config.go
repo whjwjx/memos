@@ -11,9 +11,17 @@ import (
 )
 
 func (s *APIV1Service) resolveConfiguredLLM(setting *storepb.InstanceAISetting, llmID string) (ai.ProviderConfig, string, error) {
+	provider, modelName, _, err := s.resolveConfiguredLLMProfile(setting, llmID)
+	return provider, modelName, err
+}
+
+func (s *APIV1Service) resolveConfiguredLLMProfile(
+	setting *storepb.InstanceAISetting,
+	llmID string,
+) (ai.ProviderConfig, string, *storepb.LLMConfig, error) {
 	llmID = strings.TrimSpace(llmID)
 	if llmID == "" {
-		return ai.ProviderConfig{}, "", status.Errorf(codes.FailedPrecondition, "LLM is not configured")
+		return ai.ProviderConfig{}, "", nil, status.Errorf(codes.FailedPrecondition, "LLM is not configured")
 	}
 
 	var llm *storepb.LLMConfig
@@ -24,22 +32,22 @@ func (s *APIV1Service) resolveConfiguredLLM(setting *storepb.InstanceAISetting, 
 		}
 	}
 	if llm == nil {
-		return ai.ProviderConfig{}, "", status.Errorf(codes.FailedPrecondition, "LLM %q is not configured", llmID)
+		return ai.ProviderConfig{}, "", nil, status.Errorf(codes.FailedPrecondition, "LLM %q is not configured", llmID)
 	}
 	if !llm.GetEnabled() {
-		return ai.ProviderConfig{}, "", status.Errorf(codes.FailedPrecondition, "LLM %q is disabled", llmID)
+		return ai.ProviderConfig{}, "", nil, status.Errorf(codes.FailedPrecondition, "LLM %q is disabled", llmID)
 	}
 
 	provider := findProviderByID(setting.GetProviders(), llm.GetProviderId())
 	if provider == nil || provider.GetApiKey() == "" {
-		return ai.ProviderConfig{}, "", status.Errorf(codes.FailedPrecondition, "LLM provider %q is not configured", llm.GetProviderId())
+		return ai.ProviderConfig{}, "", nil, status.Errorf(codes.FailedPrecondition, "LLM provider %q is not configured", llm.GetProviderId())
 	}
 
 	modelName := strings.TrimSpace(llm.GetModel())
 	if modelName == "" {
-		return ai.ProviderConfig{}, "", status.Errorf(codes.FailedPrecondition, "LLM %q model is not configured", llmID)
+		return ai.ProviderConfig{}, "", nil, status.Errorf(codes.FailedPrecondition, "LLM %q model is not configured", llmID)
 	}
-	return convertAIProviderConfigFromStore(provider), modelName, nil
+	return convertAIProviderConfigFromStore(provider), modelName, llm, nil
 }
 
 func defaultChatModelForProvider(provider ai.ProviderConfig) (string, error) {

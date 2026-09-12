@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/usememos/memos/internal/ai"
 	"github.com/usememos/memos/internal/ai/chat"
 	"github.com/usememos/memos/internal/ai/tools"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
@@ -294,4 +295,74 @@ func TestApplyToolConfigScopeIsolation(t *testing.T) {
 		require.NotNil(t, registry.Get("search_memos"))
 		require.NotNil(t, registry.Get("create_memo"))
 	})
+}
+
+func TestResolveChatRuntimeProfile(t *testing.T) {
+	t.Run("uses defaults and auto detects deepseek compatible providers", func(t *testing.T) {
+		profile := resolveChatRuntimeProfile(ai.ProviderConfig{
+			Type:     ai.ProviderOpenAI,
+			Title:    "DeepSeek",
+			Endpoint: "https://api.deepseek.com",
+		}, "deepseek-chat", nil)
+
+		require.NotNil(t, profile.temperature)
+		require.InDelta(t, defaultChatTemperature, *profile.temperature, 0.001)
+		require.Equal(t, defaultChatMaxOutputTokens, profile.maxTokens)
+		require.Equal(t, compatibilityPresetDeepSeekCompatible, profile.compatibilityPreset)
+		require.NotEmpty(t, buildCompatibilityGuidance(profile.compatibilityPreset))
+	})
+
+	t.Run("uses configured overrides", func(t *testing.T) {
+		temperature := float32(0)
+		profile := resolveChatRuntimeProfile(ai.ProviderConfig{Type: ai.ProviderOpenAI}, "gpt-4o-mini", &storepb.LLMConfig{
+			Temperature:         &temperature,
+			MaxOutputTokens:     4096,
+			CompatibilityPreset: compatibilityPresetStrictTools,
+		})
+
+		require.NotNil(t, profile.temperature)
+		require.Equal(t, float32(0), *profile.temperature)
+		require.Equal(t, 4096, profile.maxTokens)
+		require.Equal(t, compatibilityPresetStrictTools, profile.compatibilityPreset)
+	})
+}
+
+func TestSanitizeAssistantContentStripsPseudoToolBlocks(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name: "localized pseudo tool block",
+			content: `Deleted memo abc.
+<工具调用>
+{"name":"search_memos","arguments":{"query":"张雪峰"}}
+\</工具调用>`,
+			want: "Deleted memo abc.",
+		},
+		{
+			name: "english pseudo tool block only",
+			content: `<tool_calls>
+<invoke name="search_memos"></invoke>
+</tool_calls>`,
+			want: "已完成相关操作。",
+		},
+		{
+			name:    "empty code block only",
+			content: "```text\n\n```",
+			want:    "已完成相关操作。",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeAssistantContent(tt.content)
+			require.Equal(t, tt.want, got)
+			require.NotContains(t, got, "<工具调用>")
+			require.NotContains(t, got, "search_memos")
+			require.NotContains(t, got, "<tool_calls>")
+			require.NotContains(t, got, "```")
+		})
+	}
 }

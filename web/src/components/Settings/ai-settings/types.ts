@@ -18,6 +18,9 @@ export type LocalLLM = {
   providerId: string;
   model: string;
   enabled: boolean;
+  temperature?: number;
+  maxOutputTokens: number;
+  compatibilityPreset: string;
 };
 
 export type LocalChatAgent = {

@@ -215,8 +215,9 @@ message InstanceAISetting {
   // chat_agents is the list of conversational assistant presets surfaced in the
   // /ai-chat page. Stage 1 uses only the first enabled preset as the default
   // assistant; a second enabled preset triggers the agent selector in the UI.
-  // Backed by a provider and a system prompt. When empty, /ai-chat shows a
-  // "no assistant configured" empty state.
+  // Backed by a system prompt. Runtime model selection is handled by llms and
+  // conversation.llm_id. When empty, /ai-chat shows a "no assistant configured"
+  // empty state.
   repeated ChatAgentConfig chat_agents = 5;
 
   // tools is the per-tool toggle and safety configuration for the conversational
@@ -308,9 +309,8 @@ message MemoryEntry {
 }
 
 // ChatAgentConfig describes a conversational assistant preset for the /ai-chat
-// page. It is a prompt + provider binding with an authorized tool set. Multiple
-// presets are admin extensions that differ only in system prompt and capability
-// scope; they are NOT separate agent runtimes.
+// page. It owns persona and system instructions. Runtime model selection is
+// handled by LLMConfig and by the conversation-level llm_id.
 message ChatAgentConfig {
   // id is the stable identifier of the preset.
   string id = 1;
@@ -319,20 +319,18 @@ message ChatAgentConfig {
   // builtin marks a preset shipped with memos. Built-in presets cannot be
   // deleted, but their name/system_prompt may be edited.
   bool builtin = 3;
-  // provider_id references an entry in InstanceAISetting.providers[].id.
-  // Empty string means the preset is disabled.
-  // Deprecated: new clients should use llm_id.
+  // Deprecated: chat agents no longer bind providers. New clients should leave
+  // this empty and select an LLMConfig at conversation runtime.
   string provider_id = 4;
-  // model is the provider-specific text-generation model identifier.
-  // Empty string falls back to the engine default.
-  // Deprecated: new clients should use llm_id.
+  // Deprecated: chat agents no longer bind models. New clients should leave
+  // this empty and select an LLMConfig at conversation runtime.
   string model = 5;
   // system_prompt steers the assistant's behavior, tone, and constraints.
   string system_prompt = 6;
   // enabled toggles whether the preset is selectable in /ai-chat.
   bool enabled = 7;
-  // llm_id references an entry in InstanceAISetting.llms[].id. Empty string
-  // uses legacy provider_id/model fields.
+  // Deprecated: new clients should keep the conversation's llm_id as the
+  // runtime model selector. This field is only kept for older stored configs.
   string llm_id = 8;
 }
 
@@ -416,6 +414,13 @@ message LLMConfig {
   string provider_id = 3;
   string model = 4;
   bool enabled = 5;
+  // Optional sampling temperature. Empty means the chat runtime default.
+  optional float temperature = 6;
+  // Optional maximum output token budget. Zero means the chat runtime default.
+  int32 max_output_tokens = 7;
+  // Optional provider/model behavior preset used for prompt and tool-call
+  // compatibility tuning. Empty means auto.
+  string compatibility_preset = 8;
 }
 
 enum AIProviderType {

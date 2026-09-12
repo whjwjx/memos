@@ -37,6 +37,7 @@ type Tool interface {
 // Registry holds the available tools keyed by name.
 type Registry struct {
 	tools map[string]Tool
+	order []string
 }
 
 // NewRegistry builds a registry pre-populated with the conversational tool set.
@@ -44,9 +45,9 @@ func NewRegistry() *Registry {
 	r := &Registry{tools: make(map[string]Tool)}
 	for _, t := range []Tool{
 		&SearchMemosTool{},
-		&WebSearchTool{},
 		&GetMemoTool{},
 		&GetCommentsTool{},
+		&WebSearchTool{},
 		&CreateMemoTool{},
 		&UpdateMemoTool{},
 		&TagMemoTool{},
@@ -59,7 +60,7 @@ func NewRegistry() *Registry {
 		&QueryQueueTool{},
 		&ProjectStatusTool{},
 	} {
-		r.tools[t.Spec().Name] = t
+		r.Register(t)
 	}
 	return r
 }
@@ -72,8 +73,10 @@ func (r *Registry) Get(name string) Tool {
 // All returns every registered tool.
 func (r *Registry) All() []Tool {
 	out := make([]Tool, 0, len(r.tools))
-	for _, t := range r.tools {
-		out = append(out, t)
+	for _, name := range r.order {
+		if t := r.tools[name]; t != nil {
+			out = append(out, t)
+		}
 	}
 	return out
 }
@@ -81,7 +84,11 @@ func (r *Registry) All() []Tool {
 // Register adds (or replaces) a tool in the registry. It is primarily used by
 // tests to inject fakes without depending on store backends.
 func (r *Registry) Register(t Tool) {
-	r.tools[t.Spec().Name] = t
+	name := t.Spec().Name
+	if _, ok := r.tools[name]; !ok {
+		r.order = append(r.order, name)
+	}
+	r.tools[name] = t
 }
 
 // Remove deletes a tool from the registry so the model never sees it.
@@ -93,7 +100,7 @@ func (r *Registry) Remove(name string) {
 // a chat.Model.
 func (r *Registry) Specs() []chat.ToolSpec {
 	out := make([]chat.ToolSpec, 0, len(r.tools))
-	for _, t := range r.tools {
+	for _, t := range r.All() {
 		out = append(out, t.Spec())
 	}
 	return out

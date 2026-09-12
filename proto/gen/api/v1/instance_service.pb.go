@@ -1650,6 +1650,7 @@ type InstanceSetting_AISetting struct {
 	// chat_agents is the list of conversational assistant presets surfaced in the
 	// /ai-chat page. Stage 1 uses only the first enabled preset as the default
 	// assistant; a second enabled preset triggers the agent selector in the UI.
+	// Runtime model selection is handled by llms and conversation.llm_id.
 	ChatAgents []*InstanceSetting_ChatAgentConfig `protobuf:"bytes,5,rep,name=chat_agents,json=chatAgents,proto3" json:"chat_agents,omitempty"`
 	// tools is the per-tool toggle and safety configuration for the conversational
 	// assistant, keyed by tool name (e.g. "query_db"). Admin controls enable and
@@ -2112,9 +2113,8 @@ func (x *InstanceSetting_MemoryEntry) GetUpdatedTs() int64 {
 }
 
 // ChatAgentConfig describes a conversational assistant preset for the /ai-chat
-// page. It is a prompt + provider binding with an authorized tool set. Multiple
-// presets are admin extensions that differ only in system prompt and capability
-// scope; they are NOT separate agent runtimes.
+// page. It owns persona and system instructions. Runtime model selection is
+// handled by LLMConfig and by the conversation-level llm_id.
 type InstanceSetting_ChatAgentConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// id is the stable identifier of the preset.
@@ -2124,20 +2124,18 @@ type InstanceSetting_ChatAgentConfig struct {
 	// builtin marks a preset shipped with memos. Built-in presets cannot be
 	// deleted, but their name/system_prompt may be edited.
 	Builtin bool `protobuf:"varint,3,opt,name=builtin,proto3" json:"builtin,omitempty"`
-	// provider_id references an entry in AISetting.providers[].id.
-	// Empty string means the preset is disabled.
-	// Deprecated: new clients should use llm_id.
+	// Deprecated: chat agents no longer bind providers. New clients should leave
+	// this empty and select an LLMConfig at conversation runtime.
 	ProviderId string `protobuf:"bytes,4,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	// model is the provider-specific text-generation model identifier.
-	// Empty string falls back to the engine default.
-	// Deprecated: new clients should use llm_id.
+	// Deprecated: chat agents no longer bind models. New clients should leave
+	// this empty and select an LLMConfig at conversation runtime.
 	Model string `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	// system_prompt steers the assistant's behavior, tone, and constraints.
 	SystemPrompt string `protobuf:"bytes,6,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`
 	// enabled toggles whether the preset is selectable in /ai-chat.
 	Enabled bool `protobuf:"varint,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	// llm_id references an entry in AISetting.llms[].id. Empty string uses
-	// legacy provider_id/model fields.
+	// Deprecated: new clients should keep the conversation's llm_id as the
+	// runtime model selector. This field is only kept for older stored configs.
 	LlmId         string `protobuf:"bytes,8,opt,name=llm_id,json=llmId,proto3" json:"llm_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2617,9 +2615,16 @@ type InstanceSetting_LLMConfig struct {
 	// model is the provider-specific model identifier.
 	Model string `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
 	// enabled toggles whether the LLM can be selected by AI capabilities.
-	Enabled       bool `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Enabled bool `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Optional sampling temperature. Empty means the chat runtime default.
+	Temperature *float32 `protobuf:"fixed32,6,opt,name=temperature,proto3,oneof" json:"temperature,omitempty"`
+	// Optional maximum output token budget. Zero means the chat runtime default.
+	MaxOutputTokens int32 `protobuf:"varint,7,opt,name=max_output_tokens,json=maxOutputTokens,proto3" json:"max_output_tokens,omitempty"`
+	// Optional provider/model behavior preset used for prompt and tool-call
+	// compatibility tuning. Empty means auto.
+	CompatibilityPreset string `protobuf:"bytes,8,opt,name=compatibility_preset,json=compatibilityPreset,proto3" json:"compatibility_preset,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *InstanceSetting_LLMConfig) Reset() {
@@ -2685,6 +2690,27 @@ func (x *InstanceSetting_LLMConfig) GetEnabled() bool {
 		return x.Enabled
 	}
 	return false
+}
+
+func (x *InstanceSetting_LLMConfig) GetTemperature() float32 {
+	if x != nil && x.Temperature != nil {
+		return *x.Temperature
+	}
+	return 0
+}
+
+func (x *InstanceSetting_LLMConfig) GetMaxOutputTokens() int32 {
+	if x != nil {
+		return x.MaxOutputTokens
+	}
+	return 0
+}
+
+func (x *InstanceSetting_LLMConfig) GetCompatibilityPreset() string {
+	if x != nil {
+		return x.CompatibilityPreset
+	}
+	return ""
 }
 
 // TranscriptionConfig configures the speech-to-text feature.
@@ -3273,7 +3299,7 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\x06commit\x18\b \x01(\tR\x06commit\x12\x1f\n" +
 	"\vneeds_setup\x18\t \x01(\bR\n" +
 	"needsSetup\"\x1b\n" +
-	"\x19GetInstanceProfileRequest\"\xf56\n" +
+	"\x19GetInstanceProfileRequest\"\x8b8\n" +
 	"\x0fInstanceSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12W\n" +
 	"\x0fgeneral_setting\x18\x02 \x01(\v2,.memos.api.v1.InstanceSetting.GeneralSettingH\x00R\x0egeneralSetting\x12W\n" +
@@ -3458,14 +3484,18 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\aapi_key\x18\x05 \x01(\tB\x03\xe0A\x04R\x06apiKey\x12#\n" +
 	"\vapi_key_set\x18\b \x01(\bB\x03\xe0A\x03R\tapiKeySet\x12%\n" +
 	"\fapi_key_hint\x18\t \x01(\tB\x03\xe0A\x03R\n" +
-	"apiKeyHint\x1a\x82\x01\n" +
+	"apiKeyHint\x1a\x98\x02\n" +
 	"\tLLMConfig\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1f\n" +
 	"\vprovider_id\x18\x03 \x01(\tR\n" +
 	"providerId\x12\x14\n" +
 	"\x05model\x18\x04 \x01(\tR\x05model\x12\x18\n" +
-	"\aenabled\x18\x05 \x01(\bR\aenabled\x1a\x80\x01\n" +
+	"\aenabled\x18\x05 \x01(\bR\aenabled\x12%\n" +
+	"\vtemperature\x18\x06 \x01(\x02H\x00R\vtemperature\x88\x01\x01\x12*\n" +
+	"\x11max_output_tokens\x18\a \x01(\x05R\x0fmaxOutputTokens\x121\n" +
+	"\x14compatibility_preset\x18\b \x01(\tR\x13compatibilityPresetB\x0e\n" +
+	"\f_temperature\x1a\x80\x01\n" +
 	"\x13TranscriptionConfig\x12\x1f\n" +
 	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12\x14\n" +
@@ -3687,6 +3717,7 @@ func file_api_v1_instance_service_proto_init() {
 	file_api_v1_instance_service_proto_msgTypes[14].OneofWrappers = []any{
 		(*InstanceSetting_Storage_S3Config_)(nil),
 	}
+	file_api_v1_instance_service_proto_msgTypes[30].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

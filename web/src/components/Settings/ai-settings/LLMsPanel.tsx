@@ -7,6 +7,7 @@ import { useTranslate } from "@/utils/i18n";
 import SettingGroup from "../SettingGroup";
 import { SettingPanel } from "../SettingList";
 import SettingTable from "../SettingTable";
+import { getCompatibilityPresetLabelKey, getEffectiveLLMMaxOutputTokens, getEffectiveLLMTemperature } from "./aiRuntimeConfig";
 import type { LocalAIProvider, LocalLLM } from "./types";
 
 const byokNotes = ["setting.ai.byok-key-note", "setting.ai.byok-storage-note", "setting.ai.byok-model-note"] as const;
@@ -39,6 +40,12 @@ export const LLMsPanel = ({
   onDeleteLLM,
 }: LLMsPanelProps) => {
   const t = useTranslate();
+  const getRuntimeSummary = (llm: LocalLLM) =>
+    t("setting.ai.llm-runtime-summary", {
+      temperature: getEffectiveLLMTemperature(llm),
+      maxTokens: getEffectiveLLMMaxOutputTokens(llm),
+      preset: t(getCompatibilityPresetLabelKey(llm.compatibilityPreset)),
+    });
 
   return (
     <>
@@ -201,6 +208,7 @@ export const LLMsPanel = ({
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">{provider ? provider.title || provider.id : "-"}</div>
                       <div className="mt-1 truncate font-mono text-xs text-muted-foreground">{llm.model}</div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground">{getRuntimeSummary(llm)}</div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <input
@@ -252,7 +260,12 @@ export const LLMsPanel = ({
             {
               key: "model",
               header: t("setting.ai.llm-model"),
-              render: (_, llm: LocalLLM) => <span className="font-mono text-xs">{llm.model}</span>,
+              render: (_, llm: LocalLLM) => (
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-xs">{llm.model}</span>
+                  <span className="text-xs text-muted-foreground">{getRuntimeSummary(llm)}</span>
+                </div>
+              ),
             },
             {
               key: "enabled",

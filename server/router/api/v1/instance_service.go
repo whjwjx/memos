@@ -17,19 +17,30 @@ import (
 )
 
 const (
-	maxTranscriptionConfigModelLength    = 256
-	maxTranscriptionConfigLanguageLength = 32
-	maxTranscriptionConfigPromptLength   = 4096
-	maxTranslationConfigModelLength      = 256
-	maxTranslationConfigMaxTextLength    = 100000
-	maxLLMConfigModelLength              = 256
-	maxWebSearchConfigEndpointLength     = 512
-	defaultWebSearchMaxResults           = 5
-	maxWebSearchMaxResults               = 10
-	maxBatchGetInstanceSettings          = 100
-	defaultTavilyEndpoint                = "https://api.tavily.com"
-	tavilySearchDepthBasic               = "basic"
-	tavilySearchDepthAdvanced            = "advanced"
+	maxTranscriptionConfigModelLength     = 256
+	maxTranscriptionConfigLanguageLength  = 32
+	maxTranscriptionConfigPromptLength    = 4096
+	maxTranslationConfigModelLength       = 256
+	maxTranslationConfigMaxTextLength     = 100000
+	maxLLMConfigModelLength               = 256
+	defaultChatTemperature                = 0.2
+	minChatTemperature                    = 0
+	maxChatTemperature                    = 2
+	defaultChatMaxOutputTokens            = 2048
+	minChatMaxOutputTokens                = 256
+	maxChatMaxOutputTokens                = 8192
+	compatibilityPresetAuto               = "auto"
+	compatibilityPresetOpenAICompatible   = "openai-compatible"
+	compatibilityPresetDeepSeekCompatible = "deepseek-compatible"
+	compatibilityPresetGemini             = "gemini"
+	compatibilityPresetStrictTools        = "strict-tools"
+	maxWebSearchConfigEndpointLength      = 512
+	defaultWebSearchMaxResults            = 5
+	maxWebSearchMaxResults                = 10
+	maxBatchGetInstanceSettings           = 100
+	defaultTavilyEndpoint                 = "https://api.tavily.com"
+	tavilySearchDepthBasic                = "basic"
+	tavilySearchDepthAdvanced             = "advanced"
 )
 
 type instanceSettingCaller struct {

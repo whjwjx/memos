@@ -42,6 +42,10 @@ type AssistantRequest struct {
 	SkipUserMessage bool
 	// Model is the provider-specific model identifier passed to chat.Generate.
 	Model string
+	// Temperature optionally overrides the model's sampling temperature.
+	Temperature *float32
+	// MaxTokens optionally caps the model's output length.
+	MaxTokens int
 	// Provider builds the chat model used for generation.
 	Provider ai.ProviderConfig
 	// ChatOptions are passed through to the chat model constructor.
@@ -162,27 +166,12 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 					return nil, err
 				}
 			}
-			// Give the model no function-calling material to mimic: flatten the
-			// history so earlier assistant tool_calls and their tool results
-			// become plain text, and omit the tool definitions entirely. With no
-			// Tools list (and thus no tool_choice at all), the model cannot
-			// "demonstrate" another call — it can only produce a natural-language
-			// summary. This is far more robust than relying on tool_choice:"none",
-			// which some models (e.g. DeepSeek) ignore by echoing pseudo-XML.
-			flattened := flattenHistory(messages)
-			resp, err := generate(ctx, model, chat.Request{
-				Model:      req.Model,
-				System:     req.System,
-				Messages:   flattened,
-				ToolChoice: chat.ToolChoiceNone,
-			}, emit)
-			if err != nil {
-				return nil, errors.Wrap(err, "chat model generation failed")
-			}
-			content := stripPseudoToolXML(resp.Text)
-			if content == "" {
-				content = summarizeApproved(updated)
-			}
+			// Approval continuations are deterministic control events. The tools
+			// have already run, and their structured results are visible in the
+			// activity card, so do not ask the model to summarize them. Some
+			// providers otherwise improvise another action, echo raw tool output,
+			// or emit pseudo tool-call text.
+			content := summarizeApproved(updated)
 			finalMessage := chat.Message{Role: chat.RoleAssistant, Content: content}
 			return &AssistantResponse{
 				Content:      content,
@@ -200,11 +189,13 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 		}
 
 		resp, err := generate(ctx, model, chat.Request{
-			Model:      req.Model,
-			System:     req.System,
-			Messages:   messages,
-			Tools:      toolSpecs,
-			ToolChoice: chat.ToolChoiceAuto,
+			Model:       req.Model,
+			System:      req.System,
+			Messages:    messages,
+			Temperature: req.Temperature,
+			MaxTokens:   req.MaxTokens,
+			Tools:       toolSpecs,
+			ToolChoice:  chat.ToolChoiceAuto,
 		}, emit)
 		if err != nil {
 			return nil, errors.Wrap(err, "chat model generation failed")
@@ -429,8 +420,10 @@ func injectConfirmKeyword(argsJSON, keyword string) string {
 }
 
 var (
-	pseudoToolCallBlockRe = regexp.MustCompile(`(?is)<tool_calls\b[^>]*>.*?</tool_calls>`)
-	pseudoInvokeBlockRe   = regexp.MustCompile(`(?is)<invoke\b[^>]*>.*?</invoke>`)
+	pseudoToolCallBlockRe   = regexp.MustCompile(`(?is)\\?<\s*tool_calls\b[^>]*>.*?\\?<\s*/\s*tool_calls\s*>`)
+	pseudoZhToolCallBlockRe = regexp.MustCompile(`(?is)\\?<\s*工具调用[^>]*>.*?\\?<\s*/\s*工具调用\s*>`)
+	pseudoInvokeBlockRe     = regexp.MustCompile(`(?is)\\?<\s*invoke\b[^>]*>.*?\\?<\s*/\s*invoke\s*>`)
+	emptyFencedCodeBlockRe  = regexp.MustCompile("(?is)^\\s*(?:```|~~~)[a-z0-9_-]*\\s*(?:```|~~~)\\s*$")
 )
 
 // stripPseudoToolXML removes tool-call XML that some models emit as plain text
@@ -438,8 +431,29 @@ var (
 // approval continuation so raw XML never reaches the user.
 func stripPseudoToolXML(content string) string {
 	cleaned := pseudoToolCallBlockRe.ReplaceAllString(content, "")
+	cleaned = pseudoZhToolCallBlockRe.ReplaceAllString(cleaned, "")
 	cleaned = pseudoInvokeBlockRe.ReplaceAllString(cleaned, "")
 	return strings.TrimSpace(cleaned)
+}
+
+func stripAssistantNoise(content string) string {
+	cleaned := stripPseudoToolXML(content)
+	cleaned = emptyFencedCodeBlockRe.ReplaceAllString(cleaned, "")
+	return strings.TrimSpace(cleaned)
+}
+
+func includesToolResult(content string, updated []chat.Message) bool {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return false
+	}
+	for _, msg := range updated {
+		result := strings.TrimSpace(msg.Content)
+		if result != "" && strings.Contains(trimmed, result) {
+			return true
+		}
+	}
+	return false
 }
 
 // summarizeApproved builds a neutral completion line from the tool messages
@@ -447,7 +461,17 @@ func stripPseudoToolXML(content string) string {
 // (e.g. it only echoed XML that was stripped).
 func summarizeApproved(updated []chat.Message) string {
 	if len(updated) == 1 {
-		return fmt.Sprintf("已完成：%s", updated[0].Content)
+		switch updated[0].Name {
+		case "create_memo":
+			return "已创建 memo。"
+		case "delete_memo":
+			return "已删除那条 memo。"
+		case "update_memo":
+			return "已更新 memo。"
+		}
+	}
+	if len(updated) > 1 {
+		return fmt.Sprintf("已处理 %d 项操作。", len(updated))
 	}
 	return "已完成相关操作。"
 }

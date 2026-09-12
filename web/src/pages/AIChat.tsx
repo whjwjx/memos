@@ -68,14 +68,16 @@ const stripMemoContextEnvelope = (content: string): string => {
 };
 
 // stripFakeToolCalls hides pseudo tool-call XML that some models emit as plain
-// text (e.g. <tool_calls><invoke name="...">...</invoke></tool_calls>) instead
-// of a native function call. Real tool calls are surfaced via the confirmation
-// cards and never reach the markdown renderer.
+// text (e.g. <tool_calls><invoke name="...">...</invoke></tool_calls> or
+// <工具调用>{...}</工具调用>) instead of a native function call. Real tool calls
+// are surfaced via the confirmation cards and never reach the markdown renderer.
 const stripFakeToolCalls = (content: string): string => {
-  let cleaned = content.replace(/<tool_calls\b[^>]*>[\s\S]*?<\/tool_calls>/gi, "");
-  cleaned = cleaned.replace(/<invoke\b[^>]*>[\s\S]*?<\/invoke>/gi, "");
+  let cleaned = content.replace(/\\?<\s*tool_calls\b[^>]*>[\s\S]*?\\?<\s*\/\s*tool_calls\s*>/gi, "");
+  cleaned = cleaned.replace(/\\?<\s*工具调用[^>]*>[\s\S]*?\\?<\s*\/\s*工具调用\s*>/gi, "");
+  cleaned = cleaned.replace(/\\?<\s*invoke\b[^>]*>[\s\S]*?\\?<\s*\/\s*invoke\s*>/gi, "");
+  cleaned = cleaned.replace(/^\s*(?:```|~~~)[a-z0-9_-]*\s*(?:```|~~~)\s*$/gi, "");
   cleaned = cleaned.trim();
-  return cleaned || "Done.";
+  return cleaned || "已完成相关操作。";
 };
 
 type ToolActivityCall = {

@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { ChevronDownIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { aiServiceClient } from "@/connect";
+import { cn } from "@/lib/utils";
 import { TestAIProviderRequestSchema } from "@/types/proto/api/v1/ai_service_pb";
 import { useTranslate } from "@/utils/i18n";
+import {
+  COMPATIBILITY_PRESET_AUTO_VALUE,
+  compatibilityPresetOptions,
+  DEFAULT_LLM_MAX_OUTPUT_TOKENS,
+  DEFAULT_LLM_TEMPERATURE,
+  MAX_LLM_MAX_OUTPUT_TOKENS,
+  MAX_LLM_TEMPERATURE,
+  MIN_LLM_MAX_OUTPUT_TOKENS,
+  MIN_LLM_TEMPERATURE,
+  normalizeCompatibilityPreset,
+} from "../aiRuntimeConfig";
 import { defaultChatModelForProvider, newLLM } from "../aiSettingFactories";
 import type { LocalAIProvider, LocalLLM } from "../types";
 
@@ -24,9 +37,11 @@ export const LLMDialog = ({ llm, mode, providers, onOpenChange, onSave }: LLMDia
   const t = useTranslate();
   const [draft, setDraft] = useState<LocalLLM>(() => llm ?? newLLM(providers));
   const [testing, setTesting] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     setDraft(llm ?? newLLM(providers));
+    setAdvancedOpen(false);
   }, [llm, providers]);
 
   const updateDraft = (partial: Partial<LocalLLM>) => {
@@ -70,6 +85,14 @@ export const LLMDialog = ({ llm, mode, providers, onOpenChange, onSave }: LLMDia
     const providerId = value === "__none__" ? "" : value;
     const provider = providers.find((item) => item.id === providerId);
     updateDraft({ providerId, model: draft.model || defaultChatModelForProvider(provider) });
+  };
+
+  const handleTemperatureChange = (value: string) => {
+    updateDraft({ temperature: value.trim() === "" ? undefined : Number(value) });
+  };
+
+  const handleMaxOutputTokensChange = (value: string) => {
+    updateDraft({ maxOutputTokens: value.trim() === "" ? 0 : Number(value) });
   };
 
   return (
@@ -132,6 +155,74 @@ export const LLMDialog = ({ llm, mode, providers, onOpenChange, onSave }: LLMDia
 
           {referencedProvider && !hasApiKey && (
             <p className="text-xs text-destructive sm:col-span-2">{t("setting.ai.llm-warning-no-key")}</p>
+          )}
+        </div>
+
+        <div className="rounded-md border border-border">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+            onClick={() => setAdvancedOpen((open) => !open)}
+            aria-expanded={advancedOpen}
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-foreground">{t("setting.ai.llm-runtime-title")}</div>
+              <div className="truncate text-xs text-muted-foreground">{t("setting.ai.llm-runtime-description")}</div>
+            </div>
+            <ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", advancedOpen && "rotate-180")} />
+          </button>
+
+          {advancedOpen && (
+            <div className="grid grid-cols-1 gap-3 border-t border-border px-3 py-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label>{t("setting.ai.llm-temperature")}</Label>
+                <Input
+                  type="number"
+                  min={MIN_LLM_TEMPERATURE}
+                  max={MAX_LLM_TEMPERATURE}
+                  step={0.1}
+                  value={draft.temperature === undefined ? "" : String(draft.temperature)}
+                  onChange={(e) => handleTemperatureChange(e.target.value)}
+                  placeholder={String(DEFAULT_LLM_TEMPERATURE)}
+                />
+                <p className="text-xs text-muted-foreground">{t("setting.ai.llm-temperature-help")}</p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label>{t("setting.ai.llm-max-output-tokens")}</Label>
+                <Input
+                  type="number"
+                  min={MIN_LLM_MAX_OUTPUT_TOKENS}
+                  max={MAX_LLM_MAX_OUTPUT_TOKENS}
+                  step={1}
+                  value={draft.maxOutputTokens > 0 ? String(draft.maxOutputTokens) : ""}
+                  onChange={(e) => handleMaxOutputTokensChange(e.target.value)}
+                  placeholder={String(DEFAULT_LLM_MAX_OUTPUT_TOKENS)}
+                />
+                <p className="text-xs text-muted-foreground">{t("setting.ai.llm-max-output-tokens-help")}</p>
+              </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <Label>{t("setting.ai.llm-compatibility-preset")}</Label>
+                <Select
+                  value={draft.compatibilityPreset || COMPATIBILITY_PRESET_AUTO_VALUE}
+                  items={compatibilityPresetOptions.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
+                  onValueChange={(value) => updateDraft({ compatibilityPreset: normalizeCompatibilityPreset(value) })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {compatibilityPresetOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {t(option.labelKey)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{t("setting.ai.llm-compatibility-help")}</p>
+              </div>
+            </div>
           )}
         </div>
 

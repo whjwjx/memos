@@ -152,9 +152,55 @@ func preparePersistedLLMConfigs(
 		if len(llm.Model) > maxLLMConfigModelLength {
 			return nil, errors.Errorf("LLM %q model is too long; maximum length is %d characters", llm.Id, maxLLMConfigModelLength)
 		}
+		if llm.Temperature != nil {
+			temperature := llm.GetTemperature()
+			if math.IsNaN(float64(temperature)) || math.IsInf(float64(temperature), 0) {
+				return nil, errors.Errorf("LLM %q temperature must be a finite number", llm.Id)
+			}
+			if temperature < minChatTemperature || temperature > maxChatTemperature {
+				return nil, errors.Errorf(
+					"LLM %q temperature must be between %.1f and %.1f",
+					llm.Id,
+					float64(minChatTemperature),
+					float64(maxChatTemperature),
+				)
+			}
+		}
+		if llm.MaxOutputTokens < 0 {
+			return nil, errors.Errorf("LLM %q max_output_tokens must be >= 0", llm.Id)
+		}
+		if llm.MaxOutputTokens > 0 && (llm.MaxOutputTokens < minChatMaxOutputTokens || llm.MaxOutputTokens > maxChatMaxOutputTokens) {
+			return nil, errors.Errorf(
+				"LLM %q max_output_tokens must be 0 or between %d and %d",
+				llm.Id,
+				minChatMaxOutputTokens,
+				maxChatMaxOutputTokens,
+			)
+		}
+		llm.CompatibilityPreset = normalizeCompatibilityPreset(llm.CompatibilityPreset)
+		if !isAllowedCompatibilityPreset(llm.CompatibilityPreset) {
+			return nil, errors.Errorf("LLM %q compatibility_preset is unsupported", llm.Id)
+		}
 		llmsByID[llm.Id] = llm
 	}
 	return llmsByID, nil
+}
+
+func normalizeCompatibilityPreset(preset string) string {
+	preset = strings.ToLower(strings.TrimSpace(preset))
+	if preset == compatibilityPresetAuto {
+		return ""
+	}
+	return preset
+}
+
+func isAllowedCompatibilityPreset(preset string) bool {
+	switch preset {
+	case "", compatibilityPresetOpenAICompatible, compatibilityPresetDeepSeekCompatible, compatibilityPresetGemini, compatibilityPresetStrictTools:
+		return true
+	default:
+		return false
+	}
 }
 
 func preparePersistedTranslationConfig(
@@ -268,9 +314,6 @@ func preparePersistedChatAgentConfigs(
 
 		chatAgent.LlmId = strings.TrimSpace(chatAgent.LlmId)
 		chatAgent.ProviderId = strings.TrimSpace(chatAgent.ProviderId)
-		if chatAgent.Enabled && chatAgent.LlmId == "" && chatAgent.ProviderId == "" {
-			return errors.Errorf("chat agent %q requires llm_id when enabled", chatAgent.Id)
-		}
 		if chatAgent.LlmId != "" {
 			llm, ok := llmsByID[chatAgent.LlmId]
 			if !ok {
