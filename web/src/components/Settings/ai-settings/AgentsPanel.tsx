@@ -10,7 +10,6 @@ import type { ChatAgentTemplate, LocalChatAgent } from "./types";
 type AgentsPanelProps = {
   agents: LocalChatAgent[];
   templates: ChatAgentTemplate[];
-  getLLMLabel: (llmId: string) => string;
   onCreateAgent: () => void;
   onCreateAgentFromTemplate: (template: ChatAgentTemplate) => void;
   onEditAgent: (agent: LocalChatAgent) => void;
@@ -21,7 +20,6 @@ type AgentsPanelProps = {
 export const AgentsPanel = ({
   agents,
   templates,
-  getLLMLabel,
   onCreateAgent,
   onCreateAgentFromTemplate,
   onEditAgent,
@@ -71,7 +69,6 @@ export const AgentsPanel = ({
                       {agent.enabled ? t("setting.ai.overview-status-enabled") : t("setting.ai.overview-status-disabled")}
                     </Badge>
                   </div>
-                  <div className="mt-1 truncate text-xs text-muted-foreground">{agent.llmId ? getLLMLabel(agent.llmId) : "-"}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <input
@@ -110,11 +107,6 @@ export const AgentsPanel = ({
                 <span className="font-mono text-xs text-muted-foreground">{agent.id}</span>
               </div>
             ),
-          },
-          {
-            key: "llmId",
-            header: t("setting.ai.chat-agent-llm"),
-            render: (_, agent: LocalChatAgent) => <span>{agent.llmId ? getLLMLabel(agent.llmId) : "-"}</span>,
           },
           {
             key: "enabled",

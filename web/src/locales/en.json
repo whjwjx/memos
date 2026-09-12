@@ -963,7 +963,7 @@
       "chat-agent-system-help": "Steers the assistant's behavior and constraints.",
       "chat-agent-toggle-aria": "Toggle assistant {{name}}",
       "edit-chat-agent": "Edit assistant",
-      "chat-agent-dialog-description": "Define the assistant's system prompt and provider binding.",
+      "chat-agent-dialog-description": "Define the assistant's name and system prompt. Choose the LLM from the AI Chat composer.",
       "delete-chat-agent": "Delete assistant `{{name}}`?",
       "third-party-tools-title": "Third-party tool integrations",
       "third-party-tools-description": "Connect external services that AI tools can call. Each integration keeps its own credentials and runtime options.",

@@ -1,24 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslate } from "@/utils/i18n";
 import { newChatAgent } from "../aiSettingFactories";
-import type { LocalAIProvider, LocalChatAgent, LocalLLM } from "../types";
+import type { LocalChatAgent } from "../types";
 
 type ChatAgentDialogProps = {
   agent?: LocalChatAgent;
   mode: "create" | "edit";
-  llms: LocalLLM[];
-  providers: LocalAIProvider[];
   onOpenChange: (open: boolean) => void;
   onSave: (agent: LocalChatAgent) => void;
 };
 
-export const ChatAgentDialog = ({ agent, mode, llms, providers, onOpenChange, onSave }: ChatAgentDialogProps) => {
+export const ChatAgentDialog = ({ agent, mode, onOpenChange, onSave }: ChatAgentDialogProps) => {
   const t = useTranslate();
   const [draft, setDraft] = useState<LocalChatAgent>(() => agent ?? newChatAgent());
 
@@ -29,17 +26,6 @@ export const ChatAgentDialog = ({ agent, mode, llms, providers, onOpenChange, on
   const updateDraft = (partial: Partial<LocalChatAgent>) => {
     setDraft((prev) => ({ ...prev, ...partial }));
   };
-
-  const llmOptions = useMemo(
-    () => [
-      { value: "__none__", label: t("setting.ai.chat-agent-no-llm") },
-      ...llms.map((llm) => {
-        const provider = providers.find((item) => item.id === llm.providerId);
-        return { value: llm.id, label: `${llm.title || llm.model} · ${provider?.title || llm.providerId}` };
-      }),
-    ],
-    [llms, providers, t],
-  );
 
   return (
     <Dialog open={!!agent} onOpenChange={onOpenChange}>
@@ -57,35 +43,6 @@ export const ChatAgentDialog = ({ agent, mode, llms, providers, onOpenChange, on
               onChange={(e) => updateDraft({ name: e.target.value })}
               placeholder={t("setting.ai.chat-agent-name-placeholder")}
             />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("setting.ai.chat-agent-llm")}</Label>
-            <Select
-              value={draft.llmId || "__none__"}
-              items={llmOptions}
-              onValueChange={(value) => {
-                const llm = llms.find((item) => item.id === value);
-                updateDraft({
-                  llmId: value === "__none__" ? "" : value,
-                  providerId: llm?.providerId ?? "",
-                  model: llm?.model ?? "",
-                });
-              }}
-              disabled={llms.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {llmOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {llms.length === 0 && <p className="text-xs text-muted-foreground">{t("setting.ai.chat-agent-empty-llms")}</p>}
           </div>
 
           <div className="flex flex-col gap-1.5">
