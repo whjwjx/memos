@@ -56,6 +56,9 @@ export const toLocalLLM = (llm: InstanceSetting_LLMConfig): LocalLLM => ({
   providerId: llm.providerId,
   model: llm.model,
   enabled: llm.enabled,
+  temperature: llm.temperature,
+  maxOutputTokens: llm.maxOutputTokens,
+  compatibilityPreset: llm.compatibilityPreset,
 });
 
 export const toLLMConfig = (llm: LocalLLM) =>
@@ -65,6 +68,9 @@ export const toLLMConfig = (llm: LocalLLM) =>
     providerId: llm.providerId,
     model: llm.model.trim(),
     enabled: llm.enabled,
+    temperature: llm.temperature,
+    maxOutputTokens: llm.maxOutputTokens,
+    compatibilityPreset: llm.compatibilityPreset.trim(),
   });
 
 const legacyLLMKey = (providerId: string, model: string) => `${providerId}:${model}`;
@@ -94,6 +100,9 @@ export const deriveLLMsFromLegacy = (
       providerId,
       model: normalizedModel,
       enabled: true,
+      temperature: undefined,
+      maxOutputTokens: 0,
+      compatibilityPreset: "",
     });
   };
 

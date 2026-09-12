@@ -42,6 +42,10 @@ type AssistantRequest struct {
 	SkipUserMessage bool
 	// Model is the provider-specific model identifier passed to chat.Generate.
 	Model string
+	// Temperature optionally overrides the model's sampling temperature.
+	Temperature *float32
+	// MaxTokens optionally caps the model's output length.
+	MaxTokens int
 	// Provider builds the chat model used for generation.
 	Provider ai.ProviderConfig
 	// ChatOptions are passed through to the chat model constructor.
@@ -171,10 +175,12 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 			// which some models (e.g. DeepSeek) ignore by echoing pseudo-XML.
 			flattened := flattenHistory(messages)
 			resp, err := generate(ctx, model, chat.Request{
-				Model:      req.Model,
-				System:     req.System,
-				Messages:   flattened,
-				ToolChoice: chat.ToolChoiceNone,
+				Model:       req.Model,
+				System:      req.System,
+				Messages:    flattened,
+				Temperature: req.Temperature,
+				MaxTokens:   req.MaxTokens,
+				ToolChoice:  chat.ToolChoiceNone,
 			}, emit)
 			if err != nil {
 				return nil, errors.Wrap(err, "chat model generation failed")
@@ -200,11 +206,13 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 		}
 
 		resp, err := generate(ctx, model, chat.Request{
-			Model:      req.Model,
-			System:     req.System,
-			Messages:   messages,
-			Tools:      toolSpecs,
-			ToolChoice: chat.ToolChoiceAuto,
+			Model:       req.Model,
+			System:      req.System,
+			Messages:    messages,
+			Temperature: req.Temperature,
+			MaxTokens:   req.MaxTokens,
+			Tools:       toolSpecs,
+			ToolChoice:  chat.ToolChoiceAuto,
 		}, emit)
 		if err != nil {
 			return nil, errors.Wrap(err, "chat model generation failed")

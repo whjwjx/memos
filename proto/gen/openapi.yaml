@@ -3652,6 +3652,7 @@ components:
                         chat_agents is the list of conversational assistant presets surfaced in the
                          /ai-chat page. Stage 1 uses only the first enabled preset as the default
                          assistant; a second enabled preset triggers the agent selector in the UI.
+                         Runtime model selection is handled by llms and conversation.llm_id.
                 tools:
                     type: object
                     additionalProperties:
@@ -3740,15 +3741,13 @@ components:
                 providerId:
                     type: string
                     description: |-
-                        provider_id references an entry in AISetting.providers[].id.
-                         Empty string means the preset is disabled.
-                         Deprecated: new clients should use llm_id.
+                        Deprecated: chat agents no longer bind providers. New clients should leave
+                         this empty and select an LLMConfig at conversation runtime.
                 model:
                     type: string
                     description: |-
-                        model is the provider-specific text-generation model identifier.
-                         Empty string falls back to the engine default.
-                         Deprecated: new clients should use llm_id.
+                        Deprecated: chat agents no longer bind models. New clients should leave
+                         this empty and select an LLMConfig at conversation runtime.
                 systemPrompt:
                     type: string
                     description: system_prompt steers the assistant's behavior, tone, and constraints.
@@ -3758,13 +3757,12 @@ components:
                 llmId:
                     type: string
                     description: |-
-                        llm_id references an entry in AISetting.llms[].id. Empty string uses
-                         legacy provider_id/model fields.
+                        Deprecated: new clients should keep the conversation's llm_id as the
+                         runtime model selector. This field is only kept for older stored configs.
             description: |-
                 ChatAgentConfig describes a conversational assistant preset for the /ai-chat
-                 page. It is a prompt + provider binding with an authorized tool set. Multiple
-                 presets are admin extensions that differ only in system prompt and capability
-                 scope; they are NOT separate agent runtimes.
+                 page. It owns persona and system instructions. Runtime model selection is
+                 handled by LLMConfig and by the conversation-level llm_id.
         InstanceSetting_GeneralSetting:
             type: object
             properties:
@@ -3816,6 +3814,19 @@ components:
                 enabled:
                     type: boolean
                     description: enabled toggles whether the LLM can be selected by AI capabilities.
+                temperature:
+                    type: number
+                    description: Optional sampling temperature. Empty means the chat runtime default.
+                    format: float
+                maxOutputTokens:
+                    type: integer
+                    description: Optional maximum output token budget. Zero means the chat runtime default.
+                    format: int32
+                compatibilityPreset:
+                    type: string
+                    description: |-
+                        Optional provider/model behavior preset used for prompt and tool-call
+                         compatibility tuning. Empty means auto.
             description: LLMConfig represents one configured model profile backed by an AI provider.
         InstanceSetting_MemoRelatedSetting:
             type: object

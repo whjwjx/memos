@@ -6,6 +6,13 @@ import { useTranslate } from "@/utils/i18n";
 import { AgentsPanel } from "./ai-settings/AgentsPanel";
 import { AISettingsOverviewPanel } from "./ai-settings/AISettingsOverviewPanel";
 import { AISettingsTabs } from "./ai-settings/AISettingsTabs";
+import {
+  isAllowedCompatibilityPreset,
+  MAX_LLM_MAX_OUTPUT_TOKENS,
+  MAX_LLM_TEMPERATURE,
+  MIN_LLM_MAX_OUTPUT_TOKENS,
+  MIN_LLM_TEMPERATURE,
+} from "./ai-settings/aiRuntimeConfig";
 import { newLLM, newProvider } from "./ai-settings/aiSettingFactories";
 import { createEmptyTranslationConfig, deriveLLMsFromLegacy, toLocalProvider, toLocalWebSearch } from "./ai-settings/aiSettingMapper";
 import { ChatToolsPanel } from "./ai-settings/ChatToolsPanel";
@@ -232,8 +239,32 @@ const AISection = () => {
       toast.error(t("setting.ai.llm-model-required"));
       return;
     }
+    const temperature = llm.temperature;
+    if (
+      temperature !== undefined &&
+      (!Number.isFinite(temperature) || temperature < MIN_LLM_TEMPERATURE || temperature > MAX_LLM_TEMPERATURE)
+    ) {
+      toast.error(t("setting.ai.llm-temperature-invalid"));
+      return;
+    }
+    const maxOutputTokens = Number.isFinite(llm.maxOutputTokens) ? Math.trunc(llm.maxOutputTokens) : 0;
+    if (maxOutputTokens !== 0 && (maxOutputTokens < MIN_LLM_MAX_OUTPUT_TOKENS || maxOutputTokens > MAX_LLM_MAX_OUTPUT_TOKENS)) {
+      toast.error(t("setting.ai.llm-max-output-tokens-invalid"));
+      return;
+    }
+    if (llm.compatibilityPreset && !isAllowedCompatibilityPreset(llm.compatibilityPreset)) {
+      toast.error(t("setting.ai.llm-compatibility-invalid"));
+      return;
+    }
 
-    const normalizedLLM = { ...llm, title, model };
+    const normalizedLLM = {
+      ...llm,
+      title,
+      model,
+      temperature,
+      maxOutputTokens,
+      compatibilityPreset: llm.compatibilityPreset.trim(),
+    };
     const exists = llms.some((item) => item.id === normalizedLLM.id);
     const nextLLMs = exists ? llms.map((item) => (item.id === normalizedLLM.id ? normalizedLLM : item)) : [...llms, normalizedLLM];
 

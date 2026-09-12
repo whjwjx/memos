@@ -456,11 +456,14 @@ func convertInstanceAISettingFromStore(setting *storepb.InstanceAISetting) *v1pb
 			continue
 		}
 		aiSetting.Llms = append(aiSetting.Llms, &v1pb.InstanceSetting_LLMConfig{
-			Id:         llm.GetId(),
-			Title:      llm.GetTitle(),
-			ProviderId: llm.GetProviderId(),
-			Model:      llm.GetModel(),
-			Enabled:    llm.GetEnabled(),
+			Id:                  llm.GetId(),
+			Title:               llm.GetTitle(),
+			ProviderId:          llm.GetProviderId(),
+			Model:               llm.GetModel(),
+			Enabled:             llm.GetEnabled(),
+			Temperature:         llm.Temperature,
+			MaxOutputTokens:     llm.GetMaxOutputTokens(),
+			CompatibilityPreset: llm.GetCompatibilityPreset(),
 		})
 	}
 	for name, tool := range setting.GetTools() {
@@ -554,11 +557,14 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 			continue
 		}
 		aiSetting.Llms = append(aiSetting.Llms, &storepb.LLMConfig{
-			Id:         llm.GetId(),
-			Title:      llm.GetTitle(),
-			ProviderId: llm.GetProviderId(),
-			Model:      llm.GetModel(),
-			Enabled:    llm.GetEnabled(),
+			Id:                  llm.GetId(),
+			Title:               llm.GetTitle(),
+			ProviderId:          llm.GetProviderId(),
+			Model:               llm.GetModel(),
+			Enabled:             llm.GetEnabled(),
+			Temperature:         llm.Temperature,
+			MaxOutputTokens:     llm.GetMaxOutputTokens(),
+			CompatibilityPreset: llm.GetCompatibilityPreset(),
 		})
 	}
 	for name, tool := range setting.GetTools() {

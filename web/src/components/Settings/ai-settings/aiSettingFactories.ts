@@ -45,6 +45,9 @@ export const newLLM = (providers: LocalAIProvider[]): LocalLLM => {
     providerId: provider?.id ?? "",
     model,
     enabled: true,
+    temperature: undefined,
+    maxOutputTokens: 0,
+    compatibilityPreset: "",
   };
 };
 
