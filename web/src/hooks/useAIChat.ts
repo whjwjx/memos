@@ -456,6 +456,9 @@ export const useSendMessage = (conversationId: string | undefined) => {
               if (!event.delta) {
                 break;
               }
+              if (hasDecisions) {
+                break;
+              }
               setPhase("responding");
               queueAssistantDelta(event.delta);
               break;

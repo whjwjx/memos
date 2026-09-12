@@ -400,6 +400,9 @@ func (s *APIV1Service) StreamMessage(ctx context.Context, request *connect.Reque
 	}, func(event assistant.Event) error {
 		switch event.Type {
 		case assistant.EventAssistantDelta:
+			if turn.skipUserMessage {
+				return nil
+			}
 			if event.Delta == "" {
 				return nil
 			}
