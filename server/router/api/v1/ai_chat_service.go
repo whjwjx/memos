@@ -35,6 +35,8 @@ const chatOperationalGuidance = `Operational guidance:
 - Use get_memo before editing memo content so you do not modify a truncated search result. For batch operations, first search and summarize the candidate memo UIDs for the user, then call batch_update_memos only with explicit memo UIDs.
 - Never write tool calls into your reply text — no XML or JSON such as <tool_calls> or <invoke name="..."> blocks, and no fenced JSON function-call snippets. Tool calls are made only through the API's native function-calling mechanism. Your reply must be plain natural-language text.`
 
+const legacyToolApprovalUserMessage = "[用户已批准上述待确认工具，请直接执行并继续]"
+
 // buildMemoryContext returns the instance-wide shared memory block for the
 // system prompt, or an empty string when memory is disabled or empty.
 func (s *APIV1Service) buildMemoryContext(ctx context.Context) (string, error) {
@@ -200,13 +202,14 @@ func containsPath(paths []string, target string) bool {
 }
 
 type preparedAIChatTurn struct {
-	conv        *store.Conversation
-	userMsg     *store.ConversationMessage
-	history     []chat.Message
-	providerCfg providerBundle
-	system      string
-	registry    *tools.Registry
-	approvals   map[string]string
+	conv            *store.Conversation
+	userMsg         *store.ConversationMessage
+	history         []chat.Message
+	providerCfg     providerBundle
+	system          string
+	registry        *tools.Registry
+	approvals       map[string]string
+	skipUserMessage bool
 }
 
 func (s *APIV1Service) prepareAIChatTurn(ctx context.Context, req *v1pb.SendMessageRequest) (*preparedAIChatTurn, error) {
@@ -214,7 +217,8 @@ func (s *APIV1Service) prepareAIChatTurn(ctx context.Context, req *v1pb.SendMess
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.Content) == "" {
+	hasDecisions := hasToolDecisions(req)
+	if strings.TrimSpace(req.Content) == "" && !hasDecisions {
 		return nil, status.Errorf(codes.InvalidArgument, "content is required")
 	}
 	if req.LlmId != "" && req.LlmId != conv.LLMID {
@@ -229,18 +233,25 @@ func (s *APIV1Service) prepareAIChatTurn(ctx context.Context, req *v1pb.SendMess
 		conv = updated
 	}
 
-	// Persist the incoming user message.
-	userMsg, err := s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
-		ConversationID: conv.ID,
-		Role:           "user",
-		Content:        req.Content,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to store user message: %v", err)
+	var userMsg *store.ConversationMessage
+	excludeID := int32(0)
+	if !hasDecisions {
+		// Persist a real user turn. Tool approval continuations are control
+		// events carried by structured request fields, so they do not become
+		// visible chat history.
+		userMsg, err = s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
+			ConversationID: conv.ID,
+			Role:           "user",
+			Content:        req.Content,
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to store user message: %v", err)
+		}
+		excludeID = userMsg.ID
 	}
 
 	// Load the prior history (everything before this turn).
-	history, err := s.loadChatHistory(ctx, conv.ID, userMsg.ID)
+	history, err := s.loadChatHistory(ctx, conv.ID, excludeID)
 	if err != nil {
 		return nil, err
 	}
@@ -283,14 +294,19 @@ func (s *APIV1Service) prepareAIChatTurn(ctx context.Context, req *v1pb.SendMess
 	}
 
 	return &preparedAIChatTurn{
-		conv:        conv,
-		userMsg:     userMsg,
-		history:     history,
-		providerCfg: providerCfg,
-		system:      systemPrompt,
-		registry:    registry,
-		approvals:   approvals,
+		conv:            conv,
+		userMsg:         userMsg,
+		history:         history,
+		providerCfg:     providerCfg,
+		system:          systemPrompt,
+		registry:        registry,
+		approvals:       approvals,
+		skipUserMessage: hasDecisions,
 	}, nil
+}
+
+func hasToolDecisions(req *v1pb.SendMessageRequest) bool {
+	return len(req.GetApprovedToolCallIds()) > 0 || len(req.GetRejectedToolCallIds()) > 0 || len(req.GetToolApprovals()) > 0
 }
 
 func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request[v1pb.SendMessageRequest]) (*connect.Response[v1pb.SendMessageResponse], error) {
@@ -304,6 +320,7 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 		System:              turn.system,
 		History:             turn.history,
 		UserContent:         req.Content,
+		SkipUserMessage:     turn.skipUserMessage,
 		Model:               turn.providerCfg.modelName,
 		ChatOptions:         chat.ApplyOptions(nil),
 		Registry:            turn.registry,
@@ -344,17 +361,20 @@ func (s *APIV1Service) StreamMessage(ctx context.Context, request *connect.Reque
 	}); err != nil {
 		return err
 	}
-	if err := send(&v1pb.SendMessageStreamResponse{
-		Type:    v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED,
-		Message: convertMessageFromStore(turn.userMsg),
-	}); err != nil {
-		return err
+	if turn.userMsg != nil {
+		if err := send(&v1pb.SendMessageStreamResponse{
+			Type:    v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED,
+			Message: convertMessageFromStore(turn.userMsg),
+		}); err != nil {
+			return err
+		}
 	}
 
 	resp, err := assistant.ToolLoopStream(ctx, turn.providerCfg.model, &assistant.AssistantRequest{
 		System:              turn.system,
 		History:             turn.history,
 		UserContent:         req.Content,
+		SkipUserMessage:     turn.skipUserMessage,
 		Model:               turn.providerCfg.modelName,
 		ChatOptions:         chat.ApplyOptions(nil),
 		Registry:            turn.registry,
@@ -599,6 +619,9 @@ func (s *APIV1Service) loadChatHistory(ctx context.Context, conversationID int32
 		if m.ID == excludeID {
 			continue
 		}
+		if isLegacyToolApprovalMessage(m) {
+			continue
+		}
 		out = append(out, chat.Message{
 			Role:       m.Role,
 			Content:    m.Content,
@@ -608,6 +631,10 @@ func (s *APIV1Service) loadChatHistory(ctx context.Context, conversationID int32
 		})
 	}
 	return out, nil
+}
+
+func isLegacyToolApprovalMessage(m *store.ConversationMessage) bool {
+	return m != nil && m.Role == chat.RoleUser && strings.TrimSpace(m.Content) == legacyToolApprovalUserMessage
 }
 
 // resolveChatProvider picks the conversation's selected LLM when present, then

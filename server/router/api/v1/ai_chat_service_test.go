@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/usememos/memos/internal/ai/chat"
 	"github.com/usememos/memos/internal/ai/tools"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
@@ -105,6 +106,50 @@ func TestAIChatGetMissingReturnsNotFound(t *testing.T) {
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	require.Equal(t, codes.NotFound, st.Code())
+}
+
+func TestHasToolDecisions(t *testing.T) {
+	require.False(t, hasToolDecisions(&v1pb.SendMessageRequest{Content: "hello"}))
+	require.True(t, hasToolDecisions(&v1pb.SendMessageRequest{ApprovedToolCallIds: []string{"call-1"}}))
+	require.True(t, hasToolDecisions(&v1pb.SendMessageRequest{RejectedToolCallIds: []string{"call-1"}}))
+	require.True(t, hasToolDecisions(&v1pb.SendMessageRequest{
+		ToolApprovals: []*v1pb.ToolApproval{{ToolCallId: "call-1", ConfirmKeyword: "yes"}},
+	}))
+}
+
+func TestLoadChatHistorySkipsLegacyToolApprovalMessage(t *testing.T) {
+	s, user, ctx := newTestAIChatService(t)
+	defer s.Store.Close()
+
+	conv, err := s.Store.CreateConversation(ctx, &store.CreateConversation{
+		UID:    "history-filter",
+		UserID: user.ID,
+	})
+	require.NoError(t, err)
+	_, err = s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
+		ConversationID: conv.ID,
+		Role:           chat.RoleUser,
+		Content:        "delete memo abc",
+	})
+	require.NoError(t, err)
+	_, err = s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
+		ConversationID: conv.ID,
+		Role:           chat.RoleUser,
+		Content:        legacyToolApprovalUserMessage,
+	})
+	require.NoError(t, err)
+	_, err = s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
+		ConversationID: conv.ID,
+		Role:           chat.RoleAssistant,
+		Content:        "done",
+	})
+	require.NoError(t, err)
+
+	history, err := s.loadChatHistory(ctx, conv.ID, 0)
+	require.NoError(t, err)
+	require.Len(t, history, 2)
+	require.Equal(t, "delete memo abc", history[0].Content)
+	require.Equal(t, "done", history[1].Content)
 }
 
 func TestApplyToolConfigScopeIsolation(t *testing.T) {

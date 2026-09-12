@@ -36,6 +36,10 @@ type AssistantRequest struct {
 	History []chat.Message
 	// UserContent is the latest user message.
 	UserContent string
+	// SkipUserMessage omits UserContent from the working history. It is used for
+	// structured control continuations such as approving pending tool calls, where
+	// the user decision is carried by fields instead of chat text.
+	SkipUserMessage bool
 	// Model is the provider-specific model identifier passed to chat.Generate.
 	Model string
 	// Provider builds the chat model used for generation.
@@ -129,10 +133,12 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 	emittedMessages := make([]chat.Message, 0)
 	emittedToolMessages := make([]chat.Message, 0)
 
-	// Build the working message list: history + new user turn.
+	// Build the working message list: history + optional new user turn.
 	messages := make([]chat.Message, 0, len(req.History)+2)
 	messages = append(messages, req.History...)
-	messages = append(messages, chat.Message{Role: chat.RoleUser, Content: req.UserContent})
+	if !req.SkipUserMessage {
+		messages = append(messages, chat.Message{Role: chat.RoleUser, Content: req.UserContent})
+	}
 
 	registry := req.Registry
 	if registry == nil {

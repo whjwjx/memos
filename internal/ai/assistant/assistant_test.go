@@ -177,6 +177,34 @@ func TestRunLoopContinuesAfterApproval(t *testing.T) {
 	}
 }
 
+func TestRunLoopSkipsUserMessageForApprovalContinuation(t *testing.T) {
+	t.Parallel()
+	executed := false
+	model := &fakeModel{
+		responses: []*chat.Response{
+			{Text: "settings updated"},
+		},
+	}
+	reg := newRegistryWith(&fakeTool{name: "manage_settings", confirm: true, executed: &executed})
+	resp, err := runLoop(context.Background(), model, &AssistantRequest{
+		Registry: reg,
+		History: []chat.Message{
+			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`}}},
+			{Role: chat.RoleTool, ToolCallID: "c2", Name: "manage_settings", Content: "awaiting user confirmation"},
+		},
+		UserContent:         "[user approved the pending tool, please execute and continue]",
+		SkipUserMessage:     true,
+		ApprovedToolCallIDs: []string{"c2"},
+	}, nil)
+	require.NoError(t, err)
+	require.True(t, executed)
+	require.False(t, resp.RequiresConfirmation)
+	for _, m := range model.lastReq.Messages {
+		require.NotEqual(t, chat.RoleUser, m.Role)
+		require.NotContains(t, m.Content, "approved the pending tool")
+	}
+}
+
 func TestRunLoopApprovalExecutesApprovedAndSkipsRejected(t *testing.T) {
 	t.Parallel()
 	executed := false

@@ -35,6 +35,7 @@ import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
 const AWAITING_PLACEHOLDER = "awaiting user confirmation";
+const LEGACY_TOOL_APPROVAL_USER_MESSAGE = "[用户已批准上述待确认工具，请直接执行并继续]";
 const MEMO_CONTEXT_MAX_CHARS = 3000;
 const MEMO_CONTEXT_START = "[Selected memo context]";
 const MEMO_CONTEXT_END = "[/Selected memo context]";
@@ -179,6 +180,9 @@ const buildConversationTimeline = (messages: ConversationMessage[]): Conversatio
 
   const timeline: ConversationTimelineItem[] = [];
   for (const message of messages) {
+    if (message.role === "user" && message.content.trim() === LEGACY_TOOL_APPROVAL_USER_MESSAGE) {
+      continue;
+    }
     if (message.role === "tool") {
       continue;
     }

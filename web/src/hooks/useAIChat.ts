@@ -164,6 +164,19 @@ interface SendMessageInput {
 const hasToolDecisions = (input: SendMessageInput) =>
   (input.approvedToolCallIds?.length ?? 0) > 0 || (input.rejectedToolCallIds?.length ?? 0) > 0 || (input.toolApprovals?.length ?? 0) > 0;
 
+const LEGACY_TOOL_APPROVAL_USER_MESSAGE = "[用户已批准上述待确认工具，请直接执行并继续]";
+const MEMO_CONTEXT_QUESTION_MARKER = "[/Selected memo context]\n\nUser question:\n";
+
+const createConversationTitle = (content: string): string => {
+  const markerIndex = content.indexOf(MEMO_CONTEXT_QUESTION_MARKER);
+  const visibleContent = markerIndex >= 0 ? content.slice(markerIndex + MEMO_CONTEXT_QUESTION_MARKER.length) : content;
+  const compacted = visibleContent.trim().replace(/\s+/g, " ");
+  if (!compacted || compacted === LEGACY_TOOL_APPROVAL_USER_MESSAGE) {
+    return "";
+  }
+  return compacted.slice(0, 32);
+};
+
 const appendOrReplaceMessage = (messages: ConversationMessage[], next: ConversationMessage) => {
   if (next.id) {
     const idx = messages.findIndex((message) => message.id === next.id);
@@ -468,8 +481,10 @@ export const useSendMessage = (conversationId: string | undefined) => {
       if (input.content.trim()) {
         const cached = queryClient.getQueryData<ConversationCache>(["ai-chat", "conversation", conversationId]);
         if (cached?.conversation && cached.conversation.title === "") {
-          const title = input.content.trim().slice(0, 24).replace(/\s+/g, " ");
-          updateTitle.mutate(title);
+          const title = createConversationTitle(input.content);
+          if (title) {
+            updateTitle.mutate(title);
+          }
         }
       }
     },
@@ -523,11 +538,8 @@ export const useSendMessage = (conversationId: string | undefined) => {
           .filter((tc) => tc.status === "approved" && tc.confirmKeyword)
           .map((tc) => ({ toolCallId: tc.id, confirmKeyword: tc.confirmKeyword as string }));
         fresh.forEach((tc) => submittedIdsRef.current.add(tc.id));
-        // Send a fixed approval instruction (NOT a free-text user message) so the
-        // model treats it as "the pending tools were decided" rather than a new
-        // task, keeping behavior consistent across turns.
         send({
-          content: "[用户已批准上述待确认工具，请直接执行并继续]",
+          content: "",
           approvedToolCallIds: approvedIds,
           rejectedToolCallIds: rejectedIds,
           toolApprovals,

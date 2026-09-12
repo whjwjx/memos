@@ -1429,6 +1429,7 @@
     "empty-hint": "与你的 AI 助手开始一段对话。",
     "start-hint": "发送消息开始对话。",
     "new-conversation": "新建对话",
+    "untitled-conversation": "新对话",
     "input-placeholder": "询问任何问题，或让助手搜索、创建、整理你的备忘录…",
     "tool-result": "工具结果",
     "confirm-tools": "助手想要运行以下工具，确认后继续。",

@@ -423,17 +423,32 @@ const AIChatSidebarContent = () => {
   const [deleteTarget, setDeleteTarget] = useState<string>();
   const [renamingId, setRenamingId] = useState<string>();
   const [renameValue, setRenameValue] = useState("");
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const activeConversationId = searchParams.get("conversation") ?? undefined;
 
   const handleCreate = async () => {
+    if (isCreatingConversation || createConversation.isPending) {
+      return;
+    }
+    setIsCreatingConversation(true);
     try {
+      for (const conv of conversations.filter((item) => item.title.trim() === "")) {
+        const detail = await aiChatServiceClient.getConversation({ id: conv.id }).catch(() => undefined);
+        if (detail && (detail.messages?.length ?? 0) === 0) {
+          navigate(`${ROUTES.AI_CHAT}?conversation=${conv.id}`);
+          setMobileOpen(false);
+          return;
+        }
+      }
       const res = await createConversation.mutateAsync({});
       navigate(`${ROUTES.AI_CHAT}?conversation=${res.id}`);
       setMobileOpen(false);
     } catch (error: unknown) {
       handleError(error, toast.error, { context: "Create conversation" });
+    } finally {
+      setIsCreatingConversation(false);
     }
   };
 
@@ -486,7 +501,7 @@ const AIChatSidebarContent = () => {
           size="icon-sm"
           className={SIDEBAR_SECTION_ACTION_BUTTON_CLASSES}
           onClick={handleCreate}
-          disabled={createConversation.isPending}
+          disabled={isCreatingConversation || createConversation.isPending}
           aria-label={t("aiChat.new-conversation")}
         >
           <SquarePenIcon className={SIDEBAR_SECTION_ACTION_ICON_CLASSES} strokeWidth={1.8} />
@@ -528,7 +543,7 @@ const AIChatSidebarContent = () => {
                   className="flex h-full min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
                   <BotIcon className={SIDEBAR_ROW_ICON_CLASSES} strokeWidth={1.8} />
-                  <span className="min-w-0 flex-1 truncate">{conv.title || conv.id}</span>
+                  <span className="min-w-0 flex-1 truncate">{conv.title.trim() || t("aiChat.untitled-conversation")}</span>
                 </button>
               )}
               {!isRenaming && (
