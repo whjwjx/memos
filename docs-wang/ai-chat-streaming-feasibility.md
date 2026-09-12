@@ -380,7 +380,43 @@ const { send, stop, isPending, streamingMessageId, error } = useStreamMessage(co
 - `tool_result` 事件回来时更新对应 call。
 - `confirmation_required` 事件回来时显示确认卡片。
 
-### 4. 加停止生成
+### 4. 优化确认卡片交互
+
+当前确认卡片也会影响“丝滑感”。它不只是样式问题，和 `useSendMessage` 的状态机、streaming approval continuation 都有关。
+
+当前代码位置：
+
+- `web/src/pages/AIChat.tsx` 的 `ConfirmationCard` / `ToolCallCard`。
+- `web/src/hooks/useAIChat.ts` 的 `ResolvedToolCall`、`requiresConfirmation`、`resolveToolCall`。
+
+目前观察到的问题：
+
+- `ConfirmationCard` 中 `shouldAutoCollapse = toolCalls.length > 3`，随后 `isCollapsed = collapsed || shouldAutoCollapse`。这会导致超过 3 个工具调用时始终折叠，点击“展开全部”也会因为 `shouldAutoCollapse` 仍为 true 而无法真正展开。
+- 确认卡片状态存在于 hook 的临时 state 中，而不是 conversation timeline 的统一消息模型中；streaming 后如果不整理，会更容易出现“历史消息已更新，但确认卡片还挂着”的状态错位。
+- 用户点击某个工具的批准/拒绝后，hook 会等所有 pending 决策完成，然后自动发 approval continuation。这个逻辑是安全的，但 UI 上不够显性：用户不一定知道是“已选择，等待其它项”还是“已经提交，正在继续生成”。
+- 对 `query_db` 写操作需要输入 `yes`，但当前输入框和批准按钮只是 disabled/enabled，没有更明确的 inline validation 和焦点引导。
+- 已处理卡片会保留为记录，这是对的，但它和新的 `ToolActivity` 折叠记录存在职责重叠：一个是“待确认决策 UI”，一个是“工具执行日志”。后续需要把两者边界理清。
+
+建议优化方向：
+
+- 把确认卡片明确拆成两层：`PendingToolApprovalPanel` 负责用户决策，`ToolActivity` 负责执行记录。工具真正完成后，确认卡片可以折叠成决策记录或并入工具活动，不再长期占据主对话区域。
+- 修复自动折叠逻辑：默认可折叠，但用户点击后必须能展开。可以用 `defaultCollapsed` 初始值，而不是每次 render 都用 `toolCalls.length > 3` 强制折叠。
+- 给多工具确认增加批量操作区：`全部批准`、`全部拒绝`、`提交决定`。高风险工具仍然保留逐项确认和关键词输入，不能被批量批准绕过。
+- 点击批准/拒绝后，卡片进入明确状态：`pending`、`selected_approved`、`selected_rejected`、`submitting`、`approved`、`rejected`、`failed`。现在只有 `pending/approved/rejected`，表达不了“用户已点，但 continuation 还在请求中”。
+- approval continuation 改走 `StreamMessage` 后，应复用同一个 streaming 状态：确认提交后卡片显示“正在执行已批准工具”，随后工具活动实时更新，最后 assistant 继续流式输出。
+- 对 `query_db` 写操作，输入框应自动 focus，错误提示用 inline 文案表达，例如“输入 yes 后才能批准写操作”，避免用户只看到按钮灰掉。
+- 卡片按钮在窄屏下需要固定布局，避免“批准/拒绝/输入框”挤压换行后显得跳动。
+
+第一版建议一起做的确认卡片改动：
+
+- 修复超过 3 个工具调用无法展开的问题。
+- 增加 `submitting` 状态和清晰的“正在继续执行”反馈。
+- approval continuation 期间禁用重复点击。
+- streaming `confirmation_required` 事件到达后立即显示确认卡片，不等整轮请求结束。
+
+这部分改动不需要数据库 migration，也不需要改后端权限模型。主要影响前端状态机和 streaming event 的处理方式。
+
+### 5. 加停止生成
 
 建议第一版顺手加停止按钮，否则 streaming UI 会让用户更自然地期待“能停”。
 
