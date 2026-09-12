@@ -100,17 +100,23 @@ function setAuthorizationHeader(req: RequestWithHeader, token: string | null) {
   req.header.set("Authorization", `Bearer ${token}`);
 }
 
-function shouldHandleUnauthenticatedRetry(error: unknown, isRetryAttempt: boolean): boolean {
+export function isAuthFailureError(error: unknown): boolean {
   if (!(error instanceof ConnectError)) {
     return false;
   }
-  if (error.code !== Code.Unauthenticated) {
-    return false;
+  if (error.code === Code.Unauthenticated) {
+    return true;
   }
+  // Some server-streaming failures arrive through connect-web as Code.Unknown
+  // while the underlying gRPC status is still embedded in the message.
+  return error.code === Code.Unknown && /\bcode\s*=\s*Unauthenticated\b/i.test(error.message);
+}
+
+function shouldHandleUnauthenticatedRetry(error: unknown, isRetryAttempt: boolean): boolean {
   if (isRetryAttempt) {
     return false;
   }
-  return true;
+  return isAuthFailureError(error);
 }
 
 async function refreshAndGetAccessToken(): Promise<string> {

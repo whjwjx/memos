@@ -1,15 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  BotIcon,
-  BrainCircuitIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  MessageSquareTextIcon,
-  SendIcon,
-  UserIcon,
-  WrenchIcon,
-  XIcon,
-} from "lucide-react";
+import { BotIcon, BrainCircuitIcon, CheckIcon, ChevronDownIcon, MessageSquareTextIcon, SendIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChatMarkdown } from "@/components/ChatMarkdown";
@@ -18,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  type SendMessagePhase,
   useConversation,
   useConversations,
   useCreateConversation,
@@ -35,6 +26,7 @@ import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
 const AWAITING_PLACEHOLDER = "awaiting user confirmation";
+const LEGACY_TOOL_APPROVAL_USER_MESSAGE = "[用户已批准上述待确认工具，请直接执行并继续]";
 const MEMO_CONTEXT_MAX_CHARS = 3000;
 const MEMO_CONTEXT_START = "[Selected memo context]";
 const MEMO_CONTEXT_END = "[/Selected memo context]";
@@ -96,7 +88,7 @@ type ToolActivityCall = {
 
 type ConversationTimelineItem =
   | { kind: "message"; message: ConversationMessage }
-  | { kind: "toolActivity"; id: string; calls: ToolActivityCall[] };
+  | { kind: "reasoning"; id: string; calls: ToolActivityCall[]; label?: string; running?: boolean };
 
 const SENSITIVE_KEY_RE = /api[_-]?key|authorization|bearer|password|secret|token/i;
 
@@ -179,12 +171,15 @@ const buildConversationTimeline = (messages: ConversationMessage[]): Conversatio
 
   const timeline: ConversationTimelineItem[] = [];
   for (const message of messages) {
+    if (message.role === "user" && message.content.trim() === LEGACY_TOOL_APPROVAL_USER_MESSAGE) {
+      continue;
+    }
     if (message.role === "tool") {
       continue;
     }
     if (message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0) {
       timeline.push({
-        kind: "toolActivity",
+        kind: "reasoning",
         id: `tools-${message.id}`,
         calls: message.toolCalls.map((call) => {
           const result = toolResultByID.get(call.id)?.content ?? "";
@@ -197,10 +192,6 @@ const buildConversationTimeline = (messages: ConversationMessage[]): Conversatio
           };
         }),
       });
-      if (!message.content.trim()) {
-        continue;
-      }
-      timeline.push({ kind: "message", message: { ...message, toolCalls: [] } });
       continue;
     }
     if (message.role === "assistant" && !message.content.trim()) {
@@ -209,6 +200,70 @@ const buildConversationTimeline = (messages: ConversationMessage[]): Conversatio
     timeline.push({ kind: "message", message });
   }
   return timeline;
+};
+
+const hasVisibleStreamingAssistantMessage = (timeline: ConversationTimelineItem[]): boolean =>
+  timeline.some(
+    (item) =>
+      item.kind === "message" &&
+      item.message.role === "assistant" &&
+      item.message.id.startsWith("local-assistant-") &&
+      item.message.content.trim().length > 0,
+  );
+
+const insertRuntimeStatus = (timeline: ConversationTimelineItem[], label: string): ConversationTimelineItem[] => {
+  if (!label) {
+    return timeline;
+  }
+
+  let lastUserMessageIndex = -1;
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const item = timeline[i];
+    if (item.kind === "message" && item.message.role === "user") {
+      lastUserMessageIndex = i;
+      break;
+    }
+  }
+
+  const statusItem: ConversationTimelineItem = { kind: "reasoning", id: "runtime-status", calls: [], label, running: true };
+  if (lastUserMessageIndex < 0) {
+    return [...timeline, statusItem];
+  }
+  for (let i = lastUserMessageIndex + 1; i < timeline.length; i++) {
+    const item = timeline[i];
+    if (item.kind === "reasoning") {
+      return [
+        ...timeline.slice(0, i),
+        {
+          ...item,
+          label,
+          running: true,
+        },
+        ...timeline.slice(i + 1),
+      ];
+    }
+  }
+  return [...timeline.slice(0, lastUserMessageIndex + 1), statusItem, ...timeline.slice(lastUserMessageIndex + 1)];
+};
+
+const getRuntimeStatusLabel = (
+  phase: SendMessagePhase,
+  timeline: ConversationTimelineItem[],
+  translate: ReturnType<typeof useTranslate>,
+): string => {
+  if (phase === "idle") {
+    return "";
+  }
+  if (phase === "responding" && hasVisibleStreamingAssistantMessage(timeline)) {
+    return "";
+  }
+  if (phase === "using_tools") {
+    return translate("aiChat.status-using-tools");
+  }
+  if (phase === "responding") {
+    return translate("aiChat.status-responding");
+  }
+  return translate("aiChat.status-thinking");
 };
 
 const AgentPill = ({
@@ -316,18 +371,14 @@ const MessageBubble = ({ msg }: { msg: ConversationMessage }) => {
 
   const isUser = msg.role === "user";
   return (
-    <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        {isUser ? <UserIcon className="w-3 h-auto" /> : <BotIcon className="w-3 h-auto" />}
-        <span>{msg.role}</span>
-      </div>
+    <div className={`flex min-w-0 flex-col ${isUser ? "items-end" : "items-start"}`}>
       <div
-        className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-sm ${
+        className={`min-w-0 max-w-[82%] overflow-hidden rounded-2xl px-4 py-2.5 text-sm [overflow-wrap:anywhere] ${
           isUser ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted rounded-bl-sm"
         }`}
       >
         {isUser ? (
-          <span className="whitespace-pre-wrap break-words">{stripMemoContextEnvelope(msg.content)}</span>
+          <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{stripMemoContextEnvelope(msg.content)}</span>
         ) : (
           <ChatMarkdown content={stripFakeToolCalls(msg.content)} />
         )}
@@ -372,10 +423,11 @@ const summarizeToolCall = (name: string, argsJSON: string): string => {
   }
 };
 
-const ToolActivity = ({ calls }: { calls: ToolActivityCall[] }) => {
+const ReasoningActivity = ({ calls, label, running }: { calls: ToolActivityCall[]; label?: string; running?: boolean }) => {
   const t = useTranslate();
   const [expanded, setExpanded] = useState(false);
   const names = Array.from(new Set(calls.map((call) => call.name))).join(", ");
+  const hasCalls = calls.length > 0;
   const hasError = calls.some((call) => call.status === "error");
   const pendingCount = calls.filter((call) => call.status === "pending").length;
   const statusLabel = hasError
@@ -383,47 +435,68 @@ const ToolActivity = ({ calls }: { calls: ToolActivityCall[] }) => {
     : pendingCount > 0
       ? t("aiChat.tool-activity-status-pending")
       : t("aiChat.tool-activity-status-completed");
+  const title =
+    label ??
+    (pendingCount > 0
+      ? t("aiChat.reasoning-running")
+      : hasError
+        ? t("aiChat.reasoning-completed-with-error")
+        : t("aiChat.reasoning-completed"));
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex min-w-0 flex-col items-start gap-1">
       <button
         type="button"
-        className="group flex max-w-[82%] items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((open) => !open)}
+        className={cn(
+          "group flex min-w-0 max-w-[82%] items-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground transition-colors",
+          hasCalls ? "hover:bg-muted/50 hover:text-foreground" : "cursor-default",
+        )}
+        aria-expanded={hasCalls ? expanded : undefined}
+        onClick={() => hasCalls && setExpanded((open) => !open)}
       >
-        <WrenchIcon className="size-3.5 shrink-0" strokeWidth={1.8} />
-        <span className="min-w-0 flex-1 truncate">{t("aiChat.tool-activity-summary", { count: calls.length, names })}</span>
-        <Badge variant={hasError ? "warning" : "secondary"} shape="pill" className="hidden text-[11px] sm:inline-flex">
-          {statusLabel}
-        </Badge>
-        <ChevronDownIcon className={cn("size-3.5 shrink-0 transition-transform", expanded && "rotate-180")} strokeWidth={1.8} />
+        <BrainCircuitIcon className={cn("size-3.5 shrink-0", running && "animate-pulse")} strokeWidth={1.8} />
+        <span className="shrink-0 truncate">{title}</span>
+        {hasCalls && (
+          <span className="hidden min-w-0 flex-1 truncate text-muted-foreground/80 sm:block">
+            {t("aiChat.tool-activity-summary", { count: calls.length, names })}
+          </span>
+        )}
+        {hasCalls && (
+          <Badge variant={hasError ? "warning" : "secondary"} shape="pill" className="hidden text-[11px] sm:inline-flex">
+            {statusLabel}
+          </Badge>
+        )}
+        {hasCalls && (
+          <ChevronDownIcon className={cn("size-3.5 shrink-0 transition-transform", expanded && "rotate-180")} strokeWidth={1.8} />
+        )}
       </button>
 
-      {expanded && (
-        <div className="flex w-full max-w-[82%] flex-col gap-2 rounded-xl border border-border bg-background px-3 py-3 text-xs">
+      {expanded && hasCalls && (
+        <div className="flex w-full min-w-0 max-w-[82%] flex-col gap-2 overflow-hidden rounded-xl border border-border bg-background px-3 py-3 text-xs">
           {calls.map((call) => (
-            <div key={call.id} className="flex flex-col gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-primary">{call.name}</code>
+            <div key={call.id} className="flex min-w-0 flex-col gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <code className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 font-mono text-primary">{call.name}</code>
                 <Badge variant={call.status === "error" ? "warning" : call.status === "pending" ? "outline" : "secondary"} shape="pill">
                   {t(`aiChat.tool-activity-status-${call.status}` as Parameters<typeof t>[0])}
                 </Badge>
               </div>
-              <div className="text-sm text-foreground">{summarizeToolCall(call.name, call.arguments)}</div>
-              <div className="grid gap-2">
-                <div>
+              <div className="min-w-0 text-sm text-foreground break-words [overflow-wrap:anywhere]">
+                {summarizeToolCall(call.name, call.arguments)}
+              </div>
+              <div className="grid min-w-0 gap-2">
+                <div className="min-w-0">
                   <div className="mb-1 font-medium text-muted-foreground">{t("aiChat.tool-activity-arguments")}</div>
-                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                  <pre className="max-h-36 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
                     {formatToolPayload(call.arguments)}
                   </pre>
                 </div>
                 {call.result && call.result !== AWAITING_PLACEHOLDER && (
-                  <div>
-                    <div className="mb-1 font-medium text-muted-foreground">
+                  <div className="min-w-0">
+                    <div className="mb-1 min-w-0 break-words font-medium text-muted-foreground [overflow-wrap:anywhere]">
                       {t("aiChat.tool-activity-result")} · {getToolResultSummary(call.result)}
                     </div>
-                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                    <pre className="max-h-48 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
                       {formatToolPayload(call.result)}
                     </pre>
                   </div>
@@ -456,7 +529,7 @@ const ToolCallCard = ({
   onResolve,
   disabled,
 }: {
-  tc: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected"; confirmKeyword?: string };
+  tc: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected" | "submitting"; confirmKeyword?: string };
   onResolve: (status: "approved" | "rejected", confirmKeyword?: string) => void;
   disabled: boolean;
 }) => {
@@ -474,7 +547,7 @@ const ToolCallCard = ({
     enabled: tc.name === "delete_memo" && Boolean(memoUid),
   });
 
-  const resolved = tc.status !== "pending";
+  const resolved = tc.status === "approved" || tc.status === "rejected" || tc.status === "submitting";
   const [keyword, setKeyword] = useState("");
   const canApprove = !isQueryDBWrite || keyword.trim().toLowerCase() === CONFIRM_KEYWORD;
 
@@ -494,12 +567,17 @@ const ToolCallCard = ({
             已拒绝
           </Badge>
         )}
+        {tc.status === "submitting" && (
+          <Badge variant="warning" shape="pill" className="text-[11px]">
+            正在执行
+          </Badge>
+        )}
       </div>
       <div className="mt-1 text-sm text-foreground">{summarizeToolCall(tc.name, tc.arguments)}</div>
       {["delete_memo", "get_comments"].includes(tc.name) && memo && (
         <div className="mt-2 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
           <span className="mb-1 block font-medium text-foreground/70">目标 memo 内容：</span>
-          <div className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{memo.content}</div>
+          <div className="max-h-32 min-w-0 overflow-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{memo.content}</div>
         </div>
       )}
       {!resolved && isQueryDBWrite && (
@@ -535,15 +613,21 @@ const ConfirmationCard = ({
   onResolve,
   disabled,
 }: {
-  toolCalls: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected"; confirmKeyword?: string }[];
+  toolCalls: {
+    id: string;
+    name: string;
+    arguments: string;
+    status: "pending" | "approved" | "rejected" | "submitting";
+    confirmKeyword?: string;
+  }[];
   onResolve: (id: string, status: "approved" | "rejected", confirmKeyword?: string) => void;
   disabled: boolean;
 }) => {
   const pendingCount = toolCalls.filter((tc) => tc.status === "pending").length;
-  const [collapsed, setCollapsed] = useState(false);
-  // Collapse automatically once there are several cards so the list stays readable.
-  const shouldAutoCollapse = toolCalls.length > 3;
-  const isCollapsed = collapsed || shouldAutoCollapse;
+  // Default-collapse long approval batches once, but keep the user's explicit
+  // expand/collapse choice working afterwards.
+  const [collapsed, setCollapsed] = useState(() => toolCalls.length > 3);
+  const isCollapsed = collapsed;
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4">
@@ -592,7 +676,7 @@ const AIChat = () => {
   const { agentNameById, defaultAgent, defaultLLM, enabledChatAgents, enabledLLMs, llmNameById } = useAIChatAgents();
   const updateConversationAgent = useUpdateConversationAgent(conversationId);
   const updateConversationLLM = useUpdateConversationLLM(conversationId);
-  const { requiresConfirmation, toolCalls, send, resolveToolCall, isPending, error } = useSendMessage(conversationId);
+  const { requiresConfirmation, toolCalls, send, resolveToolCall, isPending, phase, error } = useSendMessage(conversationId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -610,6 +694,12 @@ const AIChat = () => {
   const activeAgentLabel = activeAgentId ? (agentNameById.get(activeAgentId) ?? activeAgentId) : t("aiChat.agent-fallback-label");
   const activeLLMLabel = activeLLMId ? (llmNameById.get(activeLLMId) ?? activeLLMId) : "LLM";
   const timeline = useMemo(() => buildConversationTimeline(history), [history]);
+  const runtimeStatusLabel = useMemo(() => getRuntimeStatusLabel(phase, timeline, t), [phase, timeline, t]);
+  const timelineWithRuntimeStatus = useMemo(() => insertRuntimeStatus(timeline, runtimeStatusLabel), [runtimeStatusLabel, timeline]);
+  const historyRenderKey = useMemo(
+    () => history.map((msg) => `${msg.id}:${msg.content?.length ?? 0}:${msg.toolCalls?.length ?? 0}`).join("|"),
+    [history],
+  );
   const composerDisabled =
     isPending ||
     createConversation.isPending ||
@@ -665,7 +755,7 @@ const AIChat = () => {
   // Smoothly scroll to the newest message when content changes.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [history.length, requiresConfirmation, isPending]);
+  }, [historyRenderKey, requiresConfirmation, isPending, phase]);
 
   // Jump (not smooth) to the bottom when the composer is focused, so the input
   // is never hidden behind the mobile keyboard and the latest message stays in view.
@@ -890,19 +980,12 @@ const AIChat = () => {
         {history.length === 0 && (
           <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">{t("aiChat.start-hint")}</div>
         )}
-        {timeline.map((item) =>
+        {timelineWithRuntimeStatus.map((item) =>
           item.kind === "message" ? (
             <MessageBubble key={item.message.id} msg={item.message} />
           ) : (
-            <ToolActivity key={item.id} calls={item.calls} />
+            <ReasoningActivity key={item.id} calls={item.calls} label={item.label} running={item.running} />
           ),
-        )}
-
-        {isPending && history.length > 0 && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <BotIcon className="h-4 w-auto animate-pulse" />
-            <span>正在思考…</span>
-          </div>
         )}
 
         {requiresConfirmation && toolCalls.length > 0 && (

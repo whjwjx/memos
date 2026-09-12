@@ -1,10 +1,12 @@
 import { create } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { aiChatServiceClient } from "@/connect";
-import { type Conversation, type ConversationMessage } from "@/types/proto/api/v1/ai_chat_service_pb";
+import { aiChatServiceClient, isAuthFailureError, refreshAccessToken } from "@/connect";
+import { AIChatStreamEventType, type Conversation, type ConversationMessage, type ToolCall } from "@/types/proto/api/v1/ai_chat_service_pb";
+import { redirectOnAuthFailure } from "@/utils/auth-redirect";
 
 export const useConversations = () => {
   return useQuery({
@@ -132,9 +134,10 @@ interface ResolvedToolCall {
   arguments: string;
   requiresConfirmation: boolean;
   // "pending" 等待用户决定；"approved"/"rejected" 已处理（卡片保留作为记录，不消失）。
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "submitting";
   // 用户在二次确认卡片上输入的确认词（如 query_db 写操作的 "yes"）。
   confirmKeyword?: string;
+  submittedDecision?: "approved" | "rejected";
 }
 
 interface SendMessageState {
@@ -143,24 +146,117 @@ interface SendMessageState {
   toolCalls: ResolvedToolCall[];
 }
 
+type SendMessagePhase = "idle" | "thinking" | "using_tools" | "responding";
+
 const emptyState: SendMessageState = {
   requiresConfirmation: false,
   toolCalls: [],
 };
 
+type ConversationCache = { conversation?: Conversation; messages?: ConversationMessage[] };
+
+interface SendMessageInput {
+  content: string;
+  approvedToolCallIds?: string[];
+  rejectedToolCallIds?: string[];
+  toolApprovals?: { toolCallId: string; confirmKeyword: string }[];
+  llmId?: string;
+}
+
+const hasToolDecisions = (input: SendMessageInput) =>
+  (input.approvedToolCallIds?.length ?? 0) > 0 || (input.rejectedToolCallIds?.length ?? 0) > 0 || (input.toolApprovals?.length ?? 0) > 0;
+
+const LEGACY_TOOL_APPROVAL_USER_MESSAGE = "[用户已批准上述待确认工具，请直接执行并继续]";
+const MEMO_CONTEXT_QUESTION_MARKER = "[/Selected memo context]\n\nUser question:\n";
+
+const createConversationTitle = (content: string): string => {
+  const markerIndex = content.indexOf(MEMO_CONTEXT_QUESTION_MARKER);
+  const visibleContent = markerIndex >= 0 ? content.slice(markerIndex + MEMO_CONTEXT_QUESTION_MARKER.length) : content;
+  const compacted = visibleContent.trim().replace(/\s+/g, " ");
+  if (!compacted || compacted === LEGACY_TOOL_APPROVAL_USER_MESSAGE) {
+    return "";
+  }
+  return compacted.slice(0, 32);
+};
+
+const ASSISTANT_STREAM_CHARS_PER_TICK = 3;
+const ASSISTANT_STREAM_TICK_MS = 24;
+
+const appendOrReplaceMessage = (messages: ConversationMessage[], next: ConversationMessage) => {
+  if (next.id) {
+    const idx = messages.findIndex((message) => message.id === next.id);
+    if (idx >= 0) {
+      return [...messages.slice(0, idx), next, ...messages.slice(idx + 1)];
+    }
+  }
+  return [...messages, next];
+};
+
+const removeLocalTurnMessages = (messages: ConversationMessage[], localIds: Set<string>) =>
+  messages.filter((message) => !localIds.has(message.id) && !message.id.startsWith("local-"));
+
+const toResolvedToolCall = (toolCall: ToolCall): ResolvedToolCall => ({
+  id: toolCall.id,
+  name: toolCall.name,
+  arguments: toolCall.arguments,
+  requiresConfirmation: toolCall.requiresConfirmation,
+  status: "pending",
+});
+
+const shouldUseUnaryFallback = (error: unknown) => error instanceof ConnectError && error.code === Code.Unimplemented;
+
 export const useSendMessage = (conversationId: string | undefined) => {
   const queryClient = useQueryClient();
   const [state, setState] = useState<SendMessageState>(emptyState);
+  const [isPending, setIsPending] = useState(false);
+  const [phase, setPhase] = useState<SendMessagePhase>("idle");
+  const [error, setError] = useState<unknown>(null);
   const updateTitle = useUpdateConversationTitle(conversationId);
+  const abortRef = useRef<AbortController | null>(null);
+  const localTurnIdsRef = useRef<Set<string>>(new Set());
+  const localAssistantIdRef = useRef("");
+  const localToolAssistantIdRef = useRef("");
+  const localUserIdRef = useRef("");
+  const streamRenderCleanupRef = useRef<(() => void) | null>(null);
 
-  const mutation = useMutation({
-    mutationFn: async (input: {
-      content: string;
-      approvedToolCallIds?: string[];
-      rejectedToolCallIds?: string[];
-      toolApprovals?: { toolCallId: string; confirmKeyword: string }[];
-      llmId?: string;
-    }) => {
+  const patchConversation = useCallback(
+    (updater: (prev: ConversationCache) => ConversationCache) => {
+      queryClient.setQueryData(["ai-chat", "conversation", conversationId], (prev?: ConversationCache) => updater(prev ?? {}));
+    },
+    [conversationId, queryClient],
+  );
+
+  const appendMessage = useCallback(
+    (message: ConversationMessage) => {
+      patchConversation((prev) => ({
+        ...prev,
+        messages: appendOrReplaceMessage(prev.messages ?? [], message),
+      }));
+    },
+    [patchConversation],
+  );
+
+  const replaceLocalTurnWithFinalMessages = useCallback(
+    (finalMessages: ConversationMessage[]) => {
+      if (finalMessages.length === 0) {
+        return;
+      }
+      patchConversation((prev) => {
+        const withoutLocal = removeLocalTurnMessages(prev.messages ?? [], localTurnIdsRef.current);
+        return {
+          ...prev,
+          messages: finalMessages.reduce(appendOrReplaceMessage, withoutLocal),
+        };
+      });
+      localTurnIdsRef.current = new Set();
+      localAssistantIdRef.current = "";
+      localToolAssistantIdRef.current = "";
+    },
+    [patchConversation],
+  );
+
+  const runUnaryFallback = useCallback(
+    async (input: SendMessageInput) => {
       if (!conversationId) {
         throw new Error("conversation not created yet");
       }
@@ -172,87 +268,345 @@ export const useSendMessage = (conversationId: string | undefined) => {
         toolApprovals: input.toolApprovals ?? [],
         llmId: input.llmId ?? "",
       });
+      setState((prevState) => ({
+        requiresConfirmation: response.requiresConfirmation,
+        toolCalls: [...prevState.toolCalls, ...(response.toolCalls ?? []).map(toResolvedToolCall)],
+      }));
+      queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
       return response;
     },
-    // Optimistically show the user's message the instant it is sent, so the chat
-    // renders user bubble → assistant thinking/reply in the correct order instead
-    // of waiting for the round-trip. The server response later replaces it with
-    // the canonical copy (real id). Approval continuations ("继续") do not insert
-    // a new user bubble.
-    onMutate: async (input) => {
-      const hasDecisions =
-        (input.approvedToolCallIds && input.approvedToolCallIds.length > 0) ||
-        (input.rejectedToolCallIds && input.rejectedToolCallIds.length > 0) ||
-        (input.toolApprovals && input.toolApprovals.length > 0);
-      if (hasDecisions) {
+    [conversationId, queryClient],
+  );
+
+  const sendAsync = useCallback(
+    async (input: SendMessageInput) => {
+      if (!conversationId) {
+        setError(new Error("conversation not created yet"));
         return;
       }
+      abortRef.current?.abort();
+      streamRenderCleanupRef.current?.();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      localTurnIdsRef.current = new Set();
+      localAssistantIdRef.current = "";
+      localToolAssistantIdRef.current = "";
+      localUserIdRef.current = "";
+      setIsPending(true);
+      setError(null);
+
+      const hasDecisions = hasToolDecisions(input);
+      setPhase(hasDecisions ? "using_tools" : "thinking");
       await queryClient.cancelQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
-      const prev = queryClient.getQueryData<{ conversation?: Conversation; messages?: ConversationMessage[] }>([
-        "ai-chat",
-        "conversation",
+      const prev = queryClient.getQueryData<ConversationCache>(["ai-chat", "conversation", conversationId]);
+      if (hasDecisions) {
+        setState((prevState) => ({
+          ...prevState,
+          requiresConfirmation: false,
+          toolCalls: prevState.toolCalls.map((tc) =>
+            tc.status === "approved" || tc.status === "rejected" ? { ...tc, status: "submitting", submittedDecision: tc.status } : tc,
+          ),
+        }));
+      } else {
+        const localUserId = `local-user-${Date.now()}`;
+        localUserIdRef.current = localUserId;
+        localTurnIdsRef.current.add(localUserId);
+        appendMessage({
+          id: localUserId,
+          role: "user",
+          content: input.content,
+        } as ConversationMessage);
+      }
+
+      const streamRequest = {
         conversationId,
-      ]);
-      if (prev) {
-        queryClient.setQueryData(["ai-chat", "conversation", conversationId], {
-          ...prev,
-          messages: [
-            ...(prev.messages ?? []),
-            {
-              id: `local-${Date.now()}`,
-              role: "user",
-              content: input.content,
-            } as ConversationMessage,
-          ],
+        content: input.content,
+        approvedToolCallIds: input.approvedToolCallIds ?? [],
+        rejectedToolCallIds: input.rejectedToolCallIds ?? [],
+        toolApprovals: input.toolApprovals ?? [],
+        llmId: input.llmId ?? "",
+      };
+      const settleSubmittingToolCalls = () => {
+        setState((prevState) => ({
+          ...prevState,
+          toolCalls: prevState.toolCalls.map((tc) =>
+            tc.status === "submitting" ? { ...tc, status: tc.submittedDecision ?? "approved", submittedDecision: undefined } : tc,
+          ),
+        }));
+      };
+      let queuedAssistantDelta = "";
+      let assistantDeltaTimer: ReturnType<typeof setTimeout> | undefined;
+      let assistantDeltaDrained: (() => void) | undefined;
+      const resolveAssistantDeltaDrained = () => {
+        assistantDeltaDrained?.();
+        assistantDeltaDrained = undefined;
+      };
+      const renderAssistantDelta = (delta: string) => {
+        localToolAssistantIdRef.current = "";
+        if (!localAssistantIdRef.current) {
+          const id = `local-assistant-${Date.now()}`;
+          localAssistantIdRef.current = id;
+          localTurnIdsRef.current.add(id);
+          appendMessage({ id, role: "assistant", content: delta, toolCalls: [] } as unknown as ConversationMessage);
+          return;
+        }
+        const id = localAssistantIdRef.current;
+        patchConversation((cache) => ({
+          ...cache,
+          messages: (cache.messages ?? []).map((message) =>
+            message.id === id ? ({ ...message, content: `${message.content}${delta}` } as ConversationMessage) : message,
+          ),
+        }));
+      };
+      const drainAssistantDeltaQueue = () => {
+        assistantDeltaTimer = undefined;
+        if (controller.signal.aborted) {
+          queuedAssistantDelta = "";
+          resolveAssistantDeltaDrained();
+          return;
+        }
+        const chars = Array.from(queuedAssistantDelta);
+        const next = chars.slice(0, ASSISTANT_STREAM_CHARS_PER_TICK).join("");
+        queuedAssistantDelta = chars.slice(ASSISTANT_STREAM_CHARS_PER_TICK).join("");
+        if (next) {
+          renderAssistantDelta(next);
+        }
+        if (queuedAssistantDelta) {
+          assistantDeltaTimer = setTimeout(drainAssistantDeltaQueue, ASSISTANT_STREAM_TICK_MS);
+          return;
+        }
+        resolveAssistantDeltaDrained();
+      };
+      const scheduleAssistantDeltaDrain = () => {
+        if (!assistantDeltaTimer) {
+          assistantDeltaTimer = setTimeout(drainAssistantDeltaQueue, ASSISTANT_STREAM_TICK_MS);
+        }
+      };
+      const queueAssistantDelta = (delta: string) => {
+        queuedAssistantDelta += delta;
+        scheduleAssistantDeltaDrain();
+      };
+      const discardAssistantDeltaQueue = () => {
+        if (assistantDeltaTimer) {
+          clearTimeout(assistantDeltaTimer);
+          assistantDeltaTimer = undefined;
+        }
+        queuedAssistantDelta = "";
+        if (localAssistantIdRef.current) {
+          const id = localAssistantIdRef.current;
+          patchConversation((cache) => ({
+            ...cache,
+            messages: (cache.messages ?? []).filter((message) => message.id !== id),
+          }));
+          localTurnIdsRef.current.delete(id);
+          localAssistantIdRef.current = "";
+        }
+        resolveAssistantDeltaDrained();
+      };
+      const waitForAssistantDeltaQueue = () => {
+        if (!queuedAssistantDelta && !assistantDeltaTimer) {
+          return Promise.resolve();
+        }
+        return new Promise<void>((resolve) => {
+          const previous = assistantDeltaDrained;
+          assistantDeltaDrained = () => {
+            previous?.();
+            resolve();
+          };
         });
-      }
-      return { prev };
-    },
-    onError: (_error, _input, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData(["ai-chat", "conversation", conversationId], ctx.prev);
-      }
-      setState(emptyState);
-      submittedIdsRef.current = new Set();
-    },
-    onSuccess: (response, variables) => {
-      setState((prev) => ({
-        requiresConfirmation: response.requiresConfirmation,
-        // Append this turn's pending tool calls; already-resolved (approved/
-        // rejected) cards from earlier turns stay in the list as a record.
-        toolCalls: [
-          ...prev.toolCalls,
-          ...(response.toolCalls ?? []).map((tc) => ({
-            id: tc.id,
-            name: tc.name,
-            arguments: tc.arguments,
-            requiresConfirmation: tc.requiresConfirmation,
-            status: "pending" as const,
-          })),
-        ],
-      }));
-
-      // The conversation history is the single source of truth for rendered
-      // messages, so just refresh it. We no longer accumulate local copies here,
-      // which used to duplicate messages once the query cache was invalidated.
-      queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
-
-      // Auto-title: derive a short summary from the first user message.
-      if (variables.content.trim()) {
-        const cached = queryClient.getQueryData<{ conversation?: Conversation }>(["ai-chat", "conversation", conversationId]);
-        if (cached?.conversation && cached.conversation.title === "") {
-          const title = variables.content.trim().slice(0, 24).replace(/\s+/g, " ");
-          updateTitle.mutate(title);
+      };
+      const cleanupAssistantDeltaRenderer = () => {
+        if (assistantDeltaTimer) {
+          clearTimeout(assistantDeltaTimer);
+          assistantDeltaTimer = undefined;
+        }
+        queuedAssistantDelta = "";
+        resolveAssistantDeltaDrained();
+      };
+      streamRenderCleanupRef.current = cleanupAssistantDeltaRenderer;
+      let accepted = false;
+      const consumeStream = async () => {
+        const stream = aiChatServiceClient.streamMessage(streamRequest, { signal: controller.signal });
+        for await (const event of stream) {
+          if (
+            event.type === AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_STARTED ||
+            event.type === AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED
+          ) {
+            accepted = true;
+          }
+          switch (event.type) {
+            case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED:
+              if (event.message) {
+                if (localUserIdRef.current && event.message.role === "user") {
+                  const localUserId = localUserIdRef.current;
+                  patchConversation((cache) => ({
+                    ...cache,
+                    messages: (cache.messages ?? []).map((message) =>
+                      message.id === localUserId ? (event.message as ConversationMessage) : message,
+                    ),
+                  }));
+                  localTurnIdsRef.current.delete(localUserId);
+                  localUserIdRef.current = "";
+                } else {
+                  appendMessage(event.message);
+                }
+              }
+              break;
+            case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA: {
+              if (!event.delta) {
+                break;
+              }
+              setPhase("responding");
+              queueAssistantDelta(event.delta);
+              break;
+            }
+            case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL:
+              if (event.toolCall) {
+                setPhase("using_tools");
+                discardAssistantDeltaQueue();
+                localAssistantIdRef.current = "";
+                if (!localToolAssistantIdRef.current) {
+                  const id = `local-tools-${Date.now()}`;
+                  localToolAssistantIdRef.current = id;
+                  localTurnIdsRef.current.add(id);
+                  appendMessage({ id, role: "assistant", content: "", toolCalls: [event.toolCall] } as ConversationMessage);
+                  break;
+                }
+                const id = localToolAssistantIdRef.current;
+                patchConversation((cache) => ({
+                  ...cache,
+                  messages: (cache.messages ?? []).map((message) =>
+                    message.id === id
+                      ? ({ ...message, toolCalls: [...(message.toolCalls ?? []), event.toolCall as ToolCall] } as ConversationMessage)
+                      : message,
+                  ),
+                }));
+              }
+              break;
+            case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT:
+              setPhase("using_tools");
+              if (event.message?.toolCallId) {
+                const id = `local-tool-${event.message.toolCallId}`;
+                localTurnIdsRef.current.add(id);
+                appendMessage({ ...event.message, id } as ConversationMessage);
+              }
+              break;
+            case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED:
+              await waitForAssistantDeltaQueue();
+              if (controller.signal.aborted) {
+                break;
+              }
+              replaceLocalTurnWithFinalMessages(event.finalMessages ?? []);
+              setState((prevState) => ({
+                requiresConfirmation: event.requiresConfirmation,
+                toolCalls: [...prevState.toolCalls, ...(event.toolCalls ?? []).map(toResolvedToolCall)],
+              }));
+              break;
+            case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_DONE:
+              await waitForAssistantDeltaQueue();
+              if (controller.signal.aborted) {
+                break;
+              }
+              replaceLocalTurnWithFinalMessages(event.finalMessages ?? []);
+              setState((prevState) => ({
+                ...prevState,
+                requiresConfirmation: false,
+                toolCalls: prevState.toolCalls.map((tc) =>
+                  tc.status === "submitting" ? { ...tc, status: tc.submittedDecision ?? "approved", submittedDecision: undefined } : tc,
+                ),
+              }));
+              break;
+            case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_ERROR:
+              throw new Error(event.error || "AI chat stream failed");
+          }
+        }
+      };
+      const invalidateChatQueries = () => {
+        queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
+        queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversations"] });
+      };
+      try {
+        await consumeStream();
+        invalidateChatQueries();
+      } catch (streamError) {
+        if (!accepted && !controller.signal.aborted && isAuthFailureError(streamError)) {
+          try {
+            await refreshAccessToken();
+            await consumeStream();
+            invalidateChatQueries();
+            return;
+          } catch (retryError) {
+            if (isAuthFailureError(retryError)) {
+              redirectOnAuthFailure();
+            }
+            if (!accepted && prev) {
+              queryClient.setQueryData(["ai-chat", "conversation", conversationId], prev);
+            }
+            settleSubmittingToolCalls();
+            setError(retryError);
+            return;
+          }
+        }
+        if (!accepted && !controller.signal.aborted && shouldUseUnaryFallback(streamError)) {
+          try {
+            await runUnaryFallback(input);
+          } catch (fallbackError) {
+            if (prev) {
+              queryClient.setQueryData(["ai-chat", "conversation", conversationId], prev);
+            }
+            setState(emptyState);
+            submittedIdsRef.current = new Set();
+            setError(fallbackError);
+          }
+        } else if (!controller.signal.aborted) {
+          settleSubmittingToolCalls();
+          setError(streamError);
+        }
+      } finally {
+        if (streamRenderCleanupRef.current === cleanupAssistantDeltaRenderer) {
+          streamRenderCleanupRef.current = null;
+        }
+        cleanupAssistantDeltaRenderer();
+        setIsPending(false);
+        setPhase("idle");
+        if (abortRef.current === controller) {
+          abortRef.current = null;
         }
       }
     },
-  });
+    [appendMessage, conversationId, patchConversation, queryClient, replaceLocalTurnWithFinalMessages, runUnaryFallback, updateTitle],
+  );
+
+  const send = useCallback(
+    (input: SendMessageInput) => {
+      void sendAsync(input);
+      if (input.content.trim()) {
+        const cached = queryClient.getQueryData<ConversationCache>(["ai-chat", "conversation", conversationId]);
+        if (cached?.conversation && cached.conversation.title === "") {
+          const title = createConversationTitle(input.content);
+          if (title) {
+            updateTitle.mutate(title);
+          }
+        }
+      }
+    },
+    [conversationId, queryClient, sendAsync, updateTitle],
+  );
 
   // Reset transient confirmation state whenever the active conversation changes,
   // so a stale "pending tool" card from another chat never leaks across sessions.
   useEffect(() => {
     setState(emptyState);
     submittedIdsRef.current = new Set();
+    abortRef.current?.abort();
+    abortRef.current = null;
+    streamRenderCleanupRef.current?.();
+    streamRenderCleanupRef.current = null;
+    setPhase("idle");
+    localTurnIdsRef.current = new Set();
+    localAssistantIdRef.current = "";
+    localToolAssistantIdRef.current = "";
+    localUserIdRef.current = "";
   }, [conversationId]);
 
   // Keep a mirror of the latest state so resolveToolCall can decide — outside a
@@ -289,27 +643,25 @@ export const useSendMessage = (conversationId: string | undefined) => {
           .filter((tc) => tc.status === "approved" && tc.confirmKeyword)
           .map((tc) => ({ toolCallId: tc.id, confirmKeyword: tc.confirmKeyword as string }));
         fresh.forEach((tc) => submittedIdsRef.current.add(tc.id));
-        // Send a fixed approval instruction (NOT a free-text user message) so the
-        // model treats it as "the pending tools were decided" rather than a new
-        // task, keeping behavior consistent across turns.
-        mutation.mutate({
-          content: "[用户已批准上述待确认工具，请直接执行并继续]",
+        send({
+          content: "",
           approvedToolCallIds: approvedIds,
           rejectedToolCallIds: rejectedIds,
           toolApprovals,
         });
       }
     },
-    [mutation],
+    [send],
   );
 
   return {
     ...state,
-    send: mutation.mutate,
+    send,
     resolveToolCall,
-    isPending: mutation.isPending,
-    error: mutation.error,
+    isPending,
+    phase,
+    error,
   };
 };
 
-export type { Conversation, ConversationMessage };
+export type { Conversation, ConversationMessage, SendMessagePhase };

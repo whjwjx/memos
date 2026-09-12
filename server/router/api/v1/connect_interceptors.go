@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"reflect"
 	"runtime/debug"
 
@@ -28,36 +29,7 @@ func NewMetadataInterceptor() *MetadataInterceptor {
 
 func (*MetadataInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		// Convert HTTP headers to gRPC metadata
-		header := req.Header()
-		md := metadata.MD{}
-
-		// Copy important headers for client info extraction
-		if ua := header.Get("User-Agent"); ua != "" {
-			md.Set("user-agent", ua)
-		}
-		if origin := header.Get("Origin"); origin != "" {
-			md.Set("origin", origin)
-		}
-		if xff := header.Get("X-Forwarded-For"); xff != "" {
-			md.Set("x-forwarded-for", xff)
-		}
-		if xfp := header.Get("X-Forwarded-Proto"); xfp != "" {
-			md.Set("x-forwarded-proto", xfp)
-		}
-		if xri := header.Get("X-Real-Ip"); xri != "" {
-			md.Set("x-real-ip", xri)
-		}
-		if forwarded := header.Get("Forwarded"); forwarded != "" {
-			md.Set("forwarded", forwarded)
-		}
-		// Forward Cookie header for authentication methods that need it (e.g., RefreshToken)
-		if cookie := header.Get("Cookie"); cookie != "" {
-			md.Set("cookie", cookie)
-		}
-
-		// Set metadata in context so services can use metadata.FromIncomingContext()
-		ctx = metadata.NewIncomingContext(ctx, md)
+		ctx = metadataContextFromHeader(ctx, req.Header())
 
 		// Execute the request
 		resp, err := next(ctx, req)
@@ -87,7 +59,43 @@ func (*MetadataInterceptor) WrapStreamingClient(next connect.StreamingClientFunc
 }
 
 func (*MetadataInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return next
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		ctx = metadataContextFromHeader(ctx, conn.RequestHeader())
+		conn.ResponseHeader().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		conn.ResponseHeader().Set("Pragma", "no-cache")
+		conn.ResponseHeader().Set("Expires", "0")
+		return next(ctx, conn)
+	}
+}
+
+func metadataContextFromHeader(ctx context.Context, header http.Header) context.Context {
+	md := metadata.MD{}
+
+	// Copy important headers for client info extraction
+	if ua := header.Get("User-Agent"); ua != "" {
+		md.Set("user-agent", ua)
+	}
+	if origin := header.Get("Origin"); origin != "" {
+		md.Set("origin", origin)
+	}
+	if xff := header.Get("X-Forwarded-For"); xff != "" {
+		md.Set("x-forwarded-for", xff)
+	}
+	if xfp := header.Get("X-Forwarded-Proto"); xfp != "" {
+		md.Set("x-forwarded-proto", xfp)
+	}
+	if xri := header.Get("X-Real-Ip"); xri != "" {
+		md.Set("x-real-ip", xri)
+	}
+	if forwarded := header.Get("Forwarded"); forwarded != "" {
+		md.Set("forwarded", forwarded)
+	}
+	// Forward Cookie header for authentication methods that need it (e.g., RefreshToken)
+	if cookie := header.Get("Cookie"); cookie != "" {
+		md.Set("cookie", cookie)
+	}
+
+	return metadata.NewIncomingContext(ctx, md)
 }
 
 // LoggingInterceptor logs Connect RPC requests with appropriate log levels.
@@ -116,8 +124,12 @@ func (*LoggingInterceptor) WrapStreamingClient(next connect.StreamingClientFunc)
 	return next // No-op for server-side interceptor
 }
 
-func (*LoggingInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return next // Streaming not used in this service
+func (in *LoggingInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		err := next(ctx, conn)
+		in.log(conn.Spec().Procedure, err)
+		return err
+	}
 }
 
 func (in *LoggingInterceptor) log(procedure string, err error) {
@@ -187,8 +199,16 @@ func (*RecoveryInterceptor) WrapStreamingClient(next connect.StreamingClientFunc
 	return next
 }
 
-func (*RecoveryInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return next
+func (in *RecoveryInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				in.logPanic(conn.Spec().Procedure, r)
+				err = connect.NewError(connect.CodeInternal, pkgerrors.New("internal server error"))
+			}
+		}()
+		return next(ctx, conn)
+	}
 }
 
 func (in *RecoveryInterceptor) logPanic(procedure string, panicValue any) {
@@ -234,6 +254,18 @@ func (*AuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) co
 	return next
 }
 
-func (*AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return next
+func (in *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		header := conn.RequestHeader()
+		authHeader := header.Get("Authorization")
+
+		result := in.authorizer.Authenticate(ctx, authHeader)
+		if err := in.authorizer.CheckAccess(ctx, conn.Spec().Procedure, result); err != nil {
+			return connect.NewError(connect.CodeUnauthenticated, err)
+		}
+
+		ctx = auth.ApplyToContext(ctx, result)
+
+		return next(ctx, conn)
+	}
 }

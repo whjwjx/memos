@@ -130,6 +130,41 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/ai/chats/{conversationId}:streamMessage:
+        post:
+            tags:
+                - AIChatService
+            description: |-
+                StreamMessage appends a user turn and streams assistant progress events.
+                 It preserves SendMessage semantics but lets the client render assistant
+                 deltas, tool activity, and confirmation requests as they happen.
+            operationId: AIChatService_StreamMessage
+            parameters:
+                - name: conversationId
+                  in: path
+                  description: Required. Conversation resource id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SendMessageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SendMessageStreamResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/ai/chats/{id}:
         get:
             tags:
@@ -4949,6 +4984,53 @@ components:
                     items:
                         $ref: '#/components/schemas/ConversationMessage'
                     description: Assistant turns appended during this request (including tool results).
+        SendMessageStreamResponse:
+            type: object
+            properties:
+                eventId:
+                    type: string
+                conversationId:
+                    type: string
+                type:
+                    enum:
+                        - AI_CHAT_STREAM_EVENT_TYPE_UNSPECIFIED
+                        - AI_CHAT_STREAM_EVENT_TYPE_STARTED
+                        - AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED
+                        - AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA
+                        - AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL
+                        - AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT
+                        - AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED
+                        - AI_CHAT_STREAM_EVENT_TYPE_DONE
+                        - AI_CHAT_STREAM_EVENT_TYPE_ERROR
+                    type: string
+                    format: enum
+                message:
+                    allOf:
+                        - $ref: '#/components/schemas/ConversationMessage'
+                    description: Message associated with this event, when applicable.
+                toolCall:
+                    allOf:
+                        - $ref: '#/components/schemas/ToolCall'
+                    description: Tool call associated with this event, when applicable.
+                delta:
+                    type: string
+                    description: Assistant text delta for ASSISTANT_DELTA events.
+                error:
+                    type: string
+                    description: Error text for ERROR events.
+                requiresConfirmation:
+                    type: boolean
+                toolCalls:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ToolCall'
+                finalMessages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ConversationMessage'
+                    description: |-
+                        Final persisted messages produced by this request. Sent with DONE or
+                         CONFIRMATION_REQUIRED so the client can replace any optimistic entries.
         SetMemoAttachmentsRequest:
             required:
                 - name

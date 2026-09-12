@@ -23,6 +23,82 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// AIChatStreamEventType identifies a single streamed AI Chat event.
+type AIChatStreamEventType int32
+
+const (
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_UNSPECIFIED AIChatStreamEventType = 0
+	// The request was accepted and processing has started.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_STARTED AIChatStreamEventType = 1
+	// A conversation message was created or should be rendered by the client.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED AIChatStreamEventType = 2
+	// A chunk of assistant text was generated.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA AIChatStreamEventType = 3
+	// The assistant requested a tool call.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL AIChatStreamEventType = 4
+	// A tool result is available.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT AIChatStreamEventType = 5
+	// One or more tool calls require user confirmation.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED AIChatStreamEventType = 6
+	// The turn completed and final persisted messages are available.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_DONE AIChatStreamEventType = 7
+	// The turn failed after the stream was accepted.
+	AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_ERROR AIChatStreamEventType = 8
+)
+
+// Enum value maps for AIChatStreamEventType.
+var (
+	AIChatStreamEventType_name = map[int32]string{
+		0: "AI_CHAT_STREAM_EVENT_TYPE_UNSPECIFIED",
+		1: "AI_CHAT_STREAM_EVENT_TYPE_STARTED",
+		2: "AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED",
+		3: "AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA",
+		4: "AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL",
+		5: "AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT",
+		6: "AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED",
+		7: "AI_CHAT_STREAM_EVENT_TYPE_DONE",
+		8: "AI_CHAT_STREAM_EVENT_TYPE_ERROR",
+	}
+	AIChatStreamEventType_value = map[string]int32{
+		"AI_CHAT_STREAM_EVENT_TYPE_UNSPECIFIED":           0,
+		"AI_CHAT_STREAM_EVENT_TYPE_STARTED":               1,
+		"AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED":       2,
+		"AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA":       3,
+		"AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL":             4,
+		"AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT":           5,
+		"AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED": 6,
+		"AI_CHAT_STREAM_EVENT_TYPE_DONE":                  7,
+		"AI_CHAT_STREAM_EVENT_TYPE_ERROR":                 8,
+	}
+)
+
+func (x AIChatStreamEventType) Enum() *AIChatStreamEventType {
+	p := new(AIChatStreamEventType)
+	*p = x
+	return p
+}
+
+func (x AIChatStreamEventType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AIChatStreamEventType) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v1_ai_chat_service_proto_enumTypes[0].Descriptor()
+}
+
+func (AIChatStreamEventType) Type() protoreflect.EnumType {
+	return &file_api_v1_ai_chat_service_proto_enumTypes[0]
+}
+
+func (x AIChatStreamEventType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AIChatStreamEventType.Descriptor instead.
+func (AIChatStreamEventType) EnumDescriptor() ([]byte, []int) {
+	return file_api_v1_ai_chat_service_proto_rawDescGZIP(), []int{0}
+}
+
 // Conversation is a single AI chat session owned by a user.
 type Conversation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -923,6 +999,128 @@ func (x *SendMessageResponse) GetMessages() []*ConversationMessage {
 	return nil
 }
 
+type SendMessageStreamResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	EventId        string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Type           AIChatStreamEventType  `protobuf:"varint,3,opt,name=type,proto3,enum=memos.api.v1.AIChatStreamEventType" json:"type,omitempty"`
+	// Message associated with this event, when applicable.
+	Message *ConversationMessage `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	// Tool call associated with this event, when applicable.
+	ToolCall *ToolCall `protobuf:"bytes,5,opt,name=tool_call,json=toolCall,proto3" json:"tool_call,omitempty"`
+	// Assistant text delta for ASSISTANT_DELTA events.
+	Delta string `protobuf:"bytes,6,opt,name=delta,proto3" json:"delta,omitempty"`
+	// Error text for ERROR events.
+	Error                string      `protobuf:"bytes,7,opt,name=error,proto3" json:"error,omitempty"`
+	RequiresConfirmation bool        `protobuf:"varint,8,opt,name=requires_confirmation,json=requiresConfirmation,proto3" json:"requires_confirmation,omitempty"`
+	ToolCalls            []*ToolCall `protobuf:"bytes,9,rep,name=tool_calls,json=toolCalls,proto3" json:"tool_calls,omitempty"`
+	// Final persisted messages produced by this request. Sent with DONE or
+	// CONFIRMATION_REQUIRED so the client can replace any optimistic entries.
+	FinalMessages []*ConversationMessage `protobuf:"bytes,10,rep,name=final_messages,json=finalMessages,proto3" json:"final_messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendMessageStreamResponse) Reset() {
+	*x = SendMessageStreamResponse{}
+	mi := &file_api_v1_ai_chat_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendMessageStreamResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendMessageStreamResponse) ProtoMessage() {}
+
+func (x *SendMessageStreamResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_ai_chat_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendMessageStreamResponse.ProtoReflect.Descriptor instead.
+func (*SendMessageStreamResponse) Descriptor() ([]byte, []int) {
+	return file_api_v1_ai_chat_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SendMessageStreamResponse) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *SendMessageStreamResponse) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *SendMessageStreamResponse) GetType() AIChatStreamEventType {
+	if x != nil {
+		return x.Type
+	}
+	return AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_UNSPECIFIED
+}
+
+func (x *SendMessageStreamResponse) GetMessage() *ConversationMessage {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
+func (x *SendMessageStreamResponse) GetToolCall() *ToolCall {
+	if x != nil {
+		return x.ToolCall
+	}
+	return nil
+}
+
+func (x *SendMessageStreamResponse) GetDelta() string {
+	if x != nil {
+		return x.Delta
+	}
+	return ""
+}
+
+func (x *SendMessageStreamResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *SendMessageStreamResponse) GetRequiresConfirmation() bool {
+	if x != nil {
+		return x.RequiresConfirmation
+	}
+	return false
+}
+
+func (x *SendMessageStreamResponse) GetToolCalls() []*ToolCall {
+	if x != nil {
+		return x.ToolCalls
+	}
+	return nil
+}
+
+func (x *SendMessageStreamResponse) GetFinalMessages() []*ConversationMessage {
+	if x != nil {
+		return x.FinalMessages
+	}
+	return nil
+}
+
 var File_api_v1_ai_chat_service_proto protoreflect.FileDescriptor
 
 const file_api_v1_ai_chat_service_proto_rawDesc = "" +
@@ -992,14 +1190,38 @@ const file_api_v1_ai_chat_service_proto_rawDesc = "" +
 	"\n" +
 	"tool_calls\x18\x02 \x03(\v2\x16.memos.api.v1.ToolCallR\ttoolCalls\x123\n" +
 	"\x15requires_confirmation\x18\x03 \x01(\bR\x14requiresConfirmation\x12=\n" +
-	"\bmessages\x18\x04 \x03(\v2!.memos.api.v1.ConversationMessageR\bmessages2\xf1\x06\n" +
+	"\bmessages\x18\x04 \x03(\v2!.memos.api.v1.ConversationMessageR\bmessages\"\xec\x03\n" +
+	"\x19SendMessageStreamResponse\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x127\n" +
+	"\x04type\x18\x03 \x01(\x0e2#.memos.api.v1.AIChatStreamEventTypeR\x04type\x12;\n" +
+	"\amessage\x18\x04 \x01(\v2!.memos.api.v1.ConversationMessageR\amessage\x123\n" +
+	"\ttool_call\x18\x05 \x01(\v2\x16.memos.api.v1.ToolCallR\btoolCall\x12\x14\n" +
+	"\x05delta\x18\x06 \x01(\tR\x05delta\x12\x14\n" +
+	"\x05error\x18\a \x01(\tR\x05error\x123\n" +
+	"\x15requires_confirmation\x18\b \x01(\bR\x14requiresConfirmation\x125\n" +
+	"\n" +
+	"tool_calls\x18\t \x03(\v2\x16.memos.api.v1.ToolCallR\ttoolCalls\x12H\n" +
+	"\x0efinal_messages\x18\n" +
+	" \x03(\v2!.memos.api.v1.ConversationMessageR\rfinalMessages*\x99\x03\n" +
+	"\x15AIChatStreamEventType\x12)\n" +
+	"%AI_CHAT_STREAM_EVENT_TYPE_UNSPECIFIED\x10\x00\x12%\n" +
+	"!AI_CHAT_STREAM_EVENT_TYPE_STARTED\x10\x01\x12-\n" +
+	")AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED\x10\x02\x12-\n" +
+	")AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA\x10\x03\x12'\n" +
+	"#AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL\x10\x04\x12)\n" +
+	"%AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT\x10\x05\x123\n" +
+	"/AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED\x10\x06\x12\"\n" +
+	"\x1eAI_CHAT_STREAM_EVENT_TYPE_DONE\x10\a\x12#\n" +
+	"\x1fAI_CHAT_STREAM_EVENT_TYPE_ERROR\x10\b2\xa7\b\n" +
 	"\rAIChatService\x12\x88\x01\n" +
 	"\x12CreateConversation\x12'.memos.api.v1.CreateConversationRequest\x1a\x1a.memos.api.v1.Conversation\"-\xdaA\x0fagent_id,llm_id\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/ai/chats\x12~\n" +
 	"\x11ListConversations\x12&.memos.api.v1.ListConversationsRequest\x1a'.memos.api.v1.ListConversationsResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/ai/chats\x12\x82\x01\n" +
 	"\x0fGetConversation\x12$.memos.api.v1.GetConversationRequest\x1a%.memos.api.v1.GetConversationResponse\"\"\xdaA\x02id\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/ai/chats/{id}\x12\x8b\x01\n" +
 	"\x12DeleteConversation\x12'.memos.api.v1.DeleteConversationRequest\x1a(.memos.api.v1.DeleteConversationResponse\"\"\xdaA\x02id\x82\xd3\xe4\x93\x02\x17*\x15/api/v1/ai/chats/{id}\x12\x97\x01\n" +
 	"\x12UpdateConversation\x12'.memos.api.v1.UpdateConversationRequest\x1a\x1a.memos.api.v1.Conversation\"<\xdaA\fconversation\x82\xd3\xe4\x93\x02':\x01*2\"/api/v1/ai/chats/{conversation.id}\x12\xa7\x01\n" +
-	"\vSendMessage\x12 .memos.api.v1.SendMessageRequest\x1a!.memos.api.v1.SendMessageResponse\"S\xdaA\x17conversation_id,content\x82\xd3\xe4\x93\x023:\x01*\"./api/v1/ai/chats/{conversation_id}:sendMessageB\xaa\x01\n" +
+	"\vSendMessage\x12 .memos.api.v1.SendMessageRequest\x1a!.memos.api.v1.SendMessageResponse\"S\xdaA\x17conversation_id,content\x82\xd3\xe4\x93\x023:\x01*\"./api/v1/ai/chats/{conversation_id}:sendMessage\x12\xb3\x01\n" +
+	"\rStreamMessage\x12 .memos.api.v1.SendMessageRequest\x1a'.memos.api.v1.SendMessageStreamResponse\"U\xdaA\x17conversation_id,content\x82\xd3\xe4\x93\x025:\x01*\"0/api/v1/ai/chats/{conversation_id}:streamMessage0\x01B\xaa\x01\n" +
 	"\x10com.memos.api.v1B\x12AiChatServiceProtoP\x01Z0github.com/usememos/memos/proto/gen/api/v1;apiv1\xa2\x02\x03MAX\xaa\x02\fMemos.Api.V1\xca\x02\fMemos\\Api\\V1\xe2\x02\x18Memos\\Api\\V1\\GPBMetadata\xea\x02\x0eMemos::Api::V1b\x06proto3"
 
 var (
@@ -1014,51 +1236,61 @@ func file_api_v1_ai_chat_service_proto_rawDescGZIP() []byte {
 	return file_api_v1_ai_chat_service_proto_rawDescData
 }
 
-var file_api_v1_ai_chat_service_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_api_v1_ai_chat_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_api_v1_ai_chat_service_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_api_v1_ai_chat_service_proto_goTypes = []any{
-	(*Conversation)(nil),               // 0: memos.api.v1.Conversation
-	(*ConversationMessage)(nil),        // 1: memos.api.v1.ConversationMessage
-	(*ToolCall)(nil),                   // 2: memos.api.v1.ToolCall
-	(*CreateConversationRequest)(nil),  // 3: memos.api.v1.CreateConversationRequest
-	(*ListConversationsRequest)(nil),   // 4: memos.api.v1.ListConversationsRequest
-	(*ListConversationsResponse)(nil),  // 5: memos.api.v1.ListConversationsResponse
-	(*GetConversationRequest)(nil),     // 6: memos.api.v1.GetConversationRequest
-	(*GetConversationResponse)(nil),    // 7: memos.api.v1.GetConversationResponse
-	(*DeleteConversationRequest)(nil),  // 8: memos.api.v1.DeleteConversationRequest
-	(*DeleteConversationResponse)(nil), // 9: memos.api.v1.DeleteConversationResponse
-	(*UpdateConversationRequest)(nil),  // 10: memos.api.v1.UpdateConversationRequest
-	(*SendMessageRequest)(nil),         // 11: memos.api.v1.SendMessageRequest
-	(*ToolApproval)(nil),               // 12: memos.api.v1.ToolApproval
-	(*SendMessageResponse)(nil),        // 13: memos.api.v1.SendMessageResponse
-	(*fieldmaskpb.FieldMask)(nil),      // 14: google.protobuf.FieldMask
+	(AIChatStreamEventType)(0),         // 0: memos.api.v1.AIChatStreamEventType
+	(*Conversation)(nil),               // 1: memos.api.v1.Conversation
+	(*ConversationMessage)(nil),        // 2: memos.api.v1.ConversationMessage
+	(*ToolCall)(nil),                   // 3: memos.api.v1.ToolCall
+	(*CreateConversationRequest)(nil),  // 4: memos.api.v1.CreateConversationRequest
+	(*ListConversationsRequest)(nil),   // 5: memos.api.v1.ListConversationsRequest
+	(*ListConversationsResponse)(nil),  // 6: memos.api.v1.ListConversationsResponse
+	(*GetConversationRequest)(nil),     // 7: memos.api.v1.GetConversationRequest
+	(*GetConversationResponse)(nil),    // 8: memos.api.v1.GetConversationResponse
+	(*DeleteConversationRequest)(nil),  // 9: memos.api.v1.DeleteConversationRequest
+	(*DeleteConversationResponse)(nil), // 10: memos.api.v1.DeleteConversationResponse
+	(*UpdateConversationRequest)(nil),  // 11: memos.api.v1.UpdateConversationRequest
+	(*SendMessageRequest)(nil),         // 12: memos.api.v1.SendMessageRequest
+	(*ToolApproval)(nil),               // 13: memos.api.v1.ToolApproval
+	(*SendMessageResponse)(nil),        // 14: memos.api.v1.SendMessageResponse
+	(*SendMessageStreamResponse)(nil),  // 15: memos.api.v1.SendMessageStreamResponse
+	(*fieldmaskpb.FieldMask)(nil),      // 16: google.protobuf.FieldMask
 }
 var file_api_v1_ai_chat_service_proto_depIdxs = []int32{
-	2,  // 0: memos.api.v1.ConversationMessage.tool_calls:type_name -> memos.api.v1.ToolCall
-	0,  // 1: memos.api.v1.ListConversationsResponse.conversations:type_name -> memos.api.v1.Conversation
-	0,  // 2: memos.api.v1.GetConversationResponse.conversation:type_name -> memos.api.v1.Conversation
-	1,  // 3: memos.api.v1.GetConversationResponse.messages:type_name -> memos.api.v1.ConversationMessage
-	0,  // 4: memos.api.v1.UpdateConversationRequest.conversation:type_name -> memos.api.v1.Conversation
-	14, // 5: memos.api.v1.UpdateConversationRequest.update_mask:type_name -> google.protobuf.FieldMask
-	12, // 6: memos.api.v1.SendMessageRequest.tool_approvals:type_name -> memos.api.v1.ToolApproval
-	2,  // 7: memos.api.v1.SendMessageResponse.tool_calls:type_name -> memos.api.v1.ToolCall
-	1,  // 8: memos.api.v1.SendMessageResponse.messages:type_name -> memos.api.v1.ConversationMessage
-	3,  // 9: memos.api.v1.AIChatService.CreateConversation:input_type -> memos.api.v1.CreateConversationRequest
-	4,  // 10: memos.api.v1.AIChatService.ListConversations:input_type -> memos.api.v1.ListConversationsRequest
-	6,  // 11: memos.api.v1.AIChatService.GetConversation:input_type -> memos.api.v1.GetConversationRequest
-	8,  // 12: memos.api.v1.AIChatService.DeleteConversation:input_type -> memos.api.v1.DeleteConversationRequest
-	10, // 13: memos.api.v1.AIChatService.UpdateConversation:input_type -> memos.api.v1.UpdateConversationRequest
-	11, // 14: memos.api.v1.AIChatService.SendMessage:input_type -> memos.api.v1.SendMessageRequest
-	0,  // 15: memos.api.v1.AIChatService.CreateConversation:output_type -> memos.api.v1.Conversation
-	5,  // 16: memos.api.v1.AIChatService.ListConversations:output_type -> memos.api.v1.ListConversationsResponse
-	7,  // 17: memos.api.v1.AIChatService.GetConversation:output_type -> memos.api.v1.GetConversationResponse
-	9,  // 18: memos.api.v1.AIChatService.DeleteConversation:output_type -> memos.api.v1.DeleteConversationResponse
-	0,  // 19: memos.api.v1.AIChatService.UpdateConversation:output_type -> memos.api.v1.Conversation
-	13, // 20: memos.api.v1.AIChatService.SendMessage:output_type -> memos.api.v1.SendMessageResponse
-	15, // [15:21] is the sub-list for method output_type
-	9,  // [9:15] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	3,  // 0: memos.api.v1.ConversationMessage.tool_calls:type_name -> memos.api.v1.ToolCall
+	1,  // 1: memos.api.v1.ListConversationsResponse.conversations:type_name -> memos.api.v1.Conversation
+	1,  // 2: memos.api.v1.GetConversationResponse.conversation:type_name -> memos.api.v1.Conversation
+	2,  // 3: memos.api.v1.GetConversationResponse.messages:type_name -> memos.api.v1.ConversationMessage
+	1,  // 4: memos.api.v1.UpdateConversationRequest.conversation:type_name -> memos.api.v1.Conversation
+	16, // 5: memos.api.v1.UpdateConversationRequest.update_mask:type_name -> google.protobuf.FieldMask
+	13, // 6: memos.api.v1.SendMessageRequest.tool_approvals:type_name -> memos.api.v1.ToolApproval
+	3,  // 7: memos.api.v1.SendMessageResponse.tool_calls:type_name -> memos.api.v1.ToolCall
+	2,  // 8: memos.api.v1.SendMessageResponse.messages:type_name -> memos.api.v1.ConversationMessage
+	0,  // 9: memos.api.v1.SendMessageStreamResponse.type:type_name -> memos.api.v1.AIChatStreamEventType
+	2,  // 10: memos.api.v1.SendMessageStreamResponse.message:type_name -> memos.api.v1.ConversationMessage
+	3,  // 11: memos.api.v1.SendMessageStreamResponse.tool_call:type_name -> memos.api.v1.ToolCall
+	3,  // 12: memos.api.v1.SendMessageStreamResponse.tool_calls:type_name -> memos.api.v1.ToolCall
+	2,  // 13: memos.api.v1.SendMessageStreamResponse.final_messages:type_name -> memos.api.v1.ConversationMessage
+	4,  // 14: memos.api.v1.AIChatService.CreateConversation:input_type -> memos.api.v1.CreateConversationRequest
+	5,  // 15: memos.api.v1.AIChatService.ListConversations:input_type -> memos.api.v1.ListConversationsRequest
+	7,  // 16: memos.api.v1.AIChatService.GetConversation:input_type -> memos.api.v1.GetConversationRequest
+	9,  // 17: memos.api.v1.AIChatService.DeleteConversation:input_type -> memos.api.v1.DeleteConversationRequest
+	11, // 18: memos.api.v1.AIChatService.UpdateConversation:input_type -> memos.api.v1.UpdateConversationRequest
+	12, // 19: memos.api.v1.AIChatService.SendMessage:input_type -> memos.api.v1.SendMessageRequest
+	12, // 20: memos.api.v1.AIChatService.StreamMessage:input_type -> memos.api.v1.SendMessageRequest
+	1,  // 21: memos.api.v1.AIChatService.CreateConversation:output_type -> memos.api.v1.Conversation
+	6,  // 22: memos.api.v1.AIChatService.ListConversations:output_type -> memos.api.v1.ListConversationsResponse
+	8,  // 23: memos.api.v1.AIChatService.GetConversation:output_type -> memos.api.v1.GetConversationResponse
+	10, // 24: memos.api.v1.AIChatService.DeleteConversation:output_type -> memos.api.v1.DeleteConversationResponse
+	1,  // 25: memos.api.v1.AIChatService.UpdateConversation:output_type -> memos.api.v1.Conversation
+	14, // 26: memos.api.v1.AIChatService.SendMessage:output_type -> memos.api.v1.SendMessageResponse
+	15, // 27: memos.api.v1.AIChatService.StreamMessage:output_type -> memos.api.v1.SendMessageStreamResponse
+	21, // [21:28] is the sub-list for method output_type
+	14, // [14:21] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_api_v1_ai_chat_service_proto_init() }
@@ -1071,13 +1303,14 @@ func file_api_v1_ai_chat_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v1_ai_chat_service_proto_rawDesc), len(file_api_v1_ai_chat_service_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   14,
+			NumEnums:      1,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_api_v1_ai_chat_service_proto_goTypes,
 		DependencyIndexes: file_api_v1_ai_chat_service_proto_depIdxs,
+		EnumInfos:         file_api_v1_ai_chat_service_proto_enumTypes,
 		MessageInfos:      file_api_v1_ai_chat_service_proto_msgTypes,
 	}.Build()
 	File_api_v1_ai_chat_service_proto = out.File

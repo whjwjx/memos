@@ -69,7 +69,7 @@ func TestRunLoopExecutesToolThenAnswers(t *testing.T) {
 	resp, err := runLoop(context.Background(), model, &AssistantRequest{
 		Registry:    reg,
 		UserContent: "find my notes",
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.True(t, executed)
 	require.Equal(t, "here are your notes", resp.Content)
@@ -84,6 +84,37 @@ func TestRunLoopExecutesToolThenAnswers(t *testing.T) {
 	require.Equal(t, "here are your notes", resp.Messages[2].Content)
 }
 
+func TestToolLoopStreamEmitsProgressEvents(t *testing.T) {
+	t.Parallel()
+	model := &fakeModel{
+		responses: []*chat.Response{
+			{Text: "looking", ToolCalls: []chat.ToolCall{{ID: "c1", Name: "search_memos", ArgumentsJSON: `{"query":"hi"}`}}},
+			{Text: "here are your notes"},
+		},
+	}
+	reg := newRegistryWith(&fakeTool{name: "search_memos"})
+	var events []Event
+	resp, err := ToolLoopStream(context.Background(), model, &AssistantRequest{
+		Registry:    reg,
+		UserContent: "find my notes",
+	}, func(event Event) error {
+		events = append(events, event)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, "here are your notes", resp.Content)
+
+	require.GreaterOrEqual(t, len(events), 4)
+	require.Equal(t, EventAssistantDelta, events[0].Type)
+	require.Equal(t, "looking", events[0].Delta)
+	require.Equal(t, EventToolCall, events[1].Type)
+	require.Equal(t, "search_memos", events[1].ToolCall.Name)
+	require.Equal(t, EventToolResult, events[2].Type)
+	require.Equal(t, "ok", events[2].ToolMessage.Content)
+	require.Equal(t, EventAssistantDelta, events[3].Type)
+	require.Equal(t, "here are your notes", events[3].Delta)
+}
+
 func TestRunLoopStopsAtConfirmation(t *testing.T) {
 	t.Parallel()
 	model := &fakeModel{
@@ -95,7 +126,7 @@ func TestRunLoopStopsAtConfirmation(t *testing.T) {
 	resp, err := runLoop(context.Background(), model, &AssistantRequest{
 		Registry:    reg,
 		UserContent: "update my settings",
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.True(t, resp.RequiresConfirmation)
 	require.Len(t, resp.ToolCalls, 1)
@@ -126,7 +157,7 @@ func TestRunLoopContinuesAfterApproval(t *testing.T) {
 		},
 		UserContent:         "[user approved the pending tool, please execute and continue]",
 		ApprovedToolCallIDs: []string{"c2"},
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.True(t, executed)
 	require.False(t, resp.RequiresConfirmation)
@@ -143,6 +174,34 @@ func TestRunLoopContinuesAfterApproval(t *testing.T) {
 	require.Empty(t, model.lastReq.Tools)
 	for _, m := range model.lastReq.Messages {
 		require.NotEqual(t, chat.RoleTool, m.Role)
+	}
+}
+
+func TestRunLoopSkipsUserMessageForApprovalContinuation(t *testing.T) {
+	t.Parallel()
+	executed := false
+	model := &fakeModel{
+		responses: []*chat.Response{
+			{Text: "settings updated"},
+		},
+	}
+	reg := newRegistryWith(&fakeTool{name: "manage_settings", confirm: true, executed: &executed})
+	resp, err := runLoop(context.Background(), model, &AssistantRequest{
+		Registry: reg,
+		History: []chat.Message{
+			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`}}},
+			{Role: chat.RoleTool, ToolCallID: "c2", Name: "manage_settings", Content: "awaiting user confirmation"},
+		},
+		UserContent:         "[user approved the pending tool, please execute and continue]",
+		SkipUserMessage:     true,
+		ApprovedToolCallIDs: []string{"c2"},
+	}, nil)
+	require.NoError(t, err)
+	require.True(t, executed)
+	require.False(t, resp.RequiresConfirmation)
+	for _, m := range model.lastReq.Messages {
+		require.NotEqual(t, chat.RoleUser, m.Role)
+		require.NotContains(t, m.Content, "approved the pending tool")
 	}
 }
 
@@ -168,7 +227,7 @@ func TestRunLoopApprovalExecutesApprovedAndSkipsRejected(t *testing.T) {
 		UserContent:         "[user decided the pending tools, continue]",
 		ApprovedToolCallIDs: []string{"c1"},
 		RejectedToolCallIDs: []string{"c2"},
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.False(t, resp.RequiresConfirmation)
 	// Only the approved call ran; the rejected one was marked as skipped.
@@ -198,7 +257,7 @@ func TestRunLoopApprovalStripsPseudoXML(t *testing.T) {
 		},
 		UserContent:         "[user approved the pending tool, please execute and continue]",
 		ApprovedToolCallIDs: []string{"c2"},
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.False(t, resp.RequiresConfirmation)
 	// The pseudo-XML is gone; the fallback summary mentions the tool result.
@@ -223,7 +282,7 @@ func TestRunLoopRespectsMaxRounds(t *testing.T) {
 	resp, err := runLoop(context.Background(), model, &AssistantRequest{
 		Registry:    reg,
 		UserContent: "loop",
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 }

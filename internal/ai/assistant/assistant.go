@@ -36,6 +36,10 @@ type AssistantRequest struct {
 	History []chat.Message
 	// UserContent is the latest user message.
 	UserContent string
+	// SkipUserMessage omits UserContent from the working history. It is used for
+	// structured control continuations such as approving pending tool calls, where
+	// the user decision is carried by fields instead of chat text.
+	SkipUserMessage bool
 	// Model is the provider-specific model identifier passed to chat.Generate.
 	Model string
 	// Provider builds the chat model used for generation.
@@ -83,23 +87,58 @@ type AssistantResponse struct {
 	RequiresConfirmation bool
 }
 
+// EventType identifies an assistant orchestration event.
+type EventType string
+
+const (
+	// EventAssistantDelta carries a user-visible assistant text chunk.
+	EventAssistantDelta EventType = "assistant_delta"
+	// EventToolCall is emitted when the model requested a tool call.
+	EventToolCall EventType = "tool_call"
+	// EventToolResult is emitted when a tool result or placeholder is available.
+	EventToolResult EventType = "tool_result"
+	// EventConfirmationRequired is emitted when execution is paused for approval.
+	EventConfirmationRequired EventType = "confirmation_required"
+)
+
+// Event is emitted by ToolLoopStream as the assistant progresses through model
+// generation and tool execution.
+type Event struct {
+	Type                 EventType
+	Delta                string
+	ToolCall             chat.ToolCall
+	ToolMessage          chat.Message
+	RequiresConfirmation bool
+}
+
+// EmitFunc receives assistant orchestration events.
+type EmitFunc func(Event) error
+
 // ToolLoop runs the generate → execute → feed-back loop for one user turn. The
 // caller is responsible for building the chat.Model (so tests can inject a fake)
 // and passes it in.
 func ToolLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*AssistantResponse, error) {
-	return runLoop(ctx, model, req)
+	return runLoop(ctx, model, req, nil)
 }
 
-func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*AssistantResponse, error) {
+// ToolLoopStream is ToolLoop with progress events. The returned response is the
+// same accumulated result that ToolLoop would produce.
+func ToolLoopStream(ctx context.Context, model chat.Model, req *AssistantRequest, emit EmitFunc) (*AssistantResponse, error) {
+	return runLoop(ctx, model, req, emit)
+}
+
+func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit EmitFunc) (*AssistantResponse, error) {
 	approved := toSet(req.ApprovedToolCallIDs)
 	rejected := toSet(req.RejectedToolCallIDs)
 	emittedMessages := make([]chat.Message, 0)
 	emittedToolMessages := make([]chat.Message, 0)
 
-	// Build the working message list: history + new user turn.
+	// Build the working message list: history + optional new user turn.
 	messages := make([]chat.Message, 0, len(req.History)+2)
 	messages = append(messages, req.History...)
-	messages = append(messages, chat.Message{Role: chat.RoleUser, Content: req.UserContent})
+	if !req.SkipUserMessage {
+		messages = append(messages, chat.Message{Role: chat.RoleUser, Content: req.UserContent})
+	}
 
 	registry := req.Registry
 	if registry == nil {
@@ -118,6 +157,11 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 		updated := applyApprovedResults(ctx, req, registry, approved, req.Approvals, messages)
 		updated = append(updated, applyRejectedResults(messages, rejected)...)
 		if len(updated) > 0 {
+			for _, msg := range updated {
+				if err := emitIfSet(emit, Event{Type: EventToolResult, ToolMessage: msg}); err != nil {
+					return nil, err
+				}
+			}
 			// Give the model no function-calling material to mimic: flatten the
 			// history so earlier assistant tool_calls and their tool results
 			// become plain text, and omit the tool definitions entirely. With no
@@ -126,12 +170,12 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 			// summary. This is far more robust than relying on tool_choice:"none",
 			// which some models (e.g. DeepSeek) ignore by echoing pseudo-XML.
 			flattened := flattenHistory(messages)
-			resp, err := model.Generate(ctx, chat.Request{
+			resp, err := generate(ctx, model, chat.Request{
 				Model:      req.Model,
 				System:     req.System,
 				Messages:   flattened,
 				ToolChoice: chat.ToolChoiceNone,
-			})
+			}, emit)
 			if err != nil {
 				return nil, errors.Wrap(err, "chat model generation failed")
 			}
@@ -155,13 +199,13 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 			toolSpecs = registry.Specs()
 		}
 
-		resp, err := model.Generate(ctx, chat.Request{
+		resp, err := generate(ctx, model, chat.Request{
 			Model:      req.Model,
 			System:     req.System,
 			Messages:   messages,
 			Tools:      toolSpecs,
 			ToolChoice: chat.ToolChoiceAuto,
-		})
+		}, emit)
 		if err != nil {
 			return nil, errors.Wrap(err, "chat model generation failed")
 		}
@@ -183,12 +227,19 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 		for _, tc := range resp.ToolCalls {
 			tool := registry.Get(tc.Name)
 			if tool == nil {
-				toolMessages = append(toolMessages, chat.Message{
+				toolMsg := chat.Message{
 					Role:       chat.RoleTool,
 					ToolCallID: tc.ID,
 					Name:       tc.Name,
 					Content:    fmt.Sprintf("error: unknown tool %q", tc.Name),
-				})
+				}
+				toolMessages = append(toolMessages, toolMsg)
+				if err := emitIfSet(emit, Event{Type: EventToolCall, ToolCall: tc}); err != nil {
+					return nil, err
+				}
+				if err := emitIfSet(emit, Event{Type: EventToolResult, ToolMessage: toolMsg}); err != nil {
+					return nil, err
+				}
 				continue
 			}
 
@@ -197,16 +248,23 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 			// approves it: we gate on the static RequiresConfirmation() so we never
 			// invoke Run before approval (no side effects happen prematurely).
 			requiresConfirm := tool.RequiresConfirmation(tc.ArgumentsJSON)
+			if err := emitIfSet(emit, Event{Type: EventToolCall, ToolCall: tc, RequiresConfirmation: requiresConfirm}); err != nil {
+				return nil, err
+			}
 			if requiresConfirm && !approved[tc.ID] {
 				pending = append(pending, tc)
 				hitConfirmation = true
 				// Do not execute yet; record the call as awaiting approval.
-				toolMessages = append(toolMessages, chat.Message{
+				toolMsg := chat.Message{
 					Role:       chat.RoleTool,
 					ToolCallID: tc.ID,
 					Name:       tc.Name,
 					Content:    awaitingConfirmationPlaceholder,
-				})
+				}
+				toolMessages = append(toolMessages, toolMsg)
+				if err := emitIfSet(emit, Event{Type: EventToolResult, ToolMessage: toolMsg, RequiresConfirmation: true}); err != nil {
+					return nil, err
+				}
 				continue
 			}
 
@@ -216,12 +274,16 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 			if execErr != nil {
 				result = fmt.Sprintf("error: %v", execErr)
 			}
-			toolMessages = append(toolMessages, chat.Message{
+			toolMsg := chat.Message{
 				Role:       chat.RoleTool,
 				ToolCallID: tc.ID,
 				Name:       tc.Name,
 				Content:    result,
-			})
+			}
+			toolMessages = append(toolMessages, toolMsg)
+			if err := emitIfSet(emit, Event{Type: EventToolResult, ToolMessage: toolMsg}); err != nil {
+				return nil, err
+			}
 		}
 
 		// Append the assistant tool-call turn and the tool results.
@@ -233,6 +295,9 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 		emittedToolMessages = append(emittedToolMessages, toolMessages...)
 
 		if hitConfirmation {
+			if err := emitIfSet(emit, Event{Type: EventConfirmationRequired, RequiresConfirmation: true}); err != nil {
+				return nil, err
+			}
 			// Return the pending calls so the caller can ask for confirmation.
 			// Include the tool messages (with the "awaiting confirmation"
 			// placeholders) so the caller can persist them and rebuild a
@@ -253,6 +318,36 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest) (*Ass
 		ToolMessages: emittedToolMessages,
 		Messages:     emittedMessages,
 	}, nil
+}
+
+func generate(ctx context.Context, model chat.Model, req chat.Request, emit EmitFunc) (*chat.Response, error) {
+	if emit != nil {
+		if streamingModel, ok := model.(chat.StreamingModel); ok {
+			return streamingModel.StreamGenerate(ctx, req, func(event chat.StreamEvent) error {
+				if event.Delta == "" {
+					return nil
+				}
+				return emit(Event{Type: EventAssistantDelta, Delta: event.Delta})
+			})
+		}
+	}
+	resp, err := model.Generate(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if emit != nil && resp.Text != "" {
+		if err := emit(Event{Type: EventAssistantDelta, Delta: resp.Text}); err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
+}
+
+func emitIfSet(emit EmitFunc, event Event) error {
+	if emit == nil {
+		return nil
+	}
+	return emit(event)
 }
 
 // applyApprovedResults fulfills a prior confirmation: for each tool message whose

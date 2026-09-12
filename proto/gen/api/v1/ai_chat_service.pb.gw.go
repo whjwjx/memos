@@ -265,6 +265,38 @@ func local_request_AIChatService_SendMessage_0(ctx context.Context, marshaler ru
 	return msg, metadata, err
 }
 
+func request_AIChatService_StreamMessage_0(ctx context.Context, marshaler runtime.Marshaler, client AIChatServiceClient, req *http.Request, pathParams map[string]string) (AIChatService_StreamMessageClient, runtime.ServerMetadata, error) {
+	var (
+		protoReq SendMessageRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["conversation_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "conversation_id")
+	}
+	protoReq.ConversationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "conversation_id", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	stream, err := client.StreamMessage(ctx, &protoReq)
+	if err != nil {
+		return nil, metadata, err
+	}
+	header, err := stream.Header()
+	if err != nil {
+		return nil, metadata, err
+	}
+	metadata.HeaderMD = header
+	return stream, metadata, nil
+}
+
 // RegisterAIChatServiceHandlerServer registers the http handlers for service AIChatService to "mux".
 // UnaryRPC     :call AIChatServiceServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -390,6 +422,13 @@ func RegisterAIChatServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 			return
 		}
 		forward_AIChatService_SendMessage_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+
+	mux.Handle(http.MethodPost, pattern_AIChatService_StreamMessage_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
+		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+		return
 	})
 
 	return nil
@@ -533,6 +572,23 @@ func RegisterAIChatServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_AIChatService_SendMessage_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_AIChatService_StreamMessage_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/memos.api.v1.AIChatService/StreamMessage", runtime.WithHTTPPathPattern("/api/v1/ai/chats/{conversation_id}:streamMessage"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_AIChatService_StreamMessage_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_AIChatService_StreamMessage_0(annotatedContext, mux, outboundMarshaler, w, req, func() (proto.Message, error) { return resp.Recv() }, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
@@ -543,6 +599,7 @@ var (
 	pattern_AIChatService_DeleteConversation_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "ai", "chats", "id"}, ""))
 	pattern_AIChatService_UpdateConversation_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "ai", "chats", "conversation.id"}, ""))
 	pattern_AIChatService_SendMessage_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "ai", "chats", "conversation_id"}, "sendMessage"))
+	pattern_AIChatService_StreamMessage_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "ai", "chats", "conversation_id"}, "streamMessage"))
 )
 
 var (
@@ -552,4 +609,5 @@ var (
 	forward_AIChatService_DeleteConversation_0 = runtime.ForwardResponseMessage
 	forward_AIChatService_UpdateConversation_0 = runtime.ForwardResponseMessage
 	forward_AIChatService_SendMessage_0        = runtime.ForwardResponseMessage
+	forward_AIChatService_StreamMessage_0      = runtime.ForwardResponseStream
 )

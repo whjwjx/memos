@@ -7,6 +7,7 @@ import {
   BookOpenCheckIcon,
   BotIcon,
   CalendarDaysIcon,
+  CheckIcon,
   ChevronDownIcon,
   EarthIcon,
   FileAudioIcon,
@@ -27,8 +28,9 @@ import {
   SquarePenIcon,
   Trash2Icon,
   UserRoundIcon,
+  XIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, matchPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -421,19 +423,79 @@ const AIChatSidebarContent = () => {
   const createConversation = useCreateConversation();
   const deleteConversation = useDeleteConversation();
   const [deleteTarget, setDeleteTarget] = useState<string>();
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<"selected" | "empty">();
   const [renamingId, setRenamingId] = useState<string>();
   const [renameValue, setRenameValue] = useState("");
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [isManagingConversations, setIsManagingConversations] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [selectedConversationIds, setSelectedConversationIds] = useState<Set<string>>(() => new Set());
+  const [emptyConversationIds, setEmptyConversationIds] = useState<Set<string>>(() => new Set());
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const activeConversationId = searchParams.get("conversation") ?? undefined;
+  const emptyTitleConversations = useMemo(() => conversations.filter((item) => item.title.trim() === ""), [conversations]);
+  const emptyConversationId = emptyConversationIds.values().next().value;
+  const selectedConversationCount = selectedConversationIds.size;
+  const allConversationsSelected = conversations.length > 0 && selectedConversationCount === conversations.length;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const inspectEmptyConversation = async () => {
+      if (emptyTitleConversations.length === 0) {
+        setEmptyConversationIds(new Set());
+        return;
+      }
+      const nextEmptyIds = new Set<string>();
+      for (const conv of emptyTitleConversations) {
+        const detail = await aiChatServiceClient.getConversation({ id: conv.id }).catch(() => undefined);
+        if (cancelled) {
+          return;
+        }
+        if (detail && (detail.messages?.length ?? 0) === 0) {
+          nextEmptyIds.add(conv.id);
+        }
+      }
+      setEmptyConversationIds(nextEmptyIds);
+    };
+
+    void inspectEmptyConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emptyTitleConversations]);
+
+  useEffect(() => {
+    const conversationIds = new Set(conversations.map((conv) => conv.id));
+    setSelectedConversationIds((prev) => {
+      const next = new Set([...prev].filter((id) => conversationIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [conversations]);
 
   const handleCreate = async () => {
+    if (emptyConversationId || isCreatingConversation || createConversation.isPending) {
+      return;
+    }
+    setIsCreatingConversation(true);
     try {
+      for (const conv of conversations.filter((item) => item.title.trim() === "")) {
+        const detail = await aiChatServiceClient.getConversation({ id: conv.id }).catch(() => undefined);
+        if (detail && (detail.messages?.length ?? 0) === 0) {
+          navigate(`${ROUTES.AI_CHAT}?conversation=${conv.id}`);
+          setMobileOpen(false);
+          return;
+        }
+      }
       const res = await createConversation.mutateAsync({});
       navigate(`${ROUTES.AI_CHAT}?conversation=${res.id}`);
       setMobileOpen(false);
     } catch (error: unknown) {
       handleError(error, toast.error, { context: "Create conversation" });
+    } finally {
+      setIsCreatingConversation(false);
     }
   };
 
@@ -460,6 +522,64 @@ const AIChatSidebarContent = () => {
 
   const cancelRename = () => setRenamingId(undefined);
 
+  const toggleManageMode = () => {
+    setRenamingId(undefined);
+    if (isManagingConversations) {
+      setSelectedConversationIds(new Set());
+    }
+    setIsManagingConversations(!isManagingConversations);
+  };
+
+  const toggleConversationSelected = (id: string) => {
+    setSelectedConversationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllConversations = () => {
+    setSelectedConversationIds(allConversationsSelected ? new Set() : new Set(conversations.map((conv) => conv.id)));
+  };
+
+  const deleteConversationIds = async (ids: string[], successMessage: string, context: string) => {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      return;
+    }
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(uniqueIds.map((id) => aiChatServiceClient.deleteConversation({ id }).then(() => id)));
+      const deletedIds = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+      const failed = results.find((result) => result.status === "rejected");
+
+      if (deletedIds.length > 0) {
+        deletedIds.forEach((id) => queryClient.removeQueries({ queryKey: ["ai-chat", "conversation", id] }));
+        queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversations"] });
+        setSelectedConversationIds((prev) => new Set([...prev].filter((id) => !deletedIds.includes(id))));
+        setEmptyConversationIds((prev) => new Set([...prev].filter((id) => !deletedIds.includes(id))));
+        toast.success(successMessage);
+      }
+
+      if (activeConversationId && deletedIds.includes(activeConversationId)) {
+        setSearchParams({}, { replace: true });
+        navigate(ROUTES.AI_CHAT, { replace: true });
+      }
+      if (failed) {
+        throw failed.reason;
+      }
+    } catch (error: unknown) {
+      handleError(error, toast.error, { context });
+    } finally {
+      setBulkDeleteTarget(undefined);
+      setIsBulkDeleting(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     const id = deleteTarget;
@@ -477,86 +597,190 @@ const AIChatSidebarContent = () => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (bulkDeleteTarget === "empty") {
+      await deleteConversationIds(
+        [...emptyConversationIds],
+        t("aiChat.bulk-delete-success", { count: emptyConversationIds.size }),
+        "Clean empty conversations",
+      );
+      return;
+    }
+    await deleteConversationIds(
+      [...selectedConversationIds],
+      t("aiChat.bulk-delete-success", { count: selectedConversationIds.size }),
+      "Bulk delete conversations",
+    );
+  };
+
+  const bulkDeleteCount = bulkDeleteTarget === "empty" ? emptyConversationIds.size : selectedConversationCount;
+
   return (
     <SidebarSection
       label={t("aiChat.title")}
       action={
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className={SIDEBAR_SECTION_ACTION_BUTTON_CLASSES}
-          onClick={handleCreate}
-          disabled={createConversation.isPending}
-          aria-label={t("aiChat.new-conversation")}
-        >
-          <SquarePenIcon className={SIDEBAR_SECTION_ACTION_ICON_CLASSES} strokeWidth={1.8} />
-        </Button>
+        <div className="flex items-center gap-1">
+          {conversations.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={SIDEBAR_SECTION_ACTION_BUTTON_CLASSES}
+              onClick={toggleManageMode}
+              aria-label={isManagingConversations ? t("aiChat.exit-manage-conversations") : t("aiChat.manage-conversations")}
+              title={isManagingConversations ? t("aiChat.exit-manage-conversations") : t("aiChat.manage-conversations")}
+            >
+              {isManagingConversations ? (
+                <XIcon className={SIDEBAR_SECTION_ACTION_ICON_CLASSES} strokeWidth={1.8} />
+              ) : (
+                <ListIcon className={SIDEBAR_SECTION_ACTION_ICON_CLASSES} strokeWidth={1.8} />
+              )}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={SIDEBAR_SECTION_ACTION_BUTTON_CLASSES}
+            onClick={handleCreate}
+            disabled={Boolean(emptyConversationId) || isCreatingConversation || createConversation.isPending}
+            aria-label={t("aiChat.new-conversation")}
+            title={emptyConversationId ? t("aiChat.new-conversation-disabled") : t("aiChat.new-conversation")}
+          >
+            <SquarePenIcon className={SIDEBAR_SECTION_ACTION_ICON_CLASSES} strokeWidth={1.8} />
+          </Button>
+        </div>
       }
     >
       {conversations.length === 0 ? (
         <div className="px-2 py-1 text-sm text-muted-foreground">{t("aiChat.no-conversations")}</div>
       ) : (
-        conversations.map((conv) => {
-          const active = activeConversationId === conv.id;
-          const isRenaming = renamingId === conv.id;
-          return (
-            <div key={conv.id} className={cn(SIDEBAR_ROW_CLASSES, "group/conv", sidebarRowStateClasses(active))}>
-              {isRenaming ? (
-                <Input
-                  ref={renameInputRef}
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={commitRename}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      commitRename();
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelRename();
-                    }
-                  }}
-                  className="h-7 min-w-0 flex-1 rounded-md px-2 text-sm"
-                />
-              ) : (
-                <button
+        <>
+          {isManagingConversations && (
+            <div className="mb-1 flex flex-col gap-1 rounded-md border border-border/70 bg-sidebar-accent/30 p-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate px-1 text-2xs text-muted-foreground">
+                  {t("aiChat.selected-count", { count: selectedConversationCount })}
+                </span>
+                <Button
                   type="button"
-                  onClick={() => {
-                    navigate(`${ROUTES.AI_CHAT}?conversation=${conv.id}`);
-                    setMobileOpen(false);
-                  }}
-                  className="flex h-full min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1.5 text-2xs"
+                  onClick={toggleSelectAllConversations}
+                  disabled={isBulkDeleting}
                 >
-                  <BotIcon className={SIDEBAR_ROW_ICON_CLASSES} strokeWidth={1.8} />
-                  <span className="min-w-0 flex-1 truncate">{conv.title || conv.id}</span>
-                </button>
-              )}
-              {!isRenaming && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    nativeButton={false}
-                    render={
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        aria-label={t("common.more")}
-                        className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-opacity hover:bg-background/70 md:opacity-0 md:group-hover/conv:opacity-100 md:focus-visible:opacity-100 data-popup-open:opacity-100"
-                      />
-                    }
-                  >
-                    <MoreHorizontalIcon className="size-3.5" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" sideOffset={2} size="sm">
-                    <DropdownMenuItem onClick={() => startRename(conv)}>{t("common.rename")}</DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(conv.id)}>
-                      {t("common.delete")}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                  {allConversationsSelected ? t("aiChat.deselect-all") : t("aiChat.select-all")}
+                </Button>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="min-w-0 flex-1 justify-start px-1.5 text-2xs"
+                  disabled={emptyConversationIds.size === 0 || isBulkDeleting}
+                  onClick={() => setBulkDeleteTarget("empty")}
+                >
+                  <Trash2Icon className="size-3.5" />
+                  <span className="truncate">{t("aiChat.clear-empty", { count: emptyConversationIds.size })}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="min-w-0 flex-1 justify-start px-1.5 text-2xs"
+                  disabled={selectedConversationCount === 0 || isBulkDeleting}
+                  onClick={() => setBulkDeleteTarget("selected")}
+                >
+                  <Trash2Icon className="size-3.5" />
+                  <span className="truncate">{t("aiChat.delete-selected")}</span>
+                </Button>
+              </div>
             </div>
-          );
-        })
+          )}
+          {conversations.map((conv) => {
+            const active = activeConversationId === conv.id;
+            const isRenaming = renamingId === conv.id;
+            const selected = selectedConversationIds.has(conv.id);
+            return (
+              <div key={conv.id} className={cn(SIDEBAR_ROW_CLASSES, "group/conv", sidebarRowStateClasses(active || selected))}>
+                {isManagingConversations ? (
+                  <label className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleConversationSelected(conv.id)}
+                      className="peer sr-only"
+                      aria-label={t("aiChat.select-conversation", { title: conv.title.trim() || t("aiChat.untitled-conversation") })}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-border bg-background text-primary-foreground shadow-xs",
+                        selected && "border-primary bg-primary",
+                      )}
+                    >
+                      {selected && <CheckIcon className="size-3" strokeWidth={2.2} />}
+                    </span>
+                    <BotIcon className={SIDEBAR_ROW_ICON_CLASSES} strokeWidth={1.8} />
+                    <span className="min-w-0 flex-1 truncate">{conv.title.trim() || t("aiChat.untitled-conversation")}</span>
+                  </label>
+                ) : isRenaming ? (
+                  <Input
+                    ref={renameInputRef}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitRename();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelRename();
+                      }
+                    }}
+                    className="h-7 min-w-0 flex-1 rounded-md px-2 text-sm"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigate(`${ROUTES.AI_CHAT}?conversation=${conv.id}`);
+                      setMobileOpen(false);
+                    }}
+                    className="flex h-full min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    <BotIcon className={SIDEBAR_ROW_ICON_CLASSES} strokeWidth={1.8} />
+                    <span className="min-w-0 flex-1 truncate">{conv.title.trim() || t("aiChat.untitled-conversation")}</span>
+                  </button>
+                )}
+                {!isRenaming && !isManagingConversations && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      nativeButton={false}
+                      render={
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t("common.more")}
+                          className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-opacity hover:bg-background/70 md:opacity-0 md:group-hover/conv:opacity-100 md:focus-visible:opacity-100 data-popup-open:opacity-100"
+                        />
+                      }
+                    >
+                      <MoreHorizontalIcon className="size-3.5" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" sideOffset={2} size="sm">
+                      <DropdownMenuItem onClick={() => startRename(conv)}>{t("common.rename")}</DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(conv.id)}>
+                        {t("common.delete")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            );
+          })}
+        </>
       )}
       <ConfirmDialog
         open={!!deleteTarget}
@@ -565,6 +789,20 @@ const AIChatSidebarContent = () => {
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}
         onConfirm={handleDelete}
+        confirmVariant="destructive"
+      />
+      <ConfirmDialog
+        open={!!bulkDeleteTarget}
+        onOpenChange={(open) => !open && setBulkDeleteTarget(undefined)}
+        title={
+          bulkDeleteTarget === "empty"
+            ? t("aiChat.clear-empty-confirm", { count: bulkDeleteCount })
+            : t("aiChat.bulk-delete-confirm", { count: bulkDeleteCount })
+        }
+        description={t("aiChat.bulk-delete-description")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={handleBulkDelete}
         confirmVariant="destructive"
       />
     </SidebarSection>

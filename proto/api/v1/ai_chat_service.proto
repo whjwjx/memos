@@ -66,6 +66,17 @@ service AIChatService {
     };
     option (google.api.method_signature) = "conversation_id,content";
   }
+
+  // StreamMessage appends a user turn and streams assistant progress events.
+  // It preserves SendMessage semantics but lets the client render assistant
+  // deltas, tool activity, and confirmation requests as they happen.
+  rpc StreamMessage(SendMessageRequest) returns (stream SendMessageStreamResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/chats/{conversation_id}:streamMessage"
+      body: "*"
+    };
+    option (google.api.method_signature) = "conversation_id,content";
+  }
 }
 
 // Conversation is a single AI chat session owned by a user.
@@ -231,4 +242,61 @@ message SendMessageResponse {
 
   // Assistant turns appended during this request (including tool results).
   repeated ConversationMessage messages = 4;
+}
+
+// AIChatStreamEventType identifies a single streamed AI Chat event.
+enum AIChatStreamEventType {
+  AI_CHAT_STREAM_EVENT_TYPE_UNSPECIFIED = 0;
+
+  // The request was accepted and processing has started.
+  AI_CHAT_STREAM_EVENT_TYPE_STARTED = 1;
+
+  // A conversation message was created or should be rendered by the client.
+  AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED = 2;
+
+  // A chunk of assistant text was generated.
+  AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA = 3;
+
+  // The assistant requested a tool call.
+  AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL = 4;
+
+  // A tool result is available.
+  AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT = 5;
+
+  // One or more tool calls require user confirmation.
+  AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED = 6;
+
+  // The turn completed and final persisted messages are available.
+  AI_CHAT_STREAM_EVENT_TYPE_DONE = 7;
+
+  // The turn failed after the stream was accepted.
+  AI_CHAT_STREAM_EVENT_TYPE_ERROR = 8;
+}
+
+message SendMessageStreamResponse {
+  string event_id = 1;
+
+  string conversation_id = 2;
+
+  AIChatStreamEventType type = 3;
+
+  // Message associated with this event, when applicable.
+  ConversationMessage message = 4;
+
+  // Tool call associated with this event, when applicable.
+  ToolCall tool_call = 5;
+
+  // Assistant text delta for ASSISTANT_DELTA events.
+  string delta = 6;
+
+  // Error text for ERROR events.
+  string error = 7;
+
+  bool requires_confirmation = 8;
+
+  repeated ToolCall tool_calls = 9;
+
+  // Final persisted messages produced by this request. Sent with DONE or
+  // CONFIRMATION_REQUIRED so the client can replace any optimistic entries.
+  repeated ConversationMessage final_messages = 10;
 }
