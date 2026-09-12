@@ -201,10 +201,6 @@ const buildConversationTimeline = (messages: ConversationMessage[]): Conversatio
           };
         }),
       });
-      if (!message.content.trim()) {
-        continue;
-      }
-      timeline.push({ kind: "message", message: { ...message, toolCalls: [] } });
       continue;
     }
     if (message.role === "assistant" && !message.content.trim()) {

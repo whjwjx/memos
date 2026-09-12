@@ -1449,6 +1449,7 @@
     "empty-hint": "Start a conversation with your AI assistant.",
     "start-hint": "Send a message to begin.",
     "new-conversation": "New conversation",
+    "new-conversation-disabled": "Use the existing empty chat first",
     "untitled-conversation": "New chat",
     "input-placeholder": "Ask anything, or ask the assistant to search, create, or organize your memos…",
     "tool-result": "tool result",

@@ -177,6 +177,9 @@ const createConversationTitle = (content: string): string => {
   return compacted.slice(0, 32);
 };
 
+const ASSISTANT_STREAM_CHARS_PER_TICK = 3;
+const ASSISTANT_STREAM_TICK_MS = 24;
+
 const appendOrReplaceMessage = (messages: ConversationMessage[], next: ConversationMessage) => {
   if (next.id) {
     const idx = messages.findIndex((message) => message.id === next.id);
@@ -188,7 +191,7 @@ const appendOrReplaceMessage = (messages: ConversationMessage[], next: Conversat
 };
 
 const removeLocalTurnMessages = (messages: ConversationMessage[], localIds: Set<string>) =>
-  messages.filter((message) => !localIds.has(message.id));
+  messages.filter((message) => !localIds.has(message.id) && !message.id.startsWith("local-"));
 
 const toResolvedToolCall = (toolCall: ToolCall): ResolvedToolCall => ({
   id: toolCall.id,
@@ -211,6 +214,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
   const localAssistantIdRef = useRef("");
   const localToolAssistantIdRef = useRef("");
   const localUserIdRef = useRef("");
+  const streamRenderCleanupRef = useRef<(() => void) | null>(null);
 
   const patchConversation = useCallback(
     (updater: (prev: ConversationCache) => ConversationCache) => {
@@ -278,6 +282,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
         return;
       }
       abortRef.current?.abort();
+      streamRenderCleanupRef.current?.();
       const controller = new AbortController();
       abortRef.current = controller;
       localTurnIdsRef.current = new Set();
@@ -325,6 +330,96 @@ export const useSendMessage = (conversationId: string | undefined) => {
           ),
         }));
       };
+      let queuedAssistantDelta = "";
+      let assistantDeltaTimer: ReturnType<typeof setTimeout> | undefined;
+      let assistantDeltaDrained: (() => void) | undefined;
+      const resolveAssistantDeltaDrained = () => {
+        assistantDeltaDrained?.();
+        assistantDeltaDrained = undefined;
+      };
+      const renderAssistantDelta = (delta: string) => {
+        localToolAssistantIdRef.current = "";
+        if (!localAssistantIdRef.current) {
+          const id = `local-assistant-${Date.now()}`;
+          localAssistantIdRef.current = id;
+          localTurnIdsRef.current.add(id);
+          appendMessage({ id, role: "assistant", content: delta, toolCalls: [] } as unknown as ConversationMessage);
+          return;
+        }
+        const id = localAssistantIdRef.current;
+        patchConversation((cache) => ({
+          ...cache,
+          messages: (cache.messages ?? []).map((message) =>
+            message.id === id ? ({ ...message, content: `${message.content}${delta}` } as ConversationMessage) : message,
+          ),
+        }));
+      };
+      const drainAssistantDeltaQueue = () => {
+        assistantDeltaTimer = undefined;
+        if (controller.signal.aborted) {
+          queuedAssistantDelta = "";
+          resolveAssistantDeltaDrained();
+          return;
+        }
+        const chars = Array.from(queuedAssistantDelta);
+        const next = chars.slice(0, ASSISTANT_STREAM_CHARS_PER_TICK).join("");
+        queuedAssistantDelta = chars.slice(ASSISTANT_STREAM_CHARS_PER_TICK).join("");
+        if (next) {
+          renderAssistantDelta(next);
+        }
+        if (queuedAssistantDelta) {
+          assistantDeltaTimer = setTimeout(drainAssistantDeltaQueue, ASSISTANT_STREAM_TICK_MS);
+          return;
+        }
+        resolveAssistantDeltaDrained();
+      };
+      const scheduleAssistantDeltaDrain = () => {
+        if (!assistantDeltaTimer) {
+          assistantDeltaTimer = setTimeout(drainAssistantDeltaQueue, ASSISTANT_STREAM_TICK_MS);
+        }
+      };
+      const queueAssistantDelta = (delta: string) => {
+        queuedAssistantDelta += delta;
+        scheduleAssistantDeltaDrain();
+      };
+      const discardAssistantDeltaQueue = () => {
+        if (assistantDeltaTimer) {
+          clearTimeout(assistantDeltaTimer);
+          assistantDeltaTimer = undefined;
+        }
+        queuedAssistantDelta = "";
+        if (localAssistantIdRef.current) {
+          const id = localAssistantIdRef.current;
+          patchConversation((cache) => ({
+            ...cache,
+            messages: (cache.messages ?? []).filter((message) => message.id !== id),
+          }));
+          localTurnIdsRef.current.delete(id);
+          localAssistantIdRef.current = "";
+        }
+        resolveAssistantDeltaDrained();
+      };
+      const waitForAssistantDeltaQueue = () => {
+        if (!queuedAssistantDelta && !assistantDeltaTimer) {
+          return Promise.resolve();
+        }
+        return new Promise<void>((resolve) => {
+          const previous = assistantDeltaDrained;
+          assistantDeltaDrained = () => {
+            previous?.();
+            resolve();
+          };
+        });
+      };
+      const cleanupAssistantDeltaRenderer = () => {
+        if (assistantDeltaTimer) {
+          clearTimeout(assistantDeltaTimer);
+          assistantDeltaTimer = undefined;
+        }
+        queuedAssistantDelta = "";
+        resolveAssistantDeltaDrained();
+      };
+      streamRenderCleanupRef.current = cleanupAssistantDeltaRenderer;
       let accepted = false;
       const consumeStream = async () => {
         const stream = aiChatServiceClient.streamMessage(streamRequest, { signal: controller.signal });
@@ -357,25 +452,12 @@ export const useSendMessage = (conversationId: string | undefined) => {
               if (!event.delta) {
                 break;
               }
-              localToolAssistantIdRef.current = "";
-              if (!localAssistantIdRef.current) {
-                const id = `local-assistant-${Date.now()}`;
-                localAssistantIdRef.current = id;
-                localTurnIdsRef.current.add(id);
-                appendMessage({ id, role: "assistant", content: event.delta, toolCalls: [] } as unknown as ConversationMessage);
-                break;
-              }
-              const id = localAssistantIdRef.current;
-              patchConversation((cache) => ({
-                ...cache,
-                messages: (cache.messages ?? []).map((message) =>
-                  message.id === id ? ({ ...message, content: `${message.content}${event.delta}` } as ConversationMessage) : message,
-                ),
-              }));
+              queueAssistantDelta(event.delta);
               break;
             }
             case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL:
               if (event.toolCall) {
+                discardAssistantDeltaQueue();
                 localAssistantIdRef.current = "";
                 if (!localToolAssistantIdRef.current) {
                   const id = `local-tools-${Date.now()}`;
@@ -403,6 +485,10 @@ export const useSendMessage = (conversationId: string | undefined) => {
               }
               break;
             case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED:
+              await waitForAssistantDeltaQueue();
+              if (controller.signal.aborted) {
+                break;
+              }
               replaceLocalTurnWithFinalMessages(event.finalMessages ?? []);
               setState((prevState) => ({
                 requiresConfirmation: event.requiresConfirmation,
@@ -410,6 +496,10 @@ export const useSendMessage = (conversationId: string | undefined) => {
               }));
               break;
             case AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_DONE:
+              await waitForAssistantDeltaQueue();
+              if (controller.signal.aborted) {
+                break;
+              }
               replaceLocalTurnWithFinalMessages(event.finalMessages ?? []);
               setState((prevState) => ({
                 ...prevState,
@@ -466,6 +556,10 @@ export const useSendMessage = (conversationId: string | undefined) => {
           setError(streamError);
         }
       } finally {
+        if (streamRenderCleanupRef.current === cleanupAssistantDeltaRenderer) {
+          streamRenderCleanupRef.current = null;
+        }
+        cleanupAssistantDeltaRenderer();
         setIsPending(false);
         if (abortRef.current === controller) {
           abortRef.current = null;
@@ -498,6 +592,8 @@ export const useSendMessage = (conversationId: string | undefined) => {
     submittedIdsRef.current = new Set();
     abortRef.current?.abort();
     abortRef.current = null;
+    streamRenderCleanupRef.current?.();
+    streamRenderCleanupRef.current = null;
     localTurnIdsRef.current = new Set();
     localAssistantIdRef.current = "";
     localToolAssistantIdRef.current = "";

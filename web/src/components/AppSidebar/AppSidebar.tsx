@@ -28,7 +28,7 @@ import {
   Trash2Icon,
   UserRoundIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, matchPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -424,12 +424,42 @@ const AIChatSidebarContent = () => {
   const [renamingId, setRenamingId] = useState<string>();
   const [renameValue, setRenameValue] = useState("");
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [emptyConversationId, setEmptyConversationId] = useState<string>();
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const activeConversationId = searchParams.get("conversation") ?? undefined;
+  const emptyTitleConversations = useMemo(() => conversations.filter((item) => item.title.trim() === ""), [conversations]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const inspectEmptyConversation = async () => {
+      if (emptyTitleConversations.length === 0) {
+        setEmptyConversationId(undefined);
+        return;
+      }
+      for (const conv of emptyTitleConversations) {
+        const detail = await aiChatServiceClient.getConversation({ id: conv.id }).catch(() => undefined);
+        if (cancelled) {
+          return;
+        }
+        if (detail && (detail.messages?.length ?? 0) === 0) {
+          setEmptyConversationId(conv.id);
+          return;
+        }
+      }
+      setEmptyConversationId(undefined);
+    };
+
+    void inspectEmptyConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emptyTitleConversations]);
 
   const handleCreate = async () => {
-    if (isCreatingConversation || createConversation.isPending) {
+    if (emptyConversationId || isCreatingConversation || createConversation.isPending) {
       return;
     }
     setIsCreatingConversation(true);
@@ -501,8 +531,9 @@ const AIChatSidebarContent = () => {
           size="icon-sm"
           className={SIDEBAR_SECTION_ACTION_BUTTON_CLASSES}
           onClick={handleCreate}
-          disabled={isCreatingConversation || createConversation.isPending}
+          disabled={Boolean(emptyConversationId) || isCreatingConversation || createConversation.isPending}
           aria-label={t("aiChat.new-conversation")}
+          title={emptyConversationId ? t("aiChat.new-conversation-disabled") : t("aiChat.new-conversation")}
         >
           <SquarePenIcon className={SIDEBAR_SECTION_ACTION_ICON_CLASSES} strokeWidth={1.8} />
         </Button>
