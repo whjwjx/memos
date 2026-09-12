@@ -166,29 +166,12 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 					return nil, err
 				}
 			}
-			// Give the model no function-calling material to mimic: flatten the
-			// history so earlier assistant tool_calls and their tool results
-			// become plain text, and omit the tool definitions entirely. With no
-			// Tools list (and thus no tool_choice at all), the model cannot
-			// "demonstrate" another call — it can only produce a natural-language
-			// summary. This is far more robust than relying on tool_choice:"none",
-			// which some models (e.g. DeepSeek) ignore by echoing pseudo-XML.
-			flattened := flattenHistory(messages)
-			resp, err := generate(ctx, model, chat.Request{
-				Model:       req.Model,
-				System:      req.System,
-				Messages:    flattened,
-				Temperature: req.Temperature,
-				MaxTokens:   req.MaxTokens,
-				ToolChoice:  chat.ToolChoiceNone,
-			}, emit)
-			if err != nil {
-				return nil, errors.Wrap(err, "chat model generation failed")
-			}
-			content := stripAssistantNoise(resp.Text)
-			if content == "" || includesToolResult(content, updated) {
-				content = summarizeApproved(updated)
-			}
+			// Approval continuations are deterministic control events. The tools
+			// have already run, and their structured results are visible in the
+			// activity card, so do not ask the model to summarize them. Some
+			// providers otherwise improvise another action, echo raw tool output,
+			// or emit pseudo tool-call text.
+			content := summarizeApproved(updated)
 			finalMessage := chat.Message{Role: chat.RoleAssistant, Content: content}
 			return &AssistantResponse{
 				Content:      content,
@@ -486,6 +469,9 @@ func summarizeApproved(updated []chat.Message) string {
 		case "update_memo":
 			return "已更新 memo。"
 		}
+	}
+	if len(updated) > 1 {
+		return fmt.Sprintf("已处理 %d 项操作。", len(updated))
 	}
 	return "已完成相关操作。"
 }
