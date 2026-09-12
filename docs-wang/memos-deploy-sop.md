@@ -397,6 +397,19 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 清理：悬空镜像已 `docker image prune -f`（删 `bec4bba4`）；旧备份目录 `memos_data_20260906_1941`、`memos_data_20260906_2016` 因审批超时未删除（连续两次，后续手动确认），保留 `20260910_0008` 与 `20260911_0747`。
 - 备注：本次 C 盘 33.2GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.7；**本次无新增踩坑**（9.7 正则校验正常）。
 
+### 8.16 部署记录（2026-09-13，凌晨）
+
+> 完整重新部署：纳入 AI Chat 流式化（Connect server-streaming）+ Tavily 联网搜索 + LLM profile/agent 分离（`8929e108` stream AI chat responses、`33272167` ai-chat-streaming、`38ba7c19` Tavily、`241af446` llm profiles、`23134f81` merge）。**同时修复 nginx 反代缓冲**：新增 AI chat 流式 location（`proxy_buffering off`），参考 `vps-gateway` 内 `fxa.conf`（fastexpoagent）的 SSE 优化写法。
+
+- 代码：`dev` HEAD = `23134f81`（merge llm-profile-runtime-tuning）。
+- 构建：`pnpm release`（资产 `index-5VcRrSc6.js`，5129 modules）→ `go build`（linux/amd64，103076416 字节 / ≈98.3MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260913_0136/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `b8f81dbe`），容器 recreate 时间 `2026-09-13T01:37:49+08:00`（北京时间 9-13 01:37）。
+- nginx 改动（`vps-gateway` 容器，挂载源 `/home/deployer/vps-infra/nginx/conf.d/memos.huajiang.wang.conf`）：在 `location /` 前新增 AI chat 流式 location（正则 `~* ^/.*memos\.api\.v1\.AIChatService/`），设 `proxy_buffering off; proxy_cache off; proxy_max_temp_file_size 0; add_header X-Accel-Buffering no; gzip off; proxy_read_timeout 600s;`。`docker cp` 因 conf.d 只读挂载被拒，改为 scp 覆盖**宿主机挂载源**后 `nginx -t` + `nginx -s reload` 生效。
+- 校验：公网前端资产 `index-5VcRrSc6.js` 与构建输出一致（9.7 正则）；API 正常；容器 `Up`；词典 `ecdict.db` 仍在（180MB）；日志无异常、**无 DB 迁移**；AI chat 流式路径 `/memos.api.v1.AIChatService/StreamMessage` 经 nginx 正则 location 正确转发（返回 415=Connect 合法拒 json，证明路径匹配且转发到 memos），`proxy_buffering off` 已就位（真实逐字流式需浏览器登录体验）。
+- 清理：悬空镜像已 `docker image prune -f`（删 `e9025139`）；旧备份 `20260906_1941`/`20260906_2016`/`20260910_0008` 已删（含上轮超时未删项），保留 `20260911_0747` 与 `20260913_0136`。
+- 备注：本次 C 盘 36.8GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.7；**新增踩坑**：流式/SSE 部署必须关闭 nginx 代理缓冲（见 9.8，参考 fastexpoagent）。
+
 ---
 
 ## 9. 部署踩坑与注意事项
@@ -465,3 +478,30 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - **做法**（PowerShell + curl）：
   `curl.exe -s https://memos.huajiang.wang/ | Select-String -Pattern 'assets/index-[^"]+\.js' | ForEach-Object { $_.Matches.Value }`
 - **注意**：资产名是否含连字符具有随机性，前几次部署（`index-BFy8sQp8.js`、`index-CeWK1Dcs.js`、`index-BuDAnneP.js`）均不含，本次才触发；建议统一用覆盖连字符的正则以避免漏判。
+
+### 9.8 流式/SSE 部署必须关闭 nginx 代理缓冲
+
+- **现象**：首次部署 AI Chat 流式（Connect server-streaming）时，发现 nginx 反代（vps-gateway 容器）默认 `proxy_buffering on`，会把流式 chunked 响应攒满/结束才下发，导致 AI 回复不逐字输出（前端 `ReadableStream` 等全部生成完才收到）。memos 站点原 `location /` 仅有 `Connection "upgrade"`（WebSocket 写法），缺 `proxy_buffering off`。
+- **根因**：memos 前端 AI chat 走 Connect（`web/src/connect.ts`、`apiv1connect/ai_chat_service.connect.go`），流式方法 `streamMessage` 路径为 `/memos.api.v1.AIChatService/StreamMessage`（根前缀，非 `/api/v1/`），底层 HTTP/1.1 chunked（非 `text/event-stream`）。nginx 默认缓冲对该路径生效，破坏流式即时性。
+- **修复（参考 vps-gateway 内 `fxa.conf` / fastexpoagent 的 SSE 优化写法）**：在 memos 站点 `location /` 前新增正则 location 仅截获 AI chat 流式路径、关缓冲，保留原 `location /` 的 WebSocket `Connection "upgrade"` 与静态资源缓冲：
+  ```nginx
+  location ~* ^/.*memos\.api\.v1\.AIChatService/ {
+      proxy_pass http://memos:5230;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_buffering off;
+      proxy_cache off;
+      proxy_max_temp_file_size 0;
+      add_header X-Accel-Buffering no;
+      gzip off;
+      proxy_read_timeout 600s;
+      proxy_send_timeout 600s;
+  }
+  ```
+  - 关键指令：`proxy_buffering off`（关缓冲）、`proxy_cache off` + `proxy_max_temp_file_size 0`（禁落临时文件）、`add_header X-Accel-Buffering no`（通知下游/CDN 也别缓冲）、`gzip off`（避免分块与 gzip 冲突）、延长 `proxy_read/send_timeout`（长文本不中断）。
+  - 该 location 正则优先级高于前缀 `location /`，且不影响普通请求与前端静态资源加速。
+- **容器只读挂载坑（改配置的方式）**：`vps-gateway` 的 `/etc/nginx/conf.d` 是**只读 bind 挂载**（容器侧 RW=false），`docker cp` 进容器报错 `mounted volume is marked read-only`。正确做法：`docker inspect vps-gateway` 找到宿主机挂载源 `/home/deployer/vps-infra/nginx/conf.d`，直接 scp/写该宿主机文件（容器侧只读不影响宿主机侧写），再 `docker exec vps-gateway nginx -t && nginx -s reload`。**注意**：scp 传含 `$host` 等变量的配置不会触发 9.4 网关字符处理（scp 是二进制传输，不解析文件内容）；切勿把含 `$` 的 nginx 配置塞进 ssh 命令行（会被网关处理）。
+- **验证**：`nginx -t` 语法通过 + `nginx -s reload` 生效；公网 `curl -X POST /memos.api.v1.AIChatService/StreamMessage` 返回 `415`（非 404，证明路径匹配且转发到 memos），`Server: nginx` 头存在。真实逐字流式需浏览器登录后体验（curl 无 token 无法触发真实流）。
