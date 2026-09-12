@@ -456,7 +456,7 @@ const ToolCallCard = ({
   onResolve,
   disabled,
 }: {
-  tc: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected"; confirmKeyword?: string };
+  tc: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected" | "submitting"; confirmKeyword?: string };
   onResolve: (status: "approved" | "rejected", confirmKeyword?: string) => void;
   disabled: boolean;
 }) => {
@@ -474,7 +474,7 @@ const ToolCallCard = ({
     enabled: tc.name === "delete_memo" && Boolean(memoUid),
   });
 
-  const resolved = tc.status !== "pending";
+  const resolved = tc.status === "approved" || tc.status === "rejected" || tc.status === "submitting";
   const [keyword, setKeyword] = useState("");
   const canApprove = !isQueryDBWrite || keyword.trim().toLowerCase() === CONFIRM_KEYWORD;
 
@@ -492,6 +492,11 @@ const ToolCallCard = ({
         {tc.status === "rejected" && (
           <Badge variant="outline" shape="pill" className="text-[11px]">
             已拒绝
+          </Badge>
+        )}
+        {tc.status === "submitting" && (
+          <Badge variant="warning" shape="pill" className="text-[11px]">
+            正在执行
           </Badge>
         )}
       </div>
@@ -535,15 +540,21 @@ const ConfirmationCard = ({
   onResolve,
   disabled,
 }: {
-  toolCalls: { id: string; name: string; arguments: string; status: "pending" | "approved" | "rejected"; confirmKeyword?: string }[];
+  toolCalls: {
+    id: string;
+    name: string;
+    arguments: string;
+    status: "pending" | "approved" | "rejected" | "submitting";
+    confirmKeyword?: string;
+  }[];
   onResolve: (id: string, status: "approved" | "rejected", confirmKeyword?: string) => void;
   disabled: boolean;
 }) => {
   const pendingCount = toolCalls.filter((tc) => tc.status === "pending").length;
-  const [collapsed, setCollapsed] = useState(false);
-  // Collapse automatically once there are several cards so the list stays readable.
-  const shouldAutoCollapse = toolCalls.length > 3;
-  const isCollapsed = collapsed || shouldAutoCollapse;
+  // Default-collapse long approval batches once, but keep the user's explicit
+  // expand/collapse choice working afterwards.
+  const [collapsed, setCollapsed] = useState(() => toolCalls.length > 3);
+  const isCollapsed = collapsed;
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4">
@@ -610,6 +621,10 @@ const AIChat = () => {
   const activeAgentLabel = activeAgentId ? (agentNameById.get(activeAgentId) ?? activeAgentId) : t("aiChat.agent-fallback-label");
   const activeLLMLabel = activeLLMId ? (llmNameById.get(activeLLMId) ?? activeLLMId) : "LLM";
   const timeline = useMemo(() => buildConversationTimeline(history), [history]);
+  const historyRenderKey = useMemo(
+    () => history.map((msg) => `${msg.id}:${msg.content.length}:${msg.toolCalls.length}`).join("|"),
+    [history],
+  );
   const composerDisabled =
     isPending ||
     createConversation.isPending ||
@@ -665,7 +680,7 @@ const AIChat = () => {
   // Smoothly scroll to the newest message when content changes.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [history.length, requiresConfirmation, isPending]);
+  }, [historyRenderKey, requiresConfirmation, isPending]);
 
   // Jump (not smooth) to the bottom when the composer is focused, so the input
   // is never hidden behind the mobile keyboard and the latest message stays in view.

@@ -25,6 +25,7 @@ const (
 	AIChatService_DeleteConversation_FullMethodName = "/memos.api.v1.AIChatService/DeleteConversation"
 	AIChatService_UpdateConversation_FullMethodName = "/memos.api.v1.AIChatService/UpdateConversation"
 	AIChatService_SendMessage_FullMethodName        = "/memos.api.v1.AIChatService/SendMessage"
+	AIChatService_StreamMessage_FullMethodName      = "/memos.api.v1.AIChatService/StreamMessage"
 )
 
 // AIChatServiceClient is the client API for AIChatService service.
@@ -51,6 +52,10 @@ type AIChatServiceClient interface {
 	// reply. To continue after a confirmation, resend with approved_tool_call_ids
 	// populated so the assistant executes the pending tool calls.
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
+	// StreamMessage appends a user turn and streams assistant progress events.
+	// It preserves SendMessage semantics but lets the client render assistant
+	// deltas, tool activity, and confirmation requests as they happen.
+	StreamMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SendMessageStreamResponse], error)
 }
 
 type aIChatServiceClient struct {
@@ -121,6 +126,25 @@ func (c *aIChatServiceClient) SendMessage(ctx context.Context, in *SendMessageRe
 	return out, nil
 }
 
+func (c *aIChatServiceClient) StreamMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SendMessageStreamResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &AIChatService_ServiceDesc.Streams[0], AIChatService_StreamMessage_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SendMessageRequest, SendMessageStreamResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AIChatService_StreamMessageClient = grpc.ServerStreamingClient[SendMessageStreamResponse]
+
 // AIChatServiceServer is the server API for AIChatService service.
 // All implementations must embed UnimplementedAIChatServiceServer
 // for forward compatibility.
@@ -145,6 +169,10 @@ type AIChatServiceServer interface {
 	// reply. To continue after a confirmation, resend with approved_tool_call_ids
 	// populated so the assistant executes the pending tool calls.
 	SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
+	// StreamMessage appends a user turn and streams assistant progress events.
+	// It preserves SendMessage semantics but lets the client render assistant
+	// deltas, tool activity, and confirmation requests as they happen.
+	StreamMessage(*SendMessageRequest, grpc.ServerStreamingServer[SendMessageStreamResponse]) error
 	mustEmbedUnimplementedAIChatServiceServer()
 }
 
@@ -172,6 +200,9 @@ func (UnimplementedAIChatServiceServer) UpdateConversation(context.Context, *Upd
 }
 func (UnimplementedAIChatServiceServer) SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
+}
+func (UnimplementedAIChatServiceServer) StreamMessage(*SendMessageRequest, grpc.ServerStreamingServer[SendMessageStreamResponse]) error {
+	return status.Error(codes.Unimplemented, "method StreamMessage not implemented")
 }
 func (UnimplementedAIChatServiceServer) mustEmbedUnimplementedAIChatServiceServer() {}
 func (UnimplementedAIChatServiceServer) testEmbeddedByValue()                       {}
@@ -302,6 +333,17 @@ func _AIChatService_SendMessage_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AIChatService_StreamMessage_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SendMessageRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AIChatServiceServer).StreamMessage(m, &grpc.GenericServerStream[SendMessageRequest, SendMessageStreamResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AIChatService_StreamMessageServer = grpc.ServerStreamingServer[SendMessageStreamResponse]
+
 // AIChatService_ServiceDesc is the grpc.ServiceDesc for AIChatService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -334,6 +376,12 @@ var AIChatService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AIChatService_SendMessage_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamMessage",
+			Handler:       _AIChatService_StreamMessage_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "api/v1/ai_chat_service.proto",
 }

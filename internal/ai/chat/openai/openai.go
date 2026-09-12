@@ -53,6 +53,81 @@ func New(cfg ai.ProviderConfig, options chat.Options) (*Model, error) {
 
 // Generate sends the conversation to the chat completions endpoint.
 func (m *Model) Generate(ctx context.Context, req chat.Request) (*chat.Response, error) {
+	params, err := buildChatCompletionParams(req)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := m.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to send OpenAI chat request")
+	}
+	if len(resp.Choices) == 0 {
+		return nil, errors.New("OpenAI chat request returned no choices")
+	}
+	choice := resp.Choices[0]
+	out := &chat.Response{
+		Text:         strings.TrimSpace(choice.Message.Content),
+		FinishReason: mapFinishReason(choice.FinishReason),
+	}
+	for _, tc := range choice.Message.ToolCalls {
+		out.ToolCalls = append(out.ToolCalls, chat.ToolCall{
+			ID:            tc.ID,
+			Name:          tc.Function.Name,
+			ArgumentsJSON: strings.TrimSpace(tc.Function.Arguments),
+		})
+	}
+	return out, nil
+}
+
+// StreamGenerate sends the conversation to the chat completions streaming
+// endpoint and emits assistant text deltas while accumulating the final
+// provider response for the caller.
+func (m *Model) StreamGenerate(ctx context.Context, req chat.Request, emit chat.StreamEmitFunc) (*chat.Response, error) {
+	params, err := buildChatCompletionParams(req)
+	if err != nil {
+		return nil, err
+	}
+
+	stream := m.client.Chat.Completions.NewStreaming(ctx, params)
+	acc := openaisdk.ChatCompletionAccumulator{}
+	for stream.Next() {
+		chunk := stream.Current()
+		if !acc.AddChunk(chunk) {
+			return nil, errors.New("failed to accumulate OpenAI stream chunk")
+		}
+		for _, choice := range chunk.Choices {
+			if choice.Delta.Content == "" || emit == nil {
+				continue
+			}
+			if err := emit(chat.StreamEvent{Delta: choice.Delta.Content}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to stream OpenAI chat request")
+	}
+	if len(acc.Choices) == 0 {
+		return nil, errors.New("OpenAI chat stream returned no choices")
+	}
+
+	choice := acc.Choices[0]
+	out := &chat.Response{
+		Text:         strings.TrimSpace(choice.Message.Content),
+		FinishReason: mapFinishReason(choice.FinishReason),
+	}
+	for _, tc := range choice.Message.ToolCalls {
+		out.ToolCalls = append(out.ToolCalls, chat.ToolCall{
+			ID:            tc.ID,
+			Name:          tc.Function.Name,
+			ArgumentsJSON: strings.TrimSpace(tc.Function.Arguments),
+		})
+	}
+	return out, nil
+}
+
+func buildChatCompletionParams(req chat.Request) (openaisdk.ChatCompletionNewParams, error) {
 	// DeepSeek/OpenAI reject a request where an assistant message carries
 	// tool_calls but the following tool messages do not answer every call id
 	// (or where an orphan tool message has no matching call). History rebuilt
@@ -71,10 +146,10 @@ func (m *Model) Generate(ctx context.Context, req chat.Request) (*chat.Response,
 		}
 	}
 	if strings.TrimSpace(req.Model) == "" {
-		return nil, errors.New("model is required")
+		return openaisdk.ChatCompletionNewParams{}, errors.New("model is required")
 	}
 	if len(messages) == 0 && strings.TrimSpace(req.System) == "" {
-		return nil, errors.New("at least one message or a system prompt is required")
+		return openaisdk.ChatCompletionNewParams{}, errors.New("at least one message or a system prompt is required")
 	}
 
 	params := openaisdk.ChatCompletionNewParams{
@@ -138,27 +213,7 @@ func (m *Model) Generate(ctx context.Context, req chat.Request) (*chat.Response,
 			}
 		}
 	}
-
-	resp, err := m.client.Chat.Completions.New(ctx, params)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to send OpenAI chat request")
-	}
-	if len(resp.Choices) == 0 {
-		return nil, errors.New("OpenAI chat request returned no choices")
-	}
-	choice := resp.Choices[0]
-	out := &chat.Response{
-		Text:         strings.TrimSpace(choice.Message.Content),
-		FinishReason: mapFinishReason(choice.FinishReason),
-	}
-	for _, tc := range choice.Message.ToolCalls {
-		out.ToolCalls = append(out.ToolCalls, chat.ToolCall{
-			ID:            tc.ID,
-			Name:          tc.Function.Name,
-			ArgumentsJSON: strings.TrimSpace(tc.Function.Arguments),
-		})
-	}
-	return out, nil
+	return params, nil
 }
 
 // sanitizeToolMessages makes a message list safe for providers (OpenAI/DeepSeek)

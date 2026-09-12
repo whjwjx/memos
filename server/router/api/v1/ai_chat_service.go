@@ -199,8 +199,17 @@ func containsPath(paths []string, target string) bool {
 	return false
 }
 
-func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request[v1pb.SendMessageRequest]) (*connect.Response[v1pb.SendMessageResponse], error) {
-	req := request.Msg
+type preparedAIChatTurn struct {
+	conv        *store.Conversation
+	userMsg     *store.ConversationMessage
+	history     []chat.Message
+	providerCfg providerBundle
+	system      string
+	registry    *tools.Registry
+	approvals   map[string]string
+}
+
+func (s *APIV1Service) prepareAIChatTurn(ctx context.Context, req *v1pb.SendMessageRequest) (*preparedAIChatTurn, error) {
 	conv, err := s.findOwnedConversation(ctx, req.ConversationId)
 	if err != nil {
 		return nil, err
@@ -273,47 +282,160 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 		}
 	}
 
-	resp, err := assistant.ToolLoop(ctx, providerCfg.model, &assistant.AssistantRequest{
-		System:              systemPrompt,
-		History:             history,
+	return &preparedAIChatTurn{
+		conv:        conv,
+		userMsg:     userMsg,
+		history:     history,
+		providerCfg: providerCfg,
+		system:      systemPrompt,
+		registry:    registry,
+		approvals:   approvals,
+	}, nil
+}
+
+func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request[v1pb.SendMessageRequest]) (*connect.Response[v1pb.SendMessageResponse], error) {
+	req := request.Msg
+	turn, err := s.prepareAIChatTurn(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := assistant.ToolLoop(ctx, turn.providerCfg.model, &assistant.AssistantRequest{
+		System:              turn.system,
+		History:             turn.history,
 		UserContent:         req.Content,
-		Model:               providerCfg.modelName,
+		Model:               turn.providerCfg.modelName,
 		ChatOptions:         chat.ApplyOptions(nil),
-		Registry:            registry,
-		ToolContext:         tools.ToolContext{UserID: conv.UserID, Store: s.Store},
+		Registry:            turn.registry,
+		ToolContext:         tools.ToolContext{UserID: turn.conv.UserID, Store: s.Store},
 		ApprovedToolCallIDs: req.ApprovedToolCallIds,
 		RejectedToolCallIDs: req.RejectedToolCallIds,
-		Approvals:           approvals,
+		Approvals:           turn.approvals,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "chat loop failed: %v", err)
 	}
+	sanitizeAssistantResponse(resp)
 
+	response, err := s.buildSendMessageResponse(ctx, turn.conv.ID, turn.registry, resp)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(response), nil
+}
+
+func (s *APIV1Service) StreamMessage(ctx context.Context, request *connect.Request[v1pb.SendMessageRequest], stream *connect.ServerStream[v1pb.SendMessageStreamResponse]) error {
+	req := request.Msg
+	turn, err := s.prepareAIChatTurn(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	stream.ResponseHeader().Set("X-Accel-Buffering", "no")
+	seq := 0
+	send := func(event *v1pb.SendMessageStreamResponse) error {
+		seq++
+		event.EventId = strconv.Itoa(seq)
+		event.ConversationId = turn.conv.UID
+		return stream.Send(event)
+	}
+	if err := send(&v1pb.SendMessageStreamResponse{
+		Type: v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_STARTED,
+	}); err != nil {
+		return err
+	}
+	if err := send(&v1pb.SendMessageStreamResponse{
+		Type:    v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_MESSAGE_CREATED,
+		Message: convertMessageFromStore(turn.userMsg),
+	}); err != nil {
+		return err
+	}
+
+	resp, err := assistant.ToolLoopStream(ctx, turn.providerCfg.model, &assistant.AssistantRequest{
+		System:              turn.system,
+		History:             turn.history,
+		UserContent:         req.Content,
+		Model:               turn.providerCfg.modelName,
+		ChatOptions:         chat.ApplyOptions(nil),
+		Registry:            turn.registry,
+		ToolContext:         tools.ToolContext{UserID: turn.conv.UserID, Store: s.Store},
+		ApprovedToolCallIDs: req.ApprovedToolCallIds,
+		RejectedToolCallIDs: req.RejectedToolCallIds,
+		Approvals:           turn.approvals,
+	}, func(event assistant.Event) error {
+		switch event.Type {
+		case assistant.EventAssistantDelta:
+			if event.Delta == "" {
+				return nil
+			}
+			return send(&v1pb.SendMessageStreamResponse{
+				Type:  v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_ASSISTANT_DELTA,
+				Delta: event.Delta,
+			})
+		case assistant.EventToolCall:
+			return send(&v1pb.SendMessageStreamResponse{
+				Type:     v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_TOOL_CALL,
+				ToolCall: toProtoToolCall(turn.registry, event.ToolCall),
+			})
+		case assistant.EventToolResult:
+			return send(&v1pb.SendMessageStreamResponse{
+				Type:    v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_TOOL_RESULT,
+				Message: convertChatMessage(event.ToolMessage),
+			})
+		default:
+			return nil
+		}
+	})
+	if err != nil {
+		_ = send(&v1pb.SendMessageStreamResponse{
+			Type:  v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_ERROR,
+			Error: fmt.Sprintf("chat loop failed: %v", err),
+		})
+		return nil
+	}
+	sanitizeAssistantResponse(resp)
+
+	response, err := s.buildSendMessageResponse(ctx, turn.conv.ID, turn.registry, resp)
+	if err != nil {
+		_ = send(&v1pb.SendMessageStreamResponse{
+			Type:  v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_ERROR,
+			Error: fmt.Sprintf("failed to store conversation messages: %v", err),
+		})
+		return nil
+	}
+	if resp.RequiresConfirmation {
+		return send(&v1pb.SendMessageStreamResponse{
+			Type:                 v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_CONFIRMATION_REQUIRED,
+			RequiresConfirmation: true,
+			ToolCalls:            response.ToolCalls,
+			FinalMessages:        response.Messages,
+		})
+	}
+	return send(&v1pb.SendMessageStreamResponse{
+		Type:          v1pb.AIChatStreamEventType_AI_CHAT_STREAM_EVENT_TYPE_DONE,
+		FinalMessages: response.Messages,
+	})
+}
+
+func sanitizeAssistantResponse(resp *assistant.AssistantResponse) {
 	// Defensive guard: some models emit pseudo tool-call XML as plain text
 	// (usually when the confirmation continuation forbids further calls via
 	// tool_choice:none but the history still carries earlier tool_calls).
 	// Real tool calls travel through the structured field and are never in
 	// the content, so stripping them here is purely cosmetic.
-	if resp.Content != "" {
+	if resp != nil && resp.Content != "" {
 		resp.Content = sanitizeAssistantContent(resp.Content)
 		syncFinalAssistantContent(resp)
 	}
+}
 
+func (s *APIV1Service) buildSendMessageResponse(ctx context.Context, conversationID int32, registry *tools.Registry, resp *assistant.AssistantResponse) (*v1pb.SendMessageResponse, error) {
 	response := &v1pb.SendMessageResponse{
 		Content:              resp.Content,
 		RequiresConfirmation: resp.RequiresConfirmation,
 	}
 	for _, tc := range resp.ToolCalls {
-		requiresConfirmation := true
-		if tool := registry.Get(tc.Name); tool != nil {
-			requiresConfirmation = tool.RequiresConfirmation(tc.ArgumentsJSON)
-		}
-		response.ToolCalls = append(response.ToolCalls, &v1pb.ToolCall{
-			Id:                   tc.ID,
-			Name:                 tc.Name,
-			Arguments:            tc.ArgumentsJSON,
-			RequiresConfirmation: requiresConfirmation,
-		})
+		response.ToolCalls = append(response.ToolCalls, toProtoToolCall(registry, tc))
 	}
 
 	if len(resp.Messages) == 0 && resp.Content != "" {
@@ -326,7 +448,7 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 	// in order so the UI can display a collapsed activity trace.
 	existingByToolCallID := make(map[string]int32)
 	existing, err := s.Store.ListConversationMessages(ctx, &store.FindConversationMessage{
-		ConversationID: &conv.ID,
+		ConversationID: &conversationID,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load existing messages: %v", err)
@@ -359,7 +481,7 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 			}
 		}
 		createdMsg, err := s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
-			ConversationID: conv.ID,
+			ConversationID: conversationID,
 			Role:           msg.Role,
 			Content:        msg.Content,
 			ToolCalls:      marshalToolCalls(msg.ToolCalls),
@@ -372,7 +494,39 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 		response.Messages = append(response.Messages, convertMessageFromStore(createdMsg))
 	}
 
-	return connect.NewResponse(response), nil
+	return response, nil
+}
+
+func toProtoToolCall(registry *tools.Registry, tc chat.ToolCall) *v1pb.ToolCall {
+	requiresConfirmation := true
+	if registry != nil {
+		if tool := registry.Get(tc.Name); tool != nil {
+			requiresConfirmation = tool.RequiresConfirmation(tc.ArgumentsJSON)
+		}
+	}
+	return &v1pb.ToolCall{
+		Id:                   tc.ID,
+		Name:                 tc.Name,
+		Arguments:            tc.ArgumentsJSON,
+		RequiresConfirmation: requiresConfirmation,
+	}
+}
+
+func convertChatMessage(msg chat.Message) *v1pb.ConversationMessage {
+	out := &v1pb.ConversationMessage{
+		Role:       msg.Role,
+		Content:    msg.Content,
+		ToolCallId: msg.ToolCallID,
+		Name:       msg.Name,
+	}
+	for _, tc := range msg.ToolCalls {
+		out.ToolCalls = append(out.ToolCalls, &v1pb.ToolCall{
+			Id:        tc.ID,
+			Name:      tc.Name,
+			Arguments: tc.ArgumentsJSON,
+		})
+	}
+	return out
 }
 
 var (

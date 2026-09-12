@@ -51,6 +51,9 @@ const (
 	// AIChatServiceSendMessageProcedure is the fully-qualified name of the AIChatService's SendMessage
 	// RPC.
 	AIChatServiceSendMessageProcedure = "/memos.api.v1.AIChatService/SendMessage"
+	// AIChatServiceStreamMessageProcedure is the fully-qualified name of the AIChatService's
+	// StreamMessage RPC.
+	AIChatServiceStreamMessageProcedure = "/memos.api.v1.AIChatService/StreamMessage"
 )
 
 // AIChatServiceClient is a client for the memos.api.v1.AIChatService service.
@@ -71,6 +74,10 @@ type AIChatServiceClient interface {
 	// reply. To continue after a confirmation, resend with approved_tool_call_ids
 	// populated so the assistant executes the pending tool calls.
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
+	// StreamMessage appends a user turn and streams assistant progress events.
+	// It preserves SendMessage semantics but lets the client render assistant
+	// deltas, tool activity, and confirmation requests as they happen.
+	StreamMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.ServerStreamForClient[v1.SendMessageStreamResponse], error)
 }
 
 // NewAIChatServiceClient constructs a client for the memos.api.v1.AIChatService service. By
@@ -120,6 +127,12 @@ func NewAIChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(aIChatServiceMethods.ByName("SendMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		streamMessage: connect.NewClient[v1.SendMessageRequest, v1.SendMessageStreamResponse](
+			httpClient,
+			baseURL+AIChatServiceStreamMessageProcedure,
+			connect.WithSchema(aIChatServiceMethods.ByName("StreamMessage")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -131,6 +144,7 @@ type aIChatServiceClient struct {
 	deleteConversation *connect.Client[v1.DeleteConversationRequest, v1.DeleteConversationResponse]
 	updateConversation *connect.Client[v1.UpdateConversationRequest, v1.Conversation]
 	sendMessage        *connect.Client[v1.SendMessageRequest, v1.SendMessageResponse]
+	streamMessage      *connect.Client[v1.SendMessageRequest, v1.SendMessageStreamResponse]
 }
 
 // CreateConversation calls memos.api.v1.AIChatService.CreateConversation.
@@ -163,6 +177,11 @@ func (c *aIChatServiceClient) SendMessage(ctx context.Context, req *connect.Requ
 	return c.sendMessage.CallUnary(ctx, req)
 }
 
+// StreamMessage calls memos.api.v1.AIChatService.StreamMessage.
+func (c *aIChatServiceClient) StreamMessage(ctx context.Context, req *connect.Request[v1.SendMessageRequest]) (*connect.ServerStreamForClient[v1.SendMessageStreamResponse], error) {
+	return c.streamMessage.CallServerStream(ctx, req)
+}
+
 // AIChatServiceHandler is an implementation of the memos.api.v1.AIChatService service.
 type AIChatServiceHandler interface {
 	// CreateConversation starts a new chat session for the current user.
@@ -181,6 +200,10 @@ type AIChatServiceHandler interface {
 	// reply. To continue after a confirmation, resend with approved_tool_call_ids
 	// populated so the assistant executes the pending tool calls.
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
+	// StreamMessage appends a user turn and streams assistant progress events.
+	// It preserves SendMessage semantics but lets the client render assistant
+	// deltas, tool activity, and confirmation requests as they happen.
+	StreamMessage(context.Context, *connect.Request[v1.SendMessageRequest], *connect.ServerStream[v1.SendMessageStreamResponse]) error
 }
 
 // NewAIChatServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -226,6 +249,12 @@ func NewAIChatServiceHandler(svc AIChatServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(aIChatServiceMethods.ByName("SendMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	aIChatServiceStreamMessageHandler := connect.NewServerStreamHandler(
+		AIChatServiceStreamMessageProcedure,
+		svc.StreamMessage,
+		connect.WithSchema(aIChatServiceMethods.ByName("StreamMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/memos.api.v1.AIChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AIChatServiceCreateConversationProcedure:
@@ -240,6 +269,8 @@ func NewAIChatServiceHandler(svc AIChatServiceHandler, opts ...connect.HandlerOp
 			aIChatServiceUpdateConversationHandler.ServeHTTP(w, r)
 		case AIChatServiceSendMessageProcedure:
 			aIChatServiceSendMessageHandler.ServeHTTP(w, r)
+		case AIChatServiceStreamMessageProcedure:
+			aIChatServiceStreamMessageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -271,4 +302,8 @@ func (UnimplementedAIChatServiceHandler) UpdateConversation(context.Context, *co
 
 func (UnimplementedAIChatServiceHandler) SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIChatService.SendMessage is not implemented"))
+}
+
+func (UnimplementedAIChatServiceHandler) StreamMessage(context.Context, *connect.Request[v1.SendMessageRequest], *connect.ServerStream[v1.SendMessageStreamResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AIChatService.StreamMessage is not implemented"))
 }

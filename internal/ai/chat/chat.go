@@ -13,6 +13,23 @@ type Model interface {
 	Generate(ctx context.Context, req Request) (*Response, error)
 }
 
+// StreamingModel is implemented by providers that can stream generated text.
+// Providers still return the fully-accumulated Response so callers can preserve
+// the existing tool-loop semantics after emitting deltas.
+type StreamingModel interface {
+	Model
+	StreamGenerate(ctx context.Context, req Request, emit StreamEmitFunc) (*Response, error)
+}
+
+// StreamEmitFunc receives provider-agnostic streaming generation events.
+type StreamEmitFunc func(StreamEvent) error
+
+// StreamEvent is a model-generation event emitted while a response is being
+// produced. Delta carries user-visible assistant text chunks.
+type StreamEvent struct {
+	Delta string
+}
+
 // Request is the input to a text-generation call.
 type Request struct {
 	// System is an optional system prompt that steers the model's behavior.
