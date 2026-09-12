@@ -371,14 +371,14 @@ const MessageBubble = ({ msg }: { msg: ConversationMessage }) => {
 
   const isUser = msg.role === "user";
   return (
-    <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+    <div className={`flex min-w-0 flex-col ${isUser ? "items-end" : "items-start"}`}>
       <div
-        className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-sm ${
+        className={`min-w-0 max-w-[82%] overflow-hidden rounded-2xl px-4 py-2.5 text-sm [overflow-wrap:anywhere] ${
           isUser ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted rounded-bl-sm"
         }`}
       >
         {isUser ? (
-          <span className="whitespace-pre-wrap break-words">{stripMemoContextEnvelope(msg.content)}</span>
+          <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{stripMemoContextEnvelope(msg.content)}</span>
         ) : (
           <ChatMarkdown content={stripFakeToolCalls(msg.content)} />
         )}
@@ -444,18 +444,18 @@ const ReasoningActivity = ({ calls, label, running }: { calls: ToolActivityCall[
         : t("aiChat.reasoning-completed"));
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex min-w-0 flex-col items-start gap-1">
       <button
         type="button"
         className={cn(
-          "group flex max-w-[82%] items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground transition-colors",
+          "group flex min-w-0 max-w-[82%] items-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground transition-colors",
           hasCalls ? "hover:bg-muted/50 hover:text-foreground" : "cursor-default",
         )}
         aria-expanded={hasCalls ? expanded : undefined}
         onClick={() => hasCalls && setExpanded((open) => !open)}
       >
         <BrainCircuitIcon className={cn("size-3.5 shrink-0", running && "animate-pulse")} strokeWidth={1.8} />
-        <span className="shrink-0">{title}</span>
+        <span className="shrink-0 truncate">{title}</span>
         {hasCalls && (
           <span className="hidden min-w-0 flex-1 truncate text-muted-foreground/80 sm:block">
             {t("aiChat.tool-activity-summary", { count: calls.length, names })}
@@ -472,29 +472,31 @@ const ReasoningActivity = ({ calls, label, running }: { calls: ToolActivityCall[
       </button>
 
       {expanded && hasCalls && (
-        <div className="flex w-full max-w-[82%] flex-col gap-2 rounded-xl border border-border bg-background px-3 py-3 text-xs">
+        <div className="flex w-full min-w-0 max-w-[82%] flex-col gap-2 overflow-hidden rounded-xl border border-border bg-background px-3 py-3 text-xs">
           {calls.map((call) => (
-            <div key={call.id} className="flex flex-col gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-primary">{call.name}</code>
+            <div key={call.id} className="flex min-w-0 flex-col gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <code className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 font-mono text-primary">{call.name}</code>
                 <Badge variant={call.status === "error" ? "warning" : call.status === "pending" ? "outline" : "secondary"} shape="pill">
                   {t(`aiChat.tool-activity-status-${call.status}` as Parameters<typeof t>[0])}
                 </Badge>
               </div>
-              <div className="text-sm text-foreground">{summarizeToolCall(call.name, call.arguments)}</div>
-              <div className="grid gap-2">
-                <div>
+              <div className="min-w-0 text-sm text-foreground break-words [overflow-wrap:anywhere]">
+                {summarizeToolCall(call.name, call.arguments)}
+              </div>
+              <div className="grid min-w-0 gap-2">
+                <div className="min-w-0">
                   <div className="mb-1 font-medium text-muted-foreground">{t("aiChat.tool-activity-arguments")}</div>
-                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                  <pre className="max-h-36 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
                     {formatToolPayload(call.arguments)}
                   </pre>
                 </div>
                 {call.result && call.result !== AWAITING_PLACEHOLDER && (
-                  <div>
-                    <div className="mb-1 font-medium text-muted-foreground">
+                  <div className="min-w-0">
+                    <div className="mb-1 min-w-0 break-words font-medium text-muted-foreground [overflow-wrap:anywhere]">
                       {t("aiChat.tool-activity-result")} · {getToolResultSummary(call.result)}
                     </div>
-                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground">
+                    <pre className="max-h-48 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
                       {formatToolPayload(call.result)}
                     </pre>
                   </div>
@@ -575,7 +577,7 @@ const ToolCallCard = ({
       {["delete_memo", "get_comments"].includes(tc.name) && memo && (
         <div className="mt-2 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
           <span className="mb-1 block font-medium text-foreground/70">目标 memo 内容：</span>
-          <div className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{memo.content}</div>
+          <div className="max-h-32 min-w-0 overflow-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{memo.content}</div>
         </div>
       )}
       {!resolved && isQueryDBWrite && (
