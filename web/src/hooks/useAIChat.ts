@@ -4,7 +4,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { aiChatServiceClient, refreshAccessToken } from "@/connect";
+import { aiChatServiceClient, isAuthFailureError, refreshAccessToken } from "@/connect";
 import { AIChatStreamEventType, type Conversation, type ConversationMessage, type ToolCall } from "@/types/proto/api/v1/ai_chat_service_pb";
 import { redirectOnAuthFailure } from "@/utils/auth-redirect";
 
@@ -186,7 +186,6 @@ const toResolvedToolCall = (toolCall: ToolCall): ResolvedToolCall => ({
 });
 
 const shouldUseUnaryFallback = (error: unknown) => error instanceof ConnectError && error.code === Code.Unimplemented;
-const isUnauthenticatedError = (error: unknown) => error instanceof ConnectError && error.code === Code.Unauthenticated;
 
 export const useSendMessage = (conversationId: string | undefined) => {
   const queryClient = useQueryClient();
@@ -286,21 +285,15 @@ export const useSendMessage = (conversationId: string | undefined) => {
             tc.status === "approved" || tc.status === "rejected" ? { ...tc, status: "submitting", submittedDecision: tc.status } : tc,
           ),
         }));
-      } else if (prev) {
+      } else {
         const localUserId = `local-user-${Date.now()}`;
         localUserIdRef.current = localUserId;
         localTurnIdsRef.current.add(localUserId);
-        queryClient.setQueryData(["ai-chat", "conversation", conversationId], {
-          ...prev,
-          messages: [
-            ...(prev.messages ?? []),
-            {
-              id: localUserId,
-              role: "user",
-              content: input.content,
-            } as ConversationMessage,
-          ],
-        });
+        appendMessage({
+          id: localUserId,
+          role: "user",
+          content: input.content,
+        } as ConversationMessage);
       }
 
       const streamRequest = {
@@ -426,14 +419,14 @@ export const useSendMessage = (conversationId: string | undefined) => {
         await consumeStream();
         invalidateChatQueries();
       } catch (streamError) {
-        if (!accepted && !controller.signal.aborted && isUnauthenticatedError(streamError)) {
+        if (!accepted && !controller.signal.aborted && isAuthFailureError(streamError)) {
           try {
             await refreshAccessToken();
             await consumeStream();
             invalidateChatQueries();
             return;
           } catch (retryError) {
-            if (isUnauthenticatedError(retryError)) {
+            if (isAuthFailureError(retryError)) {
               redirectOnAuthFailure();
             }
             if (!accepted && prev) {
