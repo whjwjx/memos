@@ -51,7 +51,7 @@ func TestAIChatConversationCRUD(t *testing.T) {
 
 	// Create.
 	created, err := s.CreateConversation(ctx, &connect.Request[v1pb.CreateConversationRequest]{
-		Msg: &v1pb.CreateConversationRequest{Title: "my chat", AgentId: "default"},
+		Msg: &v1pb.CreateConversationRequest{Title: "my chat"},
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, created.Msg.Id)
@@ -96,6 +96,75 @@ func TestAIChatConversationCRUD(t *testing.T) {
 	list, err = s.ListConversations(ctx, &connect.Request[v1pb.ListConversationsRequest]{Msg: &v1pb.ListConversationsRequest{}})
 	require.NoError(t, err)
 	require.Empty(t, list.Msg.Conversations)
+}
+
+func TestAIChatCreateConversationRejectsInvalidAgent(t *testing.T) {
+	s, _, ctx := newTestAIChatService(t)
+	defer s.Store.Close()
+
+	_, err := s.Store.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
+		Key: storepb.InstanceSettingKey_AI,
+		Value: &storepb.InstanceSetting_AiSetting{AiSetting: &storepb.InstanceAISetting{
+			ChatAgents: []*storepb.ChatAgentConfig{
+				{Id: "disabled", Name: "Disabled", Enabled: false},
+			},
+		}},
+	})
+	require.NoError(t, err)
+
+	_, err = s.CreateConversation(ctx, &connect.Request[v1pb.CreateConversationRequest]{
+		Msg: &v1pb.CreateConversationRequest{AgentId: "missing"},
+	})
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.FailedPrecondition, st.Code())
+
+	_, err = s.CreateConversation(ctx, &connect.Request[v1pb.CreateConversationRequest]{
+		Msg: &v1pb.CreateConversationRequest{AgentId: "disabled"},
+	})
+	require.Error(t, err)
+	st, ok = status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.FailedPrecondition, st.Code())
+}
+
+func TestPrepareAIChatTurnRejectsInvalidLLMWithoutPersisting(t *testing.T) {
+	s, user, ctx := newTestAIChatService(t)
+	defer s.Store.Close()
+
+	_, err := s.Store.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
+		Key: storepb.InstanceSettingKey_AI,
+		Value: &storepb.InstanceSetting_AiSetting{AiSetting: &storepb.InstanceAISetting{
+			ChatAgents: []*storepb.ChatAgentConfig{
+				{Id: "default", Name: "Default", Enabled: true},
+			},
+		}},
+	})
+	require.NoError(t, err)
+	conv, err := s.Store.CreateConversation(ctx, &store.CreateConversation{
+		UID:    "llm-validation",
+		UserID: user.ID,
+	})
+	require.NoError(t, err)
+
+	_, err = s.prepareAIChatTurn(ctx, &v1pb.SendMessageRequest{
+		ConversationId: conv.UID,
+		Content:        "hello",
+		LlmId:          "missing",
+	})
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.FailedPrecondition, st.Code())
+
+	got, err := s.Store.GetConversation(ctx, &store.FindConversation{ID: &conv.ID})
+	require.NoError(t, err)
+	require.Empty(t, got.LLMID)
+
+	messages, err := s.Store.ListConversationMessages(ctx, &store.FindConversationMessage{ConversationID: &conv.ID})
+	require.NoError(t, err)
+	require.Empty(t, messages)
 }
 
 func TestAIChatGetMissingReturnsNotFound(t *testing.T) {

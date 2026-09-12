@@ -75,6 +75,9 @@ func (s *APIV1Service) CreateConversation(ctx context.Context, request *connect.
 	if user == nil {
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
+	if err := s.validateChatAgent(ctx, req.AgentId); err != nil {
+		return nil, err
+	}
 	if err := s.validateChatLLM(ctx, req.LlmId); err != nil {
 		return nil, err
 	}
@@ -222,6 +225,9 @@ func (s *APIV1Service) prepareAIChatTurn(ctx context.Context, req *v1pb.SendMess
 		return nil, status.Errorf(codes.InvalidArgument, "content is required")
 	}
 	if req.LlmId != "" && req.LlmId != conv.LLMID {
+		if err := s.validateChatLLM(ctx, req.LlmId); err != nil {
+			return nil, err
+		}
 		llmID := req.LlmId
 		updated, err := s.Store.UpdateConversation(ctx, &store.UpdateConversation{
 			ID:    conv.ID,
@@ -666,6 +672,9 @@ func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string, 
 	var modelName string
 	selectedLLMID := strings.TrimSpace(llmID)
 	if selectedLLMID == "" {
+		selectedLLMID = defaultConfiguredLLMID(setting)
+	}
+	if selectedLLMID == "" {
 		selectedLLMID = agent.GetLlmId()
 	}
 	if selectedLLMID != "" {
@@ -693,6 +702,15 @@ func (s *APIV1Service) resolveChatProvider(ctx context.Context, agentID string, 
 		return providerBundle{}, "", status.Errorf(codes.Internal, "failed to build chat model: %v", err)
 	}
 	return providerBundle{model: model, modelName: modelName}, agent.GetSystemPrompt(), nil
+}
+
+func defaultConfiguredLLMID(setting *storepb.InstanceAISetting) string {
+	for _, llm := range setting.GetLlms() {
+		if llm.GetEnabled() && strings.TrimSpace(llm.GetId()) != "" {
+			return llm.GetId()
+		}
+	}
+	return ""
 }
 
 func (s *APIV1Service) validateChatAgent(ctx context.Context, agentID string) error {

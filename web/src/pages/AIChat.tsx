@@ -682,6 +682,8 @@ const AIChat = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [selectedLLMId, setSelectedLLMId] = useState("");
+  const [pendingAgentSelection, setPendingAgentSelection] = useState<{ conversationId: string; agentId: string }>();
+  const [pendingLLMSelection, setPendingLLMSelection] = useState<{ conversationId: string; llmId: string }>();
   const [pendingInitialMessage, setPendingInitialMessage] = useState("");
 
   const history = conversationData?.messages ?? [];
@@ -689,8 +691,10 @@ const AIChat = () => {
   const conversationLLMId = conversationData?.conversation?.llmId ?? "";
   const selectedAgentValue = selectedAgentId || defaultAgent?.id || "";
   const selectedLLMValue = selectedLLMId || defaultLLM?.id || "";
-  const activeAgentId = conversationId ? conversationAgentId || defaultAgent?.id || "" : selectedAgentValue;
-  const activeLLMId = conversationId ? conversationLLMId || selectedLLMValue : selectedLLMValue;
+  const pendingAgentId = conversationId && pendingAgentSelection?.conversationId === conversationId ? pendingAgentSelection.agentId : "";
+  const pendingLLMId = conversationId && pendingLLMSelection?.conversationId === conversationId ? pendingLLMSelection.llmId : "";
+  const activeAgentId = conversationId ? pendingAgentId || conversationAgentId || defaultAgent?.id || "" : selectedAgentValue;
+  const activeLLMId = conversationId ? pendingLLMId || conversationLLMId || defaultLLM?.id || "" : selectedLLMValue;
   const activeAgentLabel = activeAgentId ? (agentNameById.get(activeAgentId) ?? activeAgentId) : t("aiChat.agent-fallback-label");
   const activeLLMLabel = activeLLMId ? (llmNameById.get(activeLLMId) ?? activeLLMId) : "LLM";
   const timeline = useMemo(() => buildConversationTimeline(history), [history]);
@@ -739,6 +743,26 @@ const AIChat = () => {
     setPendingInitialMessage("");
   }, [activeLLMId, conversationId, pendingInitialMessage, send]);
 
+  useEffect(() => {
+    const pending = pendingAgentSelection;
+    if (!pending) {
+      return;
+    }
+    if (pending.conversationId === conversationId && conversationAgentId === pending.agentId) {
+      setPendingAgentSelection(undefined);
+    }
+  }, [conversationAgentId, conversationId, pendingAgentSelection]);
+
+  useEffect(() => {
+    const pending = pendingLLMSelection;
+    if (!pending) {
+      return;
+    }
+    if (pending.conversationId === conversationId && conversationLLMId === pending.llmId) {
+      setPendingLLMSelection(undefined);
+    }
+  }, [conversationLLMId, conversationId, pendingLLMSelection]);
+
   // When no conversation is selected (e.g. first open), automatically open the
   // most recent one instead of showing the empty hint. Only when there are no
   // conversations at all do we fall back to the "start a conversation" screen.
@@ -766,13 +790,18 @@ const AIChat = () => {
 
   const handleSelectAgent = useCallback(
     async (agentId: string) => {
-      setSelectedAgentId(agentId);
-      if (!conversationId || agentId === activeAgentId) {
+      if (!conversationId) {
+        setSelectedAgentId(agentId);
         return;
       }
+      if (agentId === activeAgentId) {
+        return;
+      }
+      setPendingAgentSelection({ conversationId, agentId });
       try {
         await updateConversationAgent.mutateAsync(agentId);
       } catch {
+        setPendingAgentSelection(undefined);
         // The mutation exposes the error below the composer.
       }
     },
@@ -781,13 +810,18 @@ const AIChat = () => {
 
   const handleSelectLLM = useCallback(
     async (llmId: string) => {
-      setSelectedLLMId(llmId);
-      if (!conversationId || llmId === activeLLMId) {
+      if (!conversationId) {
+        setSelectedLLMId(llmId);
         return;
       }
+      if (llmId === activeLLMId) {
+        return;
+      }
+      setPendingLLMSelection({ conversationId, llmId });
       try {
         await updateConversationLLM.mutateAsync(llmId);
       } catch {
+        setPendingLLMSelection(undefined);
         // The mutation exposes the error below the composer.
       }
     },
