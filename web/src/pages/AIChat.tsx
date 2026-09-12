@@ -622,7 +622,7 @@ const AIChat = () => {
   const activeLLMLabel = activeLLMId ? (llmNameById.get(activeLLMId) ?? activeLLMId) : "LLM";
   const timeline = useMemo(() => buildConversationTimeline(history), [history]);
   const historyRenderKey = useMemo(
-    () => history.map((msg) => `${msg.id}:${msg.content.length}:${msg.toolCalls.length}`).join("|"),
+    () => history.map((msg) => `${msg.id}:${msg.content?.length ?? 0}:${msg.toolCalls?.length ?? 0}`).join("|"),
     [history],
   );
   const composerDisabled =
