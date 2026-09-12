@@ -4,8 +4,9 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { aiChatServiceClient } from "@/connect";
+import { aiChatServiceClient, refreshAccessToken } from "@/connect";
 import { AIChatStreamEventType, type Conversation, type ConversationMessage, type ToolCall } from "@/types/proto/api/v1/ai_chat_service_pb";
+import { redirectOnAuthFailure } from "@/utils/auth-redirect";
 
 export const useConversations = () => {
   return useQuery({
@@ -185,6 +186,7 @@ const toResolvedToolCall = (toolCall: ToolCall): ResolvedToolCall => ({
 });
 
 const shouldUseUnaryFallback = (error: unknown) => error instanceof ConnectError && error.code === Code.Unimplemented;
+const isUnauthenticatedError = (error: unknown) => error instanceof ConnectError && error.code === Code.Unauthenticated;
 
 export const useSendMessage = (conversationId: string | undefined) => {
   const queryClient = useQueryClient();
@@ -301,19 +303,25 @@ export const useSendMessage = (conversationId: string | undefined) => {
         });
       }
 
+      const streamRequest = {
+        conversationId,
+        content: input.content,
+        approvedToolCallIds: input.approvedToolCallIds ?? [],
+        rejectedToolCallIds: input.rejectedToolCallIds ?? [],
+        toolApprovals: input.toolApprovals ?? [],
+        llmId: input.llmId ?? "",
+      };
+      const settleSubmittingToolCalls = () => {
+        setState((prevState) => ({
+          ...prevState,
+          toolCalls: prevState.toolCalls.map((tc) =>
+            tc.status === "submitting" ? { ...tc, status: tc.submittedDecision ?? "approved", submittedDecision: undefined } : tc,
+          ),
+        }));
+      };
       let accepted = false;
-      try {
-        const stream = aiChatServiceClient.streamMessage(
-          {
-            conversationId,
-            content: input.content,
-            approvedToolCallIds: input.approvedToolCallIds ?? [],
-            rejectedToolCallIds: input.rejectedToolCallIds ?? [],
-            toolApprovals: input.toolApprovals ?? [],
-            llmId: input.llmId ?? "",
-          },
-          { signal: controller.signal },
-        );
+      const consumeStream = async () => {
+        const stream = aiChatServiceClient.streamMessage(streamRequest, { signal: controller.signal });
         for await (const event of stream) {
           if (
             event.type === AIChatStreamEventType.AI_CHAT_STREAM_EVENT_TYPE_STARTED ||
@@ -409,9 +417,33 @@ export const useSendMessage = (conversationId: string | undefined) => {
               throw new Error(event.error || "AI chat stream failed");
           }
         }
+      };
+      const invalidateChatQueries = () => {
         queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversation", conversationId] });
         queryClient.invalidateQueries({ queryKey: ["ai-chat", "conversations"] });
+      };
+      try {
+        await consumeStream();
+        invalidateChatQueries();
       } catch (streamError) {
+        if (!accepted && !controller.signal.aborted && isUnauthenticatedError(streamError)) {
+          try {
+            await refreshAccessToken();
+            await consumeStream();
+            invalidateChatQueries();
+            return;
+          } catch (retryError) {
+            if (isUnauthenticatedError(retryError)) {
+              redirectOnAuthFailure();
+            }
+            if (!accepted && prev) {
+              queryClient.setQueryData(["ai-chat", "conversation", conversationId], prev);
+            }
+            settleSubmittingToolCalls();
+            setError(retryError);
+            return;
+          }
+        }
         if (!accepted && !controller.signal.aborted && shouldUseUnaryFallback(streamError)) {
           try {
             await runUnaryFallback(input);
@@ -424,12 +456,7 @@ export const useSendMessage = (conversationId: string | undefined) => {
             setError(fallbackError);
           }
         } else if (!controller.signal.aborted) {
-          setState((prevState) => ({
-            ...prevState,
-            toolCalls: prevState.toolCalls.map((tc) =>
-              tc.status === "submitting" ? { ...tc, status: tc.submittedDecision ?? "approved", submittedDecision: undefined } : tc,
-            ),
-          }));
+          settleSubmittingToolCalls();
           setError(streamError);
         }
       } finally {
