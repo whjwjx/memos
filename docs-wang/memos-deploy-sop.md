@@ -458,7 +458,7 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - **现象**：多次部署后服务器累积——① 悬空镜像（每次 `docker build` 产生新的 `memos-ai:local`，旧镜像变 `<untagged>`，约 200MB/个，可达数 GB）；② 备份目录（每次带时间戳，可累积数十个）。
 - **清理（安全，建议每次部署后做）**：
   1. **悬空镜像**：`ssh host "docker image prune -f"`。只删 dangling（无 tag、无容器引用），**不影响**当前运行的 tagged 镜像（`memos-ai:local`），安全。
-  2. **备份目录**：保留最近 2 个（本次 + 上次），删除更早的。**必须用显式目录名列表**（网关不展开 `*`），不要 `rm -rf /home/deployer/backups/memos_data_2026*`。示例：
+  2. **备份目录**：保留**最近 5 份**，仅当目录数超过 5 份时才删除最早的（其余保留）。**必须用显式目录名列表**（网关不展开 `*`），不要 `rm -rf /home/deployer/backups/memos_data_2026*`；删除前先 `sudo ls /home/deployer/backups/` 确认份数，按时间排序后只删超出 5 份的那几个最早目录。示例：
      `ssh host "sudo rm -rf /home/deployer/backups/memos_data_20260823 /home/deployer/backups/memos_data_20260825 ..."`（逐条列出待删目录）。
 - **注意**：清理前确认当前容器用的镜像有 tag（`docker images memos-ai` 仅 1 个 `memos-ai:local`），prune 不会动它；删除备份目录前确认至少保留 1 个可用回滚点。
 
