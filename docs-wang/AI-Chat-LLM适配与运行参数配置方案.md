@@ -102,6 +102,36 @@ type Registry struct {
 
 推荐把 LLM 从“一个 provider + model 名称”升级为“模型运行 profile”。Admin 在 AI Settings 的 LLM 编辑弹窗中不仅能配置 provider/model，还能看到并调整该 LLM 在 AI Chat 中的运行参数。
 
+## 成熟平台借鉴
+
+调研 OpenAI Agents SDK、Dify、Open WebUI、Anthropic Claude Tool Use、LangChain / LangGraph 后，可以看到成熟平台基本都采用类似分层：
+
+```text
+Provider / API key
+LLM profile / model runtime settings
+Agent / instructions / tools
+Conversation / per-chat selection or override
+```
+
+可借鉴点：
+
+- OpenAI Agents SDK 把 Agent 的 `instructions/tools/model` 和 `modelSettings` 分开，`modelSettings` 覆盖 temperature、max tokens、tool choice、parallel tool calls 等运行参数。
+- Dify 的模型插件会声明模型能力和参数规则，例如 tool calling、streaming、temperature、top_p、max_tokens。它的思路适合后续做“能力展示”。
+- Open WebUI 支持全局 model defaults、per-model 参数覆盖和 per-chat 使用不同模型。它最接近 Memos 当前要做的 Admin 默认值 + AI Chat 会话级选择。
+- Anthropic Claude 的 tool use 明确区分 `tool_choice=auto/any/tool/none`，并提醒 max tokens 过低可能截断工具调用。
+- LangChain / LangGraph 更偏开发框架，但也强调 model、tools、runtime config、trace/eval 分层。
+
+对 Memos 的结论：
+
+```text
+Agent = 人格 / 行为 / system prompt
+LLM = provider / model / runtime 参数 / 兼容模式
+Tools = Admin 统一开关和确认策略
+Conversation = 用户当前组合选择
+```
+
+因此不建议把 Open WebUI 那种“Model 里也可塞 system prompt / knowledge / tools”的能力完整照搬进来。Memos 更适合保持 Agent 和 LLM 的边界清楚，只借鉴它的 model defaults、per-model override 和 per-chat model selection。
+
 ### 推荐配置项
 
 第一阶段建议只开放少量高收益参数，避免 Admin 面板变成模型控制台。
