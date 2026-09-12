@@ -238,6 +238,31 @@ message InstanceAISetting {
   // llms is the list of configured model profiles. AI capabilities should
   // reference one of these entries instead of each storing a raw model name.
   repeated LLMConfig llms = 9;
+
+  // web_search configures the internet search tool exposed to AI chat.
+  WebSearchConfig web_search = 10;
+}
+
+message WebSearchConfig {
+  enum Provider {
+    PROVIDER_UNSPECIFIED = 0;
+    TAVILY = 1;
+  }
+
+  // enabled toggles whether AI chat can search the web.
+  bool enabled = 1;
+  // provider selects the search backend. First implementation supports Tavily.
+  Provider provider = 2;
+  // endpoint is the Tavily-compatible base URL. Empty uses the default.
+  string endpoint = 3;
+  // api_key is required when enabled.
+  string api_key = 4;
+  // max_results caps how many search results a single tool call returns.
+  int32 max_results = 5;
+  // search_depth is the Tavily search depth, e.g. "basic" or "advanced".
+  string search_depth = 6;
+  // include_answer asks Tavily to include its generated answer when available.
+  bool include_answer = 7;
 }
 
 // TranslationConfig configures the AI-backed translation page.

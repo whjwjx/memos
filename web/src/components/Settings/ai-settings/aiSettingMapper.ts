@@ -14,10 +14,22 @@ import {
   InstanceSetting_ToolConfigSchema,
   InstanceSetting_TranslationConfig,
   InstanceSetting_TranslationConfigSchema,
+  InstanceSetting_WebSearchConfig,
+  InstanceSetting_WebSearchConfigSchema,
+  InstanceSetting_WebSearchProvider,
 } from "@/types/proto/api/v1/instance_service_pb";
 import { defaultChatModelForProvider } from "./aiSettingFactories";
 import { toolRegistry } from "./toolRegistry";
-import type { LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemory, LocalMemoryEntry, LocalTool, LocalTranslation } from "./types";
+import type {
+  LocalAIProvider,
+  LocalChatAgent,
+  LocalLLM,
+  LocalMemory,
+  LocalMemoryEntry,
+  LocalTool,
+  LocalTranslation,
+  LocalWebSearch,
+} from "./types";
 
 export const toLocalProvider = (provider: InstanceSetting_AIProviderConfig): LocalAIProvider => ({
   id: provider.id,
@@ -180,6 +192,29 @@ export const toToolConfig = (tool: LocalTool) =>
   create(InstanceSetting_ToolConfigSchema, {
     enabled: tool.enabled,
     requiresConfirmation: tool.requiresConfirmation,
+  });
+
+export const toLocalWebSearch = (config: InstanceSetting_WebSearchConfig | undefined): LocalWebSearch => ({
+  enabled: config?.enabled ?? false,
+  provider: config?.provider ?? InstanceSetting_WebSearchProvider.TAVILY,
+  endpoint: config?.endpoint ?? "",
+  apiKey: "",
+  apiKeySet: config?.apiKeySet ?? false,
+  apiKeyHint: config?.apiKeyHint ?? "",
+  maxResults: config?.maxResults && config.maxResults > 0 ? config.maxResults : 5,
+  searchDepth: config?.searchDepth || "basic",
+  includeAnswer: config?.includeAnswer ?? true,
+});
+
+export const toWebSearchConfig = (webSearch: LocalWebSearch) =>
+  create(InstanceSetting_WebSearchConfigSchema, {
+    enabled: webSearch.enabled,
+    provider: webSearch.provider,
+    endpoint: webSearch.endpoint.trim(),
+    apiKey: webSearch.apiKey,
+    maxResults: webSearch.maxResults,
+    searchDepth: webSearch.searchDepth,
+    includeAnswer: webSearch.includeAnswer,
   });
 
 export const toLocalMemoryEntry = (entry: InstanceSetting_MemoryEntry): LocalMemoryEntry => ({

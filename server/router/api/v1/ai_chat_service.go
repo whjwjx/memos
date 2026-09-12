@@ -31,6 +31,7 @@ const chatOperationalGuidance = `Operational guidance:
 - When the user requests a sensitive action such as deleting a memo, call the corresponding tool directly. Do NOT first ask the user to verbally confirm or reply "yes" — the client will present a confirmation card and only run the tool after the user approves there.
 - After a tool executes, briefly report the outcome in natural language. Do not repeat the raw tool result verbatim.
 - If you are unsure which memo the user means, use search_memos (with an empty query to list recent memos) to find it before acting.
+- Use search_memos for this user's local memos. Use web_search only for public internet information, current facts, or external sources. When using web_search, keep queries concise, do not send private memo content verbatim, and cite source URLs from the tool results in your answer.
 - Use get_memo before editing memo content so you do not modify a truncated search result. For batch operations, first search and summarize the candidate memo UIDs for the user, then call batch_update_memos only with explicit memo UIDs.
 - Never write tool calls into your reply text — no XML or JSON such as <tool_calls> or <invoke name="..."> blocks, and no fenced JSON function-call snippets. Tool calls are made only through the API's native function-calling mechanism. Your reply must be plain natural-language text.`
 
@@ -293,24 +294,15 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 	// tool_choice:none but the history still carries earlier tool_calls).
 	// Real tool calls travel through the structured field and are never in
 	// the content, so stripping them here is purely cosmetic.
-	resp.Content = sanitizeAssistantContent(resp.Content)
-
-	// Persist the assistant turn(s).
-	assistantMsg, err := s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
-		ConversationID: conv.ID,
-		Role:           "assistant",
-		Content:        resp.Content,
-		ToolCalls:      marshalToolCalls(resp.ToolCalls),
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to store assistant message: %v", err)
+	if resp.Content != "" {
+		resp.Content = sanitizeAssistantContent(resp.Content)
+		syncFinalAssistantContent(resp)
 	}
 
 	response := &v1pb.SendMessageResponse{
 		Content:              resp.Content,
 		RequiresConfirmation: resp.RequiresConfirmation,
 	}
-	response.Messages = append(response.Messages, convertMessageFromStore(assistantMsg))
 	for _, tc := range resp.ToolCalls {
 		requiresConfirmation := true
 		if tool := registry.Get(tc.Name); tool != nil {
@@ -324,11 +316,14 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 		})
 	}
 
-	// Persist the tool-result turns produced this round (including the real
-	// results of approved calls, which replace the pending "awaiting confirmation"
-	// placeholders). A pending tool message already stored from a prior turn is
-	// updated in place (matched by tool_call_id) so the history stays valid and
-	// no duplicate rows accumulate.
+	if len(resp.Messages) == 0 && resp.Content != "" {
+		resp.Messages = []chat.Message{{Role: chat.RoleAssistant, Content: resp.Content}}
+	}
+
+	// Persist the assistant/tool turns produced this round. A pending tool
+	// message already stored from a prior turn is updated in place (matched by
+	// tool_call_id), while new automatic tool calls and their results are stored
+	// in order so the UI can display a collapsed activity trace.
 	existingByToolCallID := make(map[string]int32)
 	existing, err := s.Store.ListConversationMessages(ctx, &store.FindConversationMessage{
 		ConversationID: &conv.ID,
@@ -341,37 +336,40 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *connect.Request
 			existingByToolCallID[m.ToolCallID] = m.ID
 		}
 	}
-	for _, tm := range resp.ToolMessages {
-		if existingID, ok := existingByToolCallID[tm.ToolCallID]; ok {
-			content := tm.Content
-			name := tm.Name
-			if err := s.Store.UpdateConversationMessage(ctx, &store.UpdateConversationMessage{
-				ID:      existingID,
-				Content: &content,
-				Name:    &name,
-			}); err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to update tool message: %v", err)
+	for _, msg := range resp.Messages {
+		if msg.Role == chat.RoleTool && msg.ToolCallID != "" {
+			if existingID, ok := existingByToolCallID[msg.ToolCallID]; ok {
+				content := msg.Content
+				name := msg.Name
+				if err := s.Store.UpdateConversationMessage(ctx, &store.UpdateConversationMessage{
+					ID:      existingID,
+					Content: &content,
+					Name:    &name,
+				}); err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to update tool message: %v", err)
+				}
+				response.Messages = append(response.Messages, &v1pb.ConversationMessage{
+					Id:         itoa(existingID),
+					Role:       msg.Role,
+					Content:    msg.Content,
+					ToolCallId: msg.ToolCallID,
+					Name:       msg.Name,
+				})
+				continue
 			}
-			response.Messages = append(response.Messages, &v1pb.ConversationMessage{
-				Id:         itoa(existingID),
-				Role:       tm.Role,
-				Content:    tm.Content,
-				ToolCallId: tm.ToolCallID,
-				Name:       tm.Name,
-			})
-			continue
 		}
-		toolMsg, err := s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
+		createdMsg, err := s.Store.CreateConversationMessage(ctx, &store.CreateConversationMessage{
 			ConversationID: conv.ID,
-			Role:           tm.Role,
-			Content:        tm.Content,
-			ToolCallID:     tm.ToolCallID,
-			Name:           tm.Name,
+			Role:           msg.Role,
+			Content:        msg.Content,
+			ToolCalls:      marshalToolCalls(msg.ToolCalls),
+			ToolCallID:     msg.ToolCallID,
+			Name:           msg.Name,
 		})
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to store tool message: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to store conversation message: %v", err)
 		}
-		response.Messages = append(response.Messages, convertMessageFromStore(toolMsg))
+		response.Messages = append(response.Messages, convertMessageFromStore(createdMsg))
 	}
 
 	return connect.NewResponse(response), nil
@@ -394,6 +392,18 @@ func sanitizeAssistantContent(content string) string {
 		return "Done."
 	}
 	return cleaned
+}
+
+func syncFinalAssistantContent(resp *assistant.AssistantResponse) {
+	if resp == nil || resp.Content == "" {
+		return
+	}
+	for i := len(resp.Messages) - 1; i >= 0; i-- {
+		if resp.Messages[i].Role == chat.RoleAssistant && len(resp.Messages[i].ToolCalls) == 0 {
+			resp.Messages[i].Content = resp.Content
+			return
+		}
+	}
 }
 
 // findOwnedConversation resolves a conversation by uid and verifies ownership.
@@ -546,6 +556,7 @@ func (s *APIV1Service) validateChatLLM(ctx context.Context, llmID string) error 
 // Keep in sync with the confirmEditable=false entries in the settings UI.
 var readOnlyTools = map[string]bool{
 	"search_memos":   true,
+	"web_search":     true,
 	"get_memo":       true,
 	"get_comments":   true,
 	"get_logs":       true,
@@ -574,6 +585,10 @@ func (s *APIV1Service) applyToolConfig(ctx context.Context, registry *tools.Regi
 	setting, err := s.Store.GetInstanceAISetting(ctx)
 	if err != nil || setting == nil {
 		return
+	}
+
+	if webSearch := setting.GetWebSearch(); webSearch == nil || !webSearch.GetEnabled() || webSearch.GetApiKey() == "" {
+		registry.Remove("web_search")
 	}
 
 	// Scope isolation: admin-only tools are only exposed to admins.

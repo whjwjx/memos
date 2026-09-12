@@ -344,6 +344,36 @@ message InstanceSetting {
     // llms is the list of configured model profiles. AI capabilities should
     // reference one of these entries instead of each storing a raw model name.
     repeated LLMConfig llms = 9;
+
+    // web_search configures the internet search tool exposed to AI chat.
+    WebSearchConfig web_search = 10;
+  }
+
+  // WebSearchConfig configures the AI chat web_search tool.
+  message WebSearchConfig {
+    WebSearchProvider provider = 1;
+    // enabled toggles whether AI chat can search the web.
+    bool enabled = 2;
+    // endpoint is the Tavily-compatible base URL. Empty uses the default.
+    string endpoint = 3;
+    // api_key is write-only and is never returned by GetInstanceSetting.
+    string api_key = 4 [(google.api.field_behavior) = INPUT_ONLY];
+    // max_results caps how many search results a single tool call returns.
+    int32 max_results = 5;
+    // search_depth is the Tavily search depth, e.g. "basic" or "advanced".
+    string search_depth = 6;
+    // include_answer asks Tavily to include its generated answer when available.
+    bool include_answer = 7;
+    // api_key_set indicates whether an API key is stored for web search.
+    bool api_key_set = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+    // api_key_hint is a masked hint for the stored API key.
+    string api_key_hint = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  }
+
+  // WebSearchProvider is the search backend used by AI chat.
+  enum WebSearchProvider {
+    WEB_SEARCH_PROVIDER_UNSPECIFIED = 0;
+    TAVILY = 1;
   }
 
   // TranslationConfig configures the AI-backed translation page.

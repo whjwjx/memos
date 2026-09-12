@@ -3646,6 +3646,10 @@ components:
                     description: |-
                         llms is the list of configured model profiles. AI capabilities should
                          reference one of these entries instead of each storing a raw model name.
+                webSearch:
+                    allOf:
+                        - $ref: '#/components/schemas/InstanceSetting_WebSearchConfig'
+                    description: web_search configures the internet search tool exposed to AI chat.
             description: AI provider configuration settings.
         InstanceSetting_AgentConfig:
             type: object
@@ -4008,6 +4012,44 @@ components:
                     type: string
                     description: llm_id references an entry in AISetting.llms[].id.
             description: TranslationConfig configures the AI-backed translation page.
+        InstanceSetting_WebSearchConfig:
+            type: object
+            properties:
+                provider:
+                    enum:
+                        - WEB_SEARCH_PROVIDER_UNSPECIFIED
+                        - TAVILY
+                    type: string
+                    format: enum
+                enabled:
+                    type: boolean
+                    description: enabled toggles whether AI chat can search the web.
+                endpoint:
+                    type: string
+                    description: endpoint is the Tavily-compatible base URL. Empty uses the default.
+                apiKey:
+                    writeOnly: true
+                    type: string
+                    description: api_key is write-only and is never returned by GetInstanceSetting.
+                maxResults:
+                    type: integer
+                    description: max_results caps how many search results a single tool call returns.
+                    format: int32
+                searchDepth:
+                    type: string
+                    description: search_depth is the Tavily search depth, e.g. "basic" or "advanced".
+                includeAnswer:
+                    type: boolean
+                    description: include_answer asks Tavily to include its generated answer when available.
+                apiKeySet:
+                    readOnly: true
+                    type: boolean
+                    description: api_key_set indicates whether an API key is stored for web search.
+                apiKeyHint:
+                    readOnly: true
+                    type: string
+                    description: api_key_hint is a masked hint for the stored API key.
+            description: WebSearchConfig configures the AI chat web_search tool.
         InstanceStats:
             type: object
             properties:

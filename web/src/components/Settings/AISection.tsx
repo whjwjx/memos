@@ -7,7 +7,7 @@ import { AgentsPanel } from "./ai-settings/AgentsPanel";
 import { AISettingsOverviewPanel } from "./ai-settings/AISettingsOverviewPanel";
 import { AISettingsTabs } from "./ai-settings/AISettingsTabs";
 import { newLLM, newProvider } from "./ai-settings/aiSettingFactories";
-import { createEmptyTranslationConfig, deriveLLMsFromLegacy, toLocalProvider } from "./ai-settings/aiSettingMapper";
+import { createEmptyTranslationConfig, deriveLLMsFromLegacy, toLocalProvider, toLocalWebSearch } from "./ai-settings/aiSettingMapper";
 import { ChatToolsPanel } from "./ai-settings/ChatToolsPanel";
 import { ChatAgentDialog } from "./ai-settings/dialogs/ChatAgentDialog";
 import { LLMDialog } from "./ai-settings/dialogs/LLMDialog";
@@ -20,7 +20,7 @@ import { LLMsPanel } from "./ai-settings/LLMsPanel";
 import { MemoryPanel } from "./ai-settings/MemoryPanel";
 import { type AISettingPatch, saveAISettingPatch } from "./ai-settings/saveAISettingPatch";
 import { TranslationPanel } from "./ai-settings/TranslationPanel";
-import type { AISettingsPanel, ChatAgentTemplate, LocalAIProvider, LocalLLM } from "./ai-settings/types";
+import type { AISettingsPanel, ChatAgentTemplate, LocalAIProvider, LocalLLM, LocalWebSearch } from "./ai-settings/types";
 import SettingSection from "./SettingSection";
 import useInstanceSettingUpdater from "./useInstanceSettingUpdater";
 
@@ -52,6 +52,7 @@ const AISection = () => {
   const [deleteTarget, setDeleteTarget] = useState<LocalAIProvider | undefined>();
   const [editingLLM, setEditingLLM] = useState<LocalLLM | undefined>();
   const [deleteLLMTarget, setDeleteLLMTarget] = useState<LocalLLM | undefined>();
+  const [webSearch, setWebSearch] = useState<LocalWebSearch>(() => toLocalWebSearch(originalSetting.webSearch));
   const [activePanel, setActivePanel] = useState<AISettingsPanel>("overview");
 
   useEffect(() => {
@@ -62,6 +63,10 @@ const AISection = () => {
     const nextProviders = originalSetting.providers.map(toLocalProvider);
     setLlms(deriveLLMsFromLegacy(originalSetting.llms, nextProviders, originalSetting.chatAgents, originalSetting.translation));
   }, [originalSetting.llms, originalSetting.providers, originalSetting.chatAgents, originalSetting.translation]);
+
+  useEffect(() => {
+    setWebSearch(toLocalWebSearch(originalSetting.webSearch));
+  }, [originalSetting.webSearch]);
 
   const llmsByID = useMemo(() => new Map(llms.map((llm) => [llm.id, llm])), [llms]);
   const getLLMLabel = (llmId: string) => {
@@ -116,6 +121,29 @@ const AISection = () => {
 
   const handleCreateProvider = () => {
     setEditingProvider(newProvider());
+  };
+
+  const handleSaveWebSearch = async () => {
+    const maxResults = Number.isFinite(webSearch.maxResults) ? Math.trunc(webSearch.maxResults) : 5;
+    const normalizedWebSearch = {
+      ...webSearch,
+      endpoint: webSearch.endpoint.trim(),
+      apiKey: webSearch.apiKey.trim(),
+      maxResults: Math.min(10, Math.max(1, maxResults)),
+      searchDepth: webSearch.searchDepth || "basic",
+    };
+    if (normalizedWebSearch.enabled && !normalizedWebSearch.apiKeySet && !normalizedWebSearch.apiKey) {
+      toast.error(t("setting.ai.api-key-required"));
+      return;
+    }
+
+    const ok = await savePatch({ webSearch: normalizedWebSearch }, "Update web search");
+    if (!ok) return;
+    setWebSearch({
+      ...normalizedWebSearch,
+      apiKey: "",
+      apiKeySet: normalizedWebSearch.apiKeySet || normalizedWebSearch.apiKey !== "",
+    });
   };
 
   const handleEditProvider = (provider: LocalAIProvider) => {
@@ -329,7 +357,14 @@ const AISection = () => {
       )}
 
       {activePanel === "tools" && (
-        <ChatToolsPanel tools={tools} onToggleTool={handleToggleTool} onToggleToolConfirmation={handleToggleToolConfirmation} />
+        <ChatToolsPanel
+          tools={tools}
+          webSearch={webSearch}
+          onToggleTool={handleToggleTool}
+          onToggleToolConfirmation={handleToggleToolConfirmation}
+          onChangeWebSearch={setWebSearch}
+          onSaveWebSearch={handleSaveWebSearch}
+        />
       )}
 
       {activePanel === "memory" && (

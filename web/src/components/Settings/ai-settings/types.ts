@@ -37,6 +37,18 @@ export type LocalTool = {
   requiresConfirmation: boolean;
 };
 
+export type LocalWebSearch = {
+  enabled: boolean;
+  provider: number;
+  endpoint: string;
+  apiKey: string;
+  apiKeySet: boolean;
+  apiKeyHint: string;
+  maxResults: number;
+  searchDepth: string;
+  includeAnswer: boolean;
+};
+
 export type ChatAgentTemplate = {
   name: string;
   systemPrompt: string;

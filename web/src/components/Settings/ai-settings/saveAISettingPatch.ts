@@ -9,8 +9,8 @@ import {
   InstanceSettingSchema,
 } from "@/types/proto/api/v1/instance_service_pb";
 import { buildInstanceSettingName } from "../useInstanceSettingUpdater";
-import { toChatAgentConfig, toLLMConfig, toMemoryConfig, toProviderConfig, toToolConfig } from "./aiSettingMapper";
-import type { LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemory, LocalTool } from "./types";
+import { toChatAgentConfig, toLLMConfig, toMemoryConfig, toProviderConfig, toToolConfig, toWebSearchConfig } from "./aiSettingMapper";
+import type { LocalAIProvider, LocalChatAgent, LocalLLM, LocalMemory, LocalTool, LocalWebSearch } from "./types";
 
 type SaveInstanceSetting = (options: { key: InstanceSetting_Key; setting: InstanceSetting; errorContext: string }) => Promise<boolean>;
 
@@ -21,6 +21,7 @@ export type AISettingPatch = {
   memory?: LocalMemory;
   translation?: InstanceSetting_TranslationConfig | undefined;
   llms?: LocalLLM[];
+  webSearch?: LocalWebSearch;
 };
 
 export const saveAISettingPatch = ({
@@ -61,6 +62,7 @@ export const saveAISettingPatch = ({
           memory: patch.memory ? toMemoryConfig(patch.memory) : originalSetting.memory,
           translation: patch.translation ?? originalSetting.translation,
           llms: patch.llms?.map(toLLMConfig) ?? originalSetting.llms,
+          webSearch: patch.webSearch ? toWebSearchConfig(patch.webSearch) : originalSetting.webSearch,
         }),
       },
     }),

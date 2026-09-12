@@ -18,6 +18,13 @@ export const toolRegistry: AIChatToolRegistryItem[] = [
     confirmEditable: false,
   },
   {
+    name: "web_search",
+    descriptionKey: "setting.ai.tool-web-search",
+    adminOnly: false,
+    defaultRequiresConfirmation: false,
+    confirmEditable: false,
+  },
+  {
     name: "get_memo",
     descriptionKey: "setting.ai.tool-get-memo",
     adminOnly: false,
