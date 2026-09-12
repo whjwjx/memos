@@ -571,6 +571,7 @@ var (
 	fakeToolCallBlockRe   = regexp.MustCompile(`(?is)\\?<\s*tool_calls\b[^>]*>.*?\\?<\s*/\s*tool_calls\s*>`)
 	fakeZhToolCallBlockRe = regexp.MustCompile(`(?is)\\?<\s*工具调用[^>]*>.*?\\?<\s*/\s*工具调用\s*>`)
 	fakeInvokeBlockRe     = regexp.MustCompile(`(?is)\\?<\s*invoke\b[^>]*>.*?\\?<\s*/\s*invoke\s*>`)
+	emptyCodeBlockRe      = regexp.MustCompile("(?is)^\\s*(?:```|~~~)[a-z0-9_-]*\\s*(?:```|~~~)\\s*$")
 )
 
 // sanitizeAssistantContent strips pseudo tool-call XML that some models emit as
@@ -581,6 +582,7 @@ func sanitizeAssistantContent(content string) string {
 	cleaned := fakeToolCallBlockRe.ReplaceAllString(content, "")
 	cleaned = fakeZhToolCallBlockRe.ReplaceAllString(cleaned, "")
 	cleaned = fakeInvokeBlockRe.ReplaceAllString(cleaned, "")
+	cleaned = emptyCodeBlockRe.ReplaceAllString(cleaned, "")
 	cleaned = strings.TrimSpace(cleaned)
 	if cleaned == "" {
 		return "已完成相关操作。"

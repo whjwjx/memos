@@ -75,6 +75,7 @@ const stripFakeToolCalls = (content: string): string => {
   let cleaned = content.replace(/\\?<\s*tool_calls\b[^>]*>[\s\S]*?\\?<\s*\/\s*tool_calls\s*>/gi, "");
   cleaned = cleaned.replace(/\\?<\s*工具调用[^>]*>[\s\S]*?\\?<\s*\/\s*工具调用\s*>/gi, "");
   cleaned = cleaned.replace(/\\?<\s*invoke\b[^>]*>[\s\S]*?\\?<\s*\/\s*invoke\s*>/gi, "");
+  cleaned = cleaned.replace(/^\s*(?:```|~~~)[a-z0-9_-]*\s*(?:```|~~~)\s*$/gi, "");
   cleaned = cleaned.trim();
   return cleaned || "已完成相关操作。";
 };

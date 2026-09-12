@@ -185,8 +185,8 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 			if err != nil {
 				return nil, errors.Wrap(err, "chat model generation failed")
 			}
-			content := stripPseudoToolXML(resp.Text)
-			if content == "" || matchesToolResult(content, updated) {
+			content := stripAssistantNoise(resp.Text)
+			if content == "" || includesToolResult(content, updated) {
 				content = summarizeApproved(updated)
 			}
 			finalMessage := chat.Message{Role: chat.RoleAssistant, Content: content}
@@ -440,6 +440,7 @@ var (
 	pseudoToolCallBlockRe   = regexp.MustCompile(`(?is)\\?<\s*tool_calls\b[^>]*>.*?\\?<\s*/\s*tool_calls\s*>`)
 	pseudoZhToolCallBlockRe = regexp.MustCompile(`(?is)\\?<\s*工具调用[^>]*>.*?\\?<\s*/\s*工具调用\s*>`)
 	pseudoInvokeBlockRe     = regexp.MustCompile(`(?is)\\?<\s*invoke\b[^>]*>.*?\\?<\s*/\s*invoke\s*>`)
+	emptyFencedCodeBlockRe  = regexp.MustCompile("(?is)^\\s*(?:```|~~~)[a-z0-9_-]*\\s*(?:```|~~~)\\s*$")
 )
 
 // stripPseudoToolXML removes tool-call XML that some models emit as plain text
@@ -452,13 +453,20 @@ func stripPseudoToolXML(content string) string {
 	return strings.TrimSpace(cleaned)
 }
 
-func matchesToolResult(content string, updated []chat.Message) bool {
+func stripAssistantNoise(content string) string {
+	cleaned := stripPseudoToolXML(content)
+	cleaned = emptyFencedCodeBlockRe.ReplaceAllString(cleaned, "")
+	return strings.TrimSpace(cleaned)
+}
+
+func includesToolResult(content string, updated []chat.Message) bool {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		return false
 	}
 	for _, msg := range updated {
-		if trimmed == strings.TrimSpace(msg.Content) {
+		result := strings.TrimSpace(msg.Content)
+		if result != "" && strings.Contains(trimmed, result) {
 			return true
 		}
 	}

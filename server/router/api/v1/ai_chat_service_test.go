@@ -348,6 +348,11 @@ func TestSanitizeAssistantContentStripsPseudoToolBlocks(t *testing.T) {
 </tool_calls>`,
 			want: "已完成相关操作。",
 		},
+		{
+			name:    "empty code block only",
+			content: "```text\n\n```",
+			want:    "已完成相关操作。",
+		},
 	}
 
 	for _, tt := range tests {
@@ -357,6 +362,7 @@ func TestSanitizeAssistantContentStripsPseudoToolBlocks(t *testing.T) {
 			require.NotContains(t, got, "<工具调用>")
 			require.NotContains(t, got, "search_memos")
 			require.NotContains(t, got, "<tool_calls>")
+			require.NotContains(t, got, "```")
 		})
 	}
 }

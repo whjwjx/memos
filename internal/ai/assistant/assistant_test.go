@@ -298,7 +298,7 @@ func TestRunLoopApprovalFallsBackWhenModelEchoesToolResult(t *testing.T) {
 	t.Parallel()
 	model := &fakeModel{
 		responses: []*chat.Response{
-			{Text: `Deleted memo abc.
+			{Text: `已完成：Deleted memo abc.
 <工具调用>
 {"name":"search_memos","arguments":{"query":"张雪峰"}}
 </工具调用>`},
@@ -318,6 +318,28 @@ func TestRunLoopApprovalFallsBackWhenModelEchoesToolResult(t *testing.T) {
 	require.Equal(t, "已删除那条 memo。", resp.Content)
 	require.NotContains(t, resp.Content, "Deleted memo")
 	require.NotContains(t, resp.Content, "<工具调用>")
+}
+
+func TestRunLoopApprovalFallsBackForEmptyCodeBlock(t *testing.T) {
+	t.Parallel()
+	model := &fakeModel{
+		responses: []*chat.Response{
+			{Text: "```text\n\n```"},
+		},
+	}
+	reg := newRegistryWith(&fakeTool{name: "create_memo", confirm: true, result: "Created memo abc (visibility PRIVATE)."})
+	resp, err := runLoop(context.Background(), model, &AssistantRequest{
+		Registry: reg,
+		History: []chat.Message{
+			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "create_memo", ArgumentsJSON: `{}`}}},
+			{Role: chat.RoleTool, ToolCallID: "c2", Name: "create_memo", Content: "awaiting user confirmation"},
+		},
+		UserContent:         "[user approved the pending tool, please execute and continue]",
+		ApprovedToolCallIDs: []string{"c2"},
+	}, nil)
+	require.NoError(t, err)
+	require.Equal(t, "已创建 memo。", resp.Content)
+	require.NotContains(t, resp.Content, "```")
 }
 
 func TestRunLoopRespectsMaxRounds(t *testing.T) {
