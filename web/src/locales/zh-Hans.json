@@ -860,7 +860,7 @@
       "chat-agent-system-help": "用于约束助手的行为与边界。",
       "chat-agent-toggle-aria": "切换助手 {{name}}",
       "edit-chat-agent": "编辑助手",
-      "chat-agent-dialog-description": "定义助手的系统提示词与供应商绑定。",
+      "chat-agent-dialog-description": "定义助手名称与系统提示词。LLM 在 AI Chat 输入区选择。",
       "delete-chat-agent": "删除助手 `{{name}}`？",
       "third-party-tools-title": "第三方工具接入",
       "third-party-tools-description": "连接 AI 工具可调用的外部服务。每个接入项独立保存凭据与运行参数。",

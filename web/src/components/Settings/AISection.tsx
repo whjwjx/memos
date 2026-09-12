@@ -75,13 +75,16 @@ const AISection = () => {
     const provider = providers.find((item) => item.id === llm.providerId);
     return `${llm.title || llm.model} · ${provider?.title || llm.providerId}`;
   };
-  const savePatch = (patch: AISettingPatch, errorContext: string) =>
-    saveAISettingPatch({
+  const savePatch = (patch: AISettingPatch, errorContext: string) => {
+    const patchWithMigratedLLMs =
+      patch.chatAgents && !patch.llms && originalSetting.llms.length === 0 && llms.length > 0 ? { ...patch, llms } : patch;
+    return saveAISettingPatch({
       errorContext,
       originalSetting,
-      patch,
+      patch: patchWithMigratedLLMs,
       saveInstanceSetting,
     });
+  };
 
   const { translation, setTranslation, translationHasChanges, handleSaveTranslation } = useAITranslationSettings({
     originalSetting,
@@ -91,7 +94,6 @@ const AISection = () => {
   });
   const {
     chatAgents,
-    setChatAgents,
     editingChatAgent,
     setEditingChatAgent,
     deleteChatAgentTarget,
@@ -104,8 +106,6 @@ const AISection = () => {
     handleDeleteChatAgent,
   } = useAIChatAgents({
     originalSetting,
-    llms,
-    llmsByID,
     savePatch,
   });
   const { tools, handleToggleTool, handleToggleToolConfirmation } = useAIToolsSettings({ originalSetting, savePatch });
@@ -181,11 +181,6 @@ const AISection = () => {
     const nextProviders = providers.filter((provider) => provider.id !== target.id);
     const removedLLMIds = new Set(llms.filter((llm) => llm.providerId === target.id).map((llm) => llm.id));
     const nextLLMs = llms.filter((llm) => llm.providerId !== target.id);
-    const nextChatAgents = chatAgents.map((agent) =>
-      agent.providerId === target.id || removedLLMIds.has(agent.llmId)
-        ? { ...agent, enabled: false, llmId: "", providerId: "", model: "" }
-        : agent,
-    );
 
     const persistedTranslation = originalSetting.translation;
     const nextTranslation =
@@ -196,7 +191,6 @@ const AISection = () => {
     const ok = await savePatch(
       {
         providers: nextProviders,
-        chatAgents: nextChatAgents,
         translation: nextTranslation,
         llms: nextLLMs,
       },
@@ -205,7 +199,6 @@ const AISection = () => {
     if (!ok) return;
     setProviders(nextProviders);
     setLlms(nextLLMs);
-    setChatAgents(nextChatAgents);
     if (translation.providerId === target.id || removedLLMIds.has(translation.llmId)) {
       setTranslation((prev) => ({ ...prev, enabled: false, llmId: "", providerId: "", model: "" }));
     }
@@ -251,10 +244,7 @@ const AISection = () => {
   };
 
   const handleToggleLLM = async (llm: LocalLLM) => {
-    if (
-      llm.enabled &&
-      (chatAgents.some((agent) => agent.enabled && agent.llmId === llm.id) || (translation.enabled && translation.llmId === llm.id))
-    ) {
+    if (llm.enabled && translation.enabled && translation.llmId === llm.id) {
       toast.error(t("setting.ai.llm-in-use"));
       return;
     }
@@ -269,9 +259,6 @@ const AISection = () => {
     if (!deleteLLMTarget) return;
     const target = deleteLLMTarget;
     const nextLLMs = llms.filter((llm) => llm.id !== target.id);
-    const nextChatAgents = chatAgents.map((agent) =>
-      agent.llmId === target.id ? { ...agent, enabled: false, llmId: "", providerId: "", model: "" } : agent,
-    );
     const persistedTranslation = originalSetting.translation;
     const nextTranslation =
       persistedTranslation &&
@@ -280,10 +267,9 @@ const AISection = () => {
         ? createEmptyTranslationConfig()
         : persistedTranslation;
 
-    const ok = await savePatch({ chatAgents: nextChatAgents, translation: nextTranslation, llms: nextLLMs }, "Delete LLM");
+    const ok = await savePatch({ translation: nextTranslation, llms: nextLLMs }, "Delete LLM");
     if (!ok) return;
     setLlms(nextLLMs);
-    setChatAgents(nextChatAgents);
     if (translation.llmId === target.id) {
       setTranslation((prev) => ({ ...prev, enabled: false, llmId: "", providerId: "", model: "" }));
     }
@@ -347,7 +333,6 @@ const AISection = () => {
         <AgentsPanel
           agents={chatAgents}
           templates={chatAgentTemplates}
-          getLLMLabel={getLLMLabel}
           onCreateAgent={handleCreateChatAgent}
           onCreateAgentFromTemplate={handleCreateChatAgentFromTemplate}
           onEditAgent={handleEditChatAgent}
@@ -417,8 +402,6 @@ const AISection = () => {
       <ChatAgentDialog
         agent={editingChatAgent}
         mode={editingChatAgent && chatAgents.some((agent) => agent.id === editingChatAgent.id) ? "edit" : "create"}
-        llms={llms}
-        providers={providers}
         onOpenChange={(open) => !open && setEditingChatAgent(undefined)}
         onSave={handleSaveChatAgent}
       />

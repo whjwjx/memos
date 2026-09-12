@@ -148,17 +148,13 @@ export const toTranslationConfig = (translation: LocalTranslation) =>
 
 export const createEmptyTranslationConfig = () => create(InstanceSetting_TranslationConfigSchema, {});
 
-export const toLocalChatAgent = (
-  agent: InstanceSetting_ChatAgentConfig,
-  llms: LocalLLM[] = [],
-  providers: LocalAIProvider[] = [],
-): LocalChatAgent => ({
+export const toLocalChatAgent = (agent: InstanceSetting_ChatAgentConfig): LocalChatAgent => ({
   id: agent.id,
   name: agent.name,
   builtin: agent.builtin,
-  llmId: resolveLLMId(agent.llmId, agent.providerId, agent.model, llms, providers),
-  providerId: agent.providerId,
-  model: agent.model,
+  llmId: "",
+  providerId: "",
+  model: "",
   systemPrompt: agent.systemPrompt,
   enabled: agent.enabled,
 });
@@ -168,9 +164,9 @@ export const toChatAgentConfig = (agent: LocalChatAgent) =>
     id: agent.id,
     name: agent.name.trim(),
     builtin: agent.builtin,
-    llmId: agent.llmId,
-    providerId: agent.providerId,
-    model: agent.model.trim(),
+    llmId: "",
+    providerId: "",
+    model: "",
     systemPrompt: agent.systemPrompt,
     enabled: agent.enabled,
   });
