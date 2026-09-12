@@ -186,7 +186,7 @@ func runLoop(ctx context.Context, model chat.Model, req *AssistantRequest, emit 
 				return nil, errors.Wrap(err, "chat model generation failed")
 			}
 			content := stripPseudoToolXML(resp.Text)
-			if content == "" {
+			if content == "" || matchesToolResult(content, updated) {
 				content = summarizeApproved(updated)
 			}
 			finalMessage := chat.Message{Role: chat.RoleAssistant, Content: content}
@@ -437,8 +437,9 @@ func injectConfirmKeyword(argsJSON, keyword string) string {
 }
 
 var (
-	pseudoToolCallBlockRe = regexp.MustCompile(`(?is)<tool_calls\b[^>]*>.*?</tool_calls>`)
-	pseudoInvokeBlockRe   = regexp.MustCompile(`(?is)<invoke\b[^>]*>.*?</invoke>`)
+	pseudoToolCallBlockRe   = regexp.MustCompile(`(?is)\\?<\s*tool_calls\b[^>]*>.*?\\?<\s*/\s*tool_calls\s*>`)
+	pseudoZhToolCallBlockRe = regexp.MustCompile(`(?is)\\?<\s*工具调用[^>]*>.*?\\?<\s*/\s*工具调用\s*>`)
+	pseudoInvokeBlockRe     = regexp.MustCompile(`(?is)\\?<\s*invoke\b[^>]*>.*?\\?<\s*/\s*invoke\s*>`)
 )
 
 // stripPseudoToolXML removes tool-call XML that some models emit as plain text
@@ -446,8 +447,22 @@ var (
 // approval continuation so raw XML never reaches the user.
 func stripPseudoToolXML(content string) string {
 	cleaned := pseudoToolCallBlockRe.ReplaceAllString(content, "")
+	cleaned = pseudoZhToolCallBlockRe.ReplaceAllString(cleaned, "")
 	cleaned = pseudoInvokeBlockRe.ReplaceAllString(cleaned, "")
 	return strings.TrimSpace(cleaned)
+}
+
+func matchesToolResult(content string, updated []chat.Message) bool {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return false
+	}
+	for _, msg := range updated {
+		if trimmed == strings.TrimSpace(msg.Content) {
+			return true
+		}
+	}
+	return false
 }
 
 // summarizeApproved builds a neutral completion line from the tool messages
@@ -455,7 +470,14 @@ func stripPseudoToolXML(content string) string {
 // (e.g. it only echoed XML that was stripped).
 func summarizeApproved(updated []chat.Message) string {
 	if len(updated) == 1 {
-		return fmt.Sprintf("已完成：%s", updated[0].Content)
+		switch updated[0].Name {
+		case "create_memo":
+			return "已创建 memo。"
+		case "delete_memo":
+			return "已删除那条 memo。"
+		case "update_memo":
+			return "已更新 memo。"
+		}
 	}
 	return "已完成相关操作。"
 }

@@ -326,3 +326,37 @@ func TestResolveChatRuntimeProfile(t *testing.T) {
 		require.Equal(t, compatibilityPresetStrictTools, profile.compatibilityPreset)
 	})
 }
+
+func TestSanitizeAssistantContentStripsPseudoToolBlocks(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name: "localized pseudo tool block",
+			content: `Deleted memo abc.
+<工具调用>
+{"name":"search_memos","arguments":{"query":"张雪峰"}}
+\</工具调用>`,
+			want: "Deleted memo abc.",
+		},
+		{
+			name: "english pseudo tool block only",
+			content: `<tool_calls>
+<invoke name="search_memos"></invoke>
+</tool_calls>`,
+			want: "已完成相关操作。",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeAssistantContent(tt.content)
+			require.Equal(t, tt.want, got)
+			require.NotContains(t, got, "<工具调用>")
+			require.NotContains(t, got, "search_memos")
+			require.NotContains(t, got, "<tool_calls>")
+		})
+	}
+}

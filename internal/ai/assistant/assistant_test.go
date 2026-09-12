@@ -33,6 +33,7 @@ type fakeTool struct {
 	name     string
 	confirm  bool
 	executed *bool
+	result   string
 }
 
 func (f *fakeTool) Spec() chat.ToolSpec {
@@ -46,6 +47,9 @@ func (f *fakeTool) RequiresConfirmation(_ string) bool {
 func (f *fakeTool) Run(_ context.Context, _ tools.ToolContext, _ string) (string, error) {
 	if f.executed != nil {
 		*f.executed = true
+	}
+	if f.result != "" {
+		return f.result, nil
 	}
 	return "ok", nil
 }
@@ -243,32 +247,77 @@ func TestRunLoopApprovalStripsPseudoXML(t *testing.T) {
 	t.Parallel()
 	// The model echoes a pseudo-XML tool call instead of a summary. The loop
 	// must strip it and fall back to a neutral completion line.
-	model := &fakeModel{
-		responses: []*chat.Response{
-			{Text: "<tool_calls>\n<invoke name=\"manage_settings\">\n</invoke>\n</tool_calls>"},
+	tests := []struct {
+		name string
+		text string
+	}{
+		{
+			name: "english pseudo xml",
+			text: "<tool_calls>\n<invoke name=\"manage_settings\">\n</invoke>\n</tool_calls>",
+		},
+		{
+			name: "localized pseudo xml",
+			text: `<工具调用>
+{"name":"search_memos","arguments":{"query":"张雪峰"}}
+\</工具调用>`,
 		},
 	}
-	reg := newRegistryWith(&fakeTool{name: "manage_settings", confirm: true})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &fakeModel{
+				responses: []*chat.Response{{Text: tt.text}},
+			}
+			reg := newRegistryWith(&fakeTool{name: "manage_settings", confirm: true})
+			resp, err := runLoop(context.Background(), model, &AssistantRequest{
+				Registry: reg,
+				History: []chat.Message{
+					{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`}}},
+					{Role: chat.RoleTool, ToolCallID: "c2", Name: "manage_settings", Content: "awaiting user confirmation"},
+				},
+				UserContent:         "[user approved the pending tool, please execute and continue]",
+				ApprovedToolCallIDs: []string{"c2"},
+			}, nil)
+			require.NoError(t, err)
+			require.False(t, resp.RequiresConfirmation)
+			require.NotContains(t, resp.Content, "<tool_calls>")
+			require.NotContains(t, resp.Content, "<invoke")
+			require.NotContains(t, resp.Content, "<工具调用>")
+			require.NotContains(t, resp.Content, "search_memos")
+			require.Equal(t, "已完成相关操作。", resp.Content)
+			// The request sent to the model carries no tools and no tool messages.
+			require.Empty(t, model.lastReq.Tools)
+			for _, m := range model.lastReq.Messages {
+				require.NotEqual(t, chat.RoleTool, m.Role)
+			}
+		})
+	}
+}
+
+func TestRunLoopApprovalFallsBackWhenModelEchoesToolResult(t *testing.T) {
+	t.Parallel()
+	model := &fakeModel{
+		responses: []*chat.Response{
+			{Text: `Deleted memo abc.
+<工具调用>
+{"name":"search_memos","arguments":{"query":"张雪峰"}}
+</工具调用>`},
+		},
+	}
+	reg := newRegistryWith(&fakeTool{name: "delete_memo", confirm: true, result: "Deleted memo abc."})
 	resp, err := runLoop(context.Background(), model, &AssistantRequest{
 		Registry: reg,
 		History: []chat.Message{
-			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "manage_settings", ArgumentsJSON: `{}`}}},
-			{Role: chat.RoleTool, ToolCallID: "c2", Name: "manage_settings", Content: "awaiting user confirmation"},
+			{Role: chat.RoleAssistant, ToolCalls: []chat.ToolCall{{ID: "c2", Name: "delete_memo", ArgumentsJSON: `{}`}}},
+			{Role: chat.RoleTool, ToolCallID: "c2", Name: "delete_memo", Content: "awaiting user confirmation"},
 		},
 		UserContent:         "[user approved the pending tool, please execute and continue]",
 		ApprovedToolCallIDs: []string{"c2"},
 	}, nil)
 	require.NoError(t, err)
-	require.False(t, resp.RequiresConfirmation)
-	// The pseudo-XML is gone; the fallback summary mentions the tool result.
-	require.NotContains(t, resp.Content, "<tool_calls>")
-	require.NotContains(t, resp.Content, "<invoke")
-	require.NotEmpty(t, resp.Content)
-	// The request sent to the model carries no tools and no tool messages.
-	require.Empty(t, model.lastReq.Tools)
-	for _, m := range model.lastReq.Messages {
-		require.NotEqual(t, chat.RoleTool, m.Role)
-	}
+	require.Equal(t, "已删除那条 memo。", resp.Content)
+	require.NotContains(t, resp.Content, "Deleted memo")
+	require.NotContains(t, resp.Content, "<工具调用>")
 }
 
 func TestRunLoopRespectsMaxRounds(t *testing.T) {
