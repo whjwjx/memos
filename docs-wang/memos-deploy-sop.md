@@ -410,6 +410,18 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
 - 清理：悬空镜像已 `docker image prune -f`（删 `e9025139`）；旧备份 `20260906_1941`/`20260906_2016`/`20260910_0008` 已删（含上轮超时未删项），保留 `20260911_0747` 与 `20260913_0136`。
 - 备注：本次 C 盘 36.8GB 充足，无需 `go clean -cache`。沿用 9.4/9.5/9.7；**新增踩坑**：流式/SSE 部署必须关闭 nginx 代理缓冲（见 9.8，参考 fastexpoagent）。
 
+### 8.17 部署记录（2026-09-14，晚）
+
+> 完整重新部署：纳入 public profile aggregate stats（公开主页聚合统计）（`d60f5c89` feat、`738eda37` merge）。纯前端聚合面板 + 后端 user stats 新接口（含 `user_stats_cache`）；proto 仅新增向后兼容字段，词典已在数据卷（`ecdict.db` 未丢），无需重传。
+
+- 代码：`dev` HEAD = `738eda37`（merge public profile aggregate stats）。
+- 构建：`pnpm release`（资产 `index-CYY5Ce71.js`，5129 modules）→ `go build`（linux/amd64，103146944 字节 / ≈98.4MB）→ scp 上传。
+- 备份：`/home/deployer/backups/memos_data_20260914_2152/`（memos_prod.db + -shm + -wal）。
+- 镜像：`memos-ai:local`（哈希 `6fa7e642`），容器 recreate 时间 `2026-09-14T21:54:18+08:00`（北京时间 9-14 21:54）。
+- 校验：公网前端资产 `index-CYY5Ce71.js` 与构建输出一致（用 9.7 正则 `assets/index-[^"]+\.js`）；API `/api/v1/memos?limit=1` 正常；日志无异常、**无 DB 迁移**；容器内 `/var/opt/memos/dictionaries/ecdict.db` 仍在（180MB）；nginx 流式 location（`proxy_buffering off`）沿用 8.16 固化配置，无需改动。
+- 清理：悬空镜像已 `docker image prune -f`（删 `b8f81dbe`）；备份目录共 3 份（`20260911_0747`/`20260913_0136`/`20260914_2152`），按 9.5 新策略保留最近 5 份，**未超阈值，无旧备份需删**。
+- 备注：本次 C 盘 **14.88GB**（较此前 30–40GB 明显偏低，疑为历次构建缓存累积），但足够本次构建，未执行 `go clean -cache`；若后续跌破 ~10GB 再清理（见 9.9）。沿用 9.4/9.5/9.7；**本次无新增踩坑**（9.8 流式配置已固化，本轮新功能为纯前端聚合 + 向后兼容 proto 字段，无迁移、无 nginx 改动）。
+
 ---
 
 ## 9. 部署踩坑与注意事项
@@ -505,3 +517,13 @@ curl -sk -o /dev/null -w '%{http_code}' https://115.191.10.0/ -H 'Host: evil.com
   - 该 location 正则优先级高于前缀 `location /`，且不影响普通请求与前端静态资源加速。
 - **容器只读挂载坑（改配置的方式）**：`vps-gateway` 的 `/etc/nginx/conf.d` 是**只读 bind 挂载**（容器侧 RW=false），`docker cp` 进容器报错 `mounted volume is marked read-only`。正确做法：`docker inspect vps-gateway` 找到宿主机挂载源 `/home/deployer/vps-infra/nginx/conf.d`，直接 scp/写该宿主机文件（容器侧只读不影响宿主机侧写），再 `docker exec vps-gateway nginx -t && nginx -s reload`。**注意**：scp 传含 `$host` 等变量的配置不会触发 9.4 网关字符处理（scp 是二进制传输，不解析文件内容）；切勿把含 `$` 的 nginx 配置塞进 ssh 命令行（会被网关处理）。
 - **验证**：`nginx -t` 语法通过 + `nginx -s reload` 生效；公网 `curl -X POST /memos.api.v1.AIChatService/StreamMessage` 返回 `415`（非 404，证明路径匹配且转发到 memos），`Server: nginx` 头存在。真实逐字流式需浏览器登录后体验（curl 无 token 无法触发真实流）。
+
+### 9.9 关注部署机 C 盘剩余空间，过低时清理 go/pnpm 缓存
+
+- **现象**：部署机（Win 本地）C 盘空闲从早期 30–40GB 逐渐降到 14.88GB（见 8.17）。多轮 `pnpm release` + `go build` 会累积 `node_modules`、pnpm store、Go build cache，长期占用可观空间。
+- **阈值**：单次完整部署约需 2–3GB 临时空间。建议空闲 **低于 ~10GB** 时主动清理，避免 `go build` / `pnpm` 因磁盘不足失败（构建中途报错难以排查）。
+- **清理（安全，不影响已生成产物）**：
+  - Go 缓存：`go clean -cache`（清 `$GOCACHE`，仅让下次构建略慢）。
+  - pnpm：`pnpm store prune`（清未引用包）；或删除 `web/node_modules` 后重装。
+  - 也可核对是否有其他大文件/旧构建产物占用（如 `memos-linux` 旧副本、日志）。
+- **注意**：清理 cache 不影响已生成的 `memos-linux` 与已上传产物，仅影响下次构建速度；不要在部署中途清理，应在部署前/后空闲时做。
