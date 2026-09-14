@@ -165,6 +165,14 @@ func (s *ConnectServiceHandler) GetUserStats(ctx context.Context, req *connect.R
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) GetUserProfileStats(ctx context.Context, req *connect.Request[v1pb.GetUserProfileStatsRequest]) (*connect.Response[v1pb.UserProfileStats], error) {
+	resp, err := s.APIV1Service.GetUserProfileStats(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 func (s *ConnectServiceHandler) GetUserSetting(ctx context.Context, req *connect.Request[v1pb.GetUserSettingRequest]) (*connect.Response[v1pb.UserSetting], error) {
 	resp, err := s.APIV1Service.GetUserSetting(ctx, req.Msg)
 	if err != nil {

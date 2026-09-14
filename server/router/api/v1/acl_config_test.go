@@ -22,6 +22,7 @@ func TestPublicMethodsArePublic(t *testing.T) {
 		"/memos.api.v1.UserService/BatchGetUsers",
 		"/memos.api.v1.UserService/GetUserAvatar",
 		"/memos.api.v1.UserService/GetUserStats",
+		"/memos.api.v1.UserService/GetUserProfileStats",
 		"/memos.api.v1.UserService/ListAllUserStats",
 		// Identity Provider Service
 		"/memos.api.v1.IdentityProviderService/ListIdentityProviders",
@@ -133,6 +134,7 @@ func TestAuthBootstrapClassification(t *testing.T) {
 		"/memos.api.v1.MemoService/ListMemoAttachments",
 		"/memos.api.v1.AttachmentService/GetAttachment",
 		"/memos.api.v1.UserService/GetUser",
+		"/memos.api.v1.UserService/GetUserProfileStats",
 		"/memos.api.v1.UserService/ListAllUserStats",
 	}
 	for _, method := range gatedWhilePrivate {

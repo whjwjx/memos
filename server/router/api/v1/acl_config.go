@@ -19,12 +19,13 @@ var PublicMethods = map[string]struct{}{
 	"/memos.api.v1.InstanceService/BatchGetInstanceSettings": {},
 
 	// User Service - public user profiles and stats
-	"/memos.api.v1.UserService/CreateUser":       {}, // Registration policy is enforced in UserService
-	"/memos.api.v1.UserService/GetUser":          {},
-	"/memos.api.v1.UserService/BatchGetUsers":    {},
-	"/memos.api.v1.UserService/GetUserAvatar":    {},
-	"/memos.api.v1.UserService/GetUserStats":     {},
-	"/memos.api.v1.UserService/ListAllUserStats": {},
+	"/memos.api.v1.UserService/CreateUser":          {}, // Registration policy is enforced in UserService
+	"/memos.api.v1.UserService/GetUser":             {},
+	"/memos.api.v1.UserService/BatchGetUsers":       {},
+	"/memos.api.v1.UserService/GetUserAvatar":       {},
+	"/memos.api.v1.UserService/GetUserStats":        {},
+	"/memos.api.v1.UserService/GetUserProfileStats": {},
+	"/memos.api.v1.UserService/ListAllUserStats":    {},
 
 	// Identity Provider Service - SSO buttons on login page
 	"/memos.api.v1.IdentityProviderService/ListIdentityProviders": {},

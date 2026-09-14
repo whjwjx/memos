@@ -5,10 +5,11 @@ import { toast } from "react-hot-toast";
 import { useParams, useSearchParams } from "react-router-dom";
 import MemoView from "@/components/MemoView";
 import PagedMemoList, { getMemoKey } from "@/components/PagedMemoList";
+import ProfileStatsPanel from "@/components/ProfileStatsPanel";
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { useMemoFilters, useMemoSorting } from "@/hooks";
-import { useUser } from "@/hooks/useUserQueries";
+import { useUser, useUserProfileStats } from "@/hooks/useUserQueries";
 import { State } from "@/types/proto/api/v1/common_pb";
 import { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
@@ -52,6 +53,7 @@ const UserProfile = () => {
   const activeTab = (searchParams.get("view") === "map" ? "map" : "memos") as TabView;
 
   const { data: user, isLoading, error } = useUser(`users/${username}`, { enabled: !!username });
+  const { data: profileStats } = useUserProfileStats(user?.name, { enabled: !!user?.name });
 
   if (error && !isLoading) {
     toast.error(t("message.user-not-found"));
@@ -81,6 +83,11 @@ const UserProfile = () => {
       {user ? (
         <>
           <ProfileHeader user={user} onCopyProfileLink={handleCopyProfileLink} shareLabel={t("common.share")} />
+          <div className="pt-4">
+            <div className="mx-auto w-full max-w-2xl">
+              <ProfileStatsPanel stats={profileStats} />
+            </div>
+          </div>
 
           <div className="mt-4 flex-1">
             <div className="mx-auto w-full max-w-2xl">

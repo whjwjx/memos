@@ -71,6 +71,12 @@ service UserService {
     option (google.api.method_signature) = "name";
   }
 
+  // GetUserProfileStats returns privacy-preserving aggregate stats for a user's public Profile page.
+  rpc GetUserProfileStats(GetUserProfileStatsRequest) returns (UserProfileStats) {
+    option (google.api.http) = {get: "/api/v1/{name=users/*}:getProfileStats"};
+    option (google.api.method_signature) = "name";
+  }
+
   // GetUserSetting returns the user setting.
   rpc GetUserSetting(GetUserSettingRequest) returns (UserSetting) {
     option (google.api.http) = {get: "/api/v1/{name=users/*/settings/*}"};
@@ -438,6 +444,52 @@ message GetUserStatsRequest {
   ];
 }
 
+message UserProfileStats {
+  // The resource name of the user profile statistics singleton.
+  // Format: users/{user}/profileStats
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Total memo count included in this aggregate.
+  int32 total_memo_count = 2;
+
+  // Total unique tag count included in this aggregate.
+  int32 total_tag_count = 3;
+
+  // Number of active days included in this aggregate.
+  int32 active_day_count = 4;
+
+  // Number of memos created in the current year.
+  int32 year_memo_count = 5;
+
+  // Current consecutive active-day streak ending today or the latest active day.
+  int32 current_streak = 6;
+
+  // Longest consecutive active-day streak.
+  int32 longest_streak = 7;
+
+  // Whether the stats include all normal memos instead of only memos visible to the current viewer.
+  bool includes_all_memos = 8;
+
+  // Daily aggregate activity counts. Does not expose memo ids, content, tags, locations, or timestamps.
+  repeated DailyActivity daily_activity = 9;
+
+  message DailyActivity {
+    // Local-date-like day key in YYYY-MM-DD format.
+    string date = 1;
+    // Number of memos on this date.
+    int32 count = 2;
+  }
+}
+
+message GetUserProfileStatsRequest {
+  // Required. The resource name of the user.
+  // Format: users/{user}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "memos.api.v1/User"}
+  ];
+}
+
 message ListAllUserStatsRequest {
   // Optional. The state of memos to include. Defaults to NORMAL.
   State state = 1 [(google.api.field_behavior) = OPTIONAL];
@@ -508,6 +560,8 @@ message UserSetting {
     // Whether the memo card comment count indicator is only shown on hover.
     // When true, the indicator is hidden until the card is hovered. Defaults to false (always shown).
     bool comment_indicator_on_hover = 9 [(google.api.field_behavior) = OPTIONAL];
+    // Whether the public Profile page may show aggregate stats from all normal memos.
+    bool show_full_profile_stats = 10 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // Tag metadata for user-specific display rules.

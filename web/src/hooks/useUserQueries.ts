@@ -11,6 +11,7 @@ import {
   User,
   type UserNotification,
   UserNotification_Status,
+  type UserProfileStats,
   type UserPushSubscription,
   UserPushSubscriptionSchema,
   UserSetting,
@@ -23,6 +24,7 @@ import {
 const BATCH_GET_USERS_LIMIT = 100;
 const USER_PROFILE_STALE_TIME = 1000 * 60 * 5;
 const USER_STATS_STALE_TIME = 1000 * 60 * 2;
+const USER_PROFILE_STATS_STALE_TIME = 1000 * 30;
 type ListAllUserStatsQuery = Pick<ListAllUserStatsRequest, "state" | "filter">;
 
 // Query keys factory
@@ -32,6 +34,7 @@ export const userKeys = {
   detail: (name: string) => [...userKeys.details(), name] as const,
   stats: () => [...userKeys.all, "stats"] as const,
   userStats: (name: string) => [...userKeys.stats(), name] as const,
+  profileStats: (name: string) => [...userKeys.stats(), "profile", name] as const,
   allUserStats: (request: Partial<ListAllUserStatsQuery>) => [...userKeys.stats(), "all", request] as const,
   currentUser: () => [...userKeys.all, "current"] as const,
   memoViews: (parent?: string) => [...userKeys.all, "memoViews", parent] as const,
@@ -68,6 +71,20 @@ export function useUserStats(username?: string, options?: { enabled?: boolean })
     },
     enabled: !!username && (options?.enabled ?? true),
     staleTime: USER_STATS_STALE_TIME,
+  });
+}
+
+export function useUserProfileStats(name?: string, options?: { enabled?: boolean }) {
+  return useQuery<UserProfileStats>({
+    queryKey: name ? userKeys.profileStats(name) : [...userKeys.stats(), "profile"],
+    queryFn: async () => {
+      if (!name) {
+        throw new Error("User name is required");
+      }
+      return userServiceClient.getUserProfileStats({ name });
+    },
+    enabled: !!name && (options?.enabled ?? true),
+    staleTime: USER_PROFILE_STATS_STALE_TIME,
   });
 }
 
@@ -344,6 +361,7 @@ export function useUpdateUserSetting() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...userKeys.all, "settings"] });
+      queryClient.invalidateQueries({ queryKey: userKeys.stats() });
     },
   });
 }
@@ -392,6 +410,7 @@ export function useUpdateUserGeneralSetting(currentUserName?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...userKeys.all, "settings"] });
+      queryClient.invalidateQueries({ queryKey: userKeys.stats() });
     },
   });
 }

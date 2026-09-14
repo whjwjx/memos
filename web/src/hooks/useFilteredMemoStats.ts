@@ -4,7 +4,7 @@ import { countBy } from "lodash-es";
 import { useMemo } from "react";
 import { type MemoTimeBasis, useView } from "@/contexts/ViewContext";
 import useCurrentUser from "@/hooks/useCurrentUser";
-import { useAllUserStats, useUserStats } from "@/hooks/useUserQueries";
+import { useAllUserStats, useUserProfileStats, useUserStats } from "@/hooks/useUserQueries";
 import { mergeTagCounts } from "@/lib/tag";
 import { State } from "@/types/proto/api/v1/common_pb";
 import type { UserStats } from "@/types/proto/api/v1/user_service_pb";
@@ -47,8 +47,13 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
   const currentUser = useCurrentUser();
   const { timeBasis } = useView();
 
-  // home/profile: use backend per-user stats (full tag set, not page-limited)
-  const { data: userStats, isLoading: isLoadingUserStats } = useUserStats(userName, { enabled });
+  // home/profile: use backend per-user stats for the current visible tag list.
+  const shouldFetchUserStats = context === "home" || context === "profile" || !context;
+  const { data: userStats, isLoading: isLoadingUserStats } = useUserStats(userName, { enabled: enabled && shouldFetchUserStats });
+  // profile: use privacy-preserving aggregate stats for the public Profile summary/calendar.
+  const { data: profileStats, isLoading: isLoadingProfileStats } = useUserProfileStats(userName, {
+    enabled: enabled && context === "profile",
+  });
   // explore/archived: fetch backend grouped stats and aggregate them locally.
   // ListAllUserStats AND's the request filter with the server's auth filter, so
   // private memos are not included unless explicitly visible to the current user.
@@ -65,7 +70,7 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
   });
 
   const data = useMemo(() => {
-    const loading = isLoadingUserStats || isLoadingAllUserStats;
+    const loading = isLoadingUserStats || isLoadingAllUserStats || isLoadingProfileStats;
     let activityStats: Record<string, number> = {};
     let tagCount: Record<string, number> = mergeTagCounts();
     let memoCount = 0;
@@ -83,8 +88,14 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
         );
       }
       activityStats = countBy(displayDates);
+    } else if (context === "profile" && userName && profileStats) {
+      activityStats = Object.fromEntries(profileStats.dailyActivity.map((day) => [day.date, day.count]));
+      if (userStats?.tagCount) {
+        tagCount = mergeTagCounts(userStats.tagCount);
+      }
+      memoCount = profileStats.totalMemoCount;
     } else if (userName && userStats) {
-      // home/profile: use backend per-user stats.
+      // home: use backend per-user stats.
       const sourceArray = timestampsForBasis(userStats, timeBasis);
       if (sourceArray.length > 0) {
         activityStats = countBy(
@@ -105,12 +116,22 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
       summary: {
         activeDays: countActiveDays(activityStats),
         memoCount,
-        tagCount: countTags(tagCount),
+        tagCount: context === "profile" && profileStats ? profileStats.totalTagCount : countTags(tagCount),
       },
       tags: tagCount,
       loading,
     };
-  }, [context, userName, userStats, allUserStats, isLoadingUserStats, isLoadingAllUserStats, timeBasis]);
+  }, [
+    context,
+    userName,
+    userStats,
+    profileStats,
+    allUserStats,
+    isLoadingUserStats,
+    isLoadingProfileStats,
+    isLoadingAllUserStats,
+    timeBasis,
+  ]);
 
   return data;
 };

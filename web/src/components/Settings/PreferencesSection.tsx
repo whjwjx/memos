@@ -93,6 +93,17 @@ const PreferencesSection = () => {
     );
   };
 
+  const handleShowFullProfileStatsChange = (showFullProfileStats: boolean) => {
+    updateUserGeneralSetting(
+      { generalSetting: { showFullProfileStats }, updateMask: ["show_full_profile_stats"] },
+      {
+        onSuccess: () => {
+          refetchSettings();
+        },
+      },
+    );
+  };
+
   // Provide default values if setting is not loaded yet
   const setting: UserSetting_GeneralSetting =
     generalSetting ||
@@ -177,6 +188,22 @@ const PreferencesSection = () => {
                   { onSuccess: () => refetchSettings() },
                 )
               }
+            />
+          </SettingListItem>
+        </SettingList>
+      </SettingGroup>
+
+      <SettingGroup title={t("setting.preference.profile-title")} description={t("setting.preference.profile-description")} showSeparator>
+        <SettingList>
+          <SettingListItem
+            label={t("setting.preference.show-full-profile-stats")}
+            description={t("setting.preference.show-full-profile-stats-description")}
+          >
+            <Switch
+              aria-label={t("setting.preference.show-full-profile-stats")}
+              checked={setting.showFullProfileStats}
+              disabled={isUpdatingGeneralSetting}
+              onCheckedChange={handleShowFullProfileStatsChange}
             />
           </SettingListItem>
         </SettingList>

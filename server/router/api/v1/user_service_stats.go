@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -10,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
+	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
 )
 
@@ -315,6 +317,153 @@ func (s *APIV1Service) GetUserStats(ctx context.Context, request *v1pb.GetUserSt
 		s.userStatsCache.setUserStats(cacheKey, userStats)
 	}
 	return userStats, nil
+}
+
+func (s *APIV1Service) GetUserProfileStats(ctx context.Context, request *v1pb.GetUserProfileStatsRequest) (*v1pb.UserProfileStats, error) {
+	user, err := ResolveUserByName(ctx, s.Store, request.Name)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user name: %v", err)
+	}
+	if user == nil {
+		return nil, status.Errorf(codes.NotFound, "user not found")
+	}
+
+	currentUser, err := s.fetchCurrentUser(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
+	}
+
+	setting, err := s.Store.GetUserSetting(ctx, &store.FindUserSetting{
+		UserID: &user.ID,
+		Key:    storepb.UserSetting_GENERAL,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get user setting: %v", err)
+	}
+	includesAllMemos := setting.GetGeneral().GetShowFullProfileStats()
+
+	viewerID := int32(0)
+	if currentUser != nil {
+		viewerID = currentUser.ID
+	}
+	cacheKey := makeUserProfileStatsCacheKey(viewerID, request.Name, includesAllMemos)
+	if s.userStatsCache != nil {
+		if cached, ok := s.userStatsCache.getUserProfileStats(cacheKey); ok {
+			return cached, nil
+		}
+	}
+
+	normalStatus := store.Normal
+	memoFind := &store.FindMemo{
+		CreatorID:       &user.ID,
+		ExcludeComments: true,
+		ExcludeContent:  true,
+		RowStatus:       &normalStatus,
+	}
+	if !includesAllMemos {
+		if currentUser == nil {
+			memoFind.VisibilityList = []store.Visibility{store.Public}
+		} else if currentUser.ID != user.ID {
+			memoFind.VisibilityList = []store.Visibility{store.Public, store.Protected}
+		}
+	}
+
+	limit := 1000
+	offset := 0
+	memoFind.Limit = &limit
+	memoFind.Offset = &offset
+
+	totalMemoCount := int32(0)
+	yearMemoCount := int32(0)
+	tagSet := make(map[string]struct{})
+	dailyCounts := make(map[string]int32)
+	now := time.Now()
+
+	for {
+		memos, err := s.Store.ListMemos(ctx, memoFind)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to list memos: %v", err)
+		}
+		if len(memos) == 0 {
+			break
+		}
+
+		totalMemoCount += int32(len(memos))
+		for _, memo := range memos {
+			createdAt := time.Unix(memo.CreatedTs, 0).In(time.Local)
+			date := createdAt.Format("2006-01-02")
+			dailyCounts[date]++
+			if createdAt.Year() == now.In(time.Local).Year() {
+				yearMemoCount++
+			}
+			if memo.Payload != nil {
+				for _, tag := range memo.Payload.Tags {
+					tagSet[tag] = struct{}{}
+				}
+			}
+		}
+
+		offset += limit
+	}
+
+	dailyActivity := make([]*v1pb.UserProfileStats_DailyActivity, 0, len(dailyCounts))
+	dates := make([]string, 0, len(dailyCounts))
+	for date := range dailyCounts {
+		dates = append(dates, date)
+	}
+	sort.Strings(dates)
+	for _, date := range dates {
+		dailyActivity = append(dailyActivity, &v1pb.UserProfileStats_DailyActivity{
+			Date:  date,
+			Count: dailyCounts[date],
+		})
+	}
+
+	currentStreak, longestStreak := calculateDailyActivityStreaks(dates)
+	response := &v1pb.UserProfileStats{
+		Name:             fmt.Sprintf("%s/profileStats", BuildUserName(user.Username)),
+		TotalMemoCount:   totalMemoCount,
+		TotalTagCount:    int32(len(tagSet)),
+		ActiveDayCount:   int32(len(dailyCounts)),
+		YearMemoCount:    yearMemoCount,
+		CurrentStreak:    currentStreak,
+		LongestStreak:    longestStreak,
+		IncludesAllMemos: includesAllMemos,
+		DailyActivity:    dailyActivity,
+	}
+
+	if s.userStatsCache != nil {
+		s.userStatsCache.setUserProfileStats(cacheKey, response)
+	}
+	return response, nil
+}
+
+func calculateDailyActivityStreaks(sortedDates []string) (int32, int32) {
+	if len(sortedDates) == 0 {
+		return 0, 0
+	}
+
+	currentRun := int32(0)
+	longestRun := int32(0)
+	var previousDate time.Time
+
+	for index, dateString := range sortedDates {
+		date, err := time.ParseInLocation("2006-01-02", dateString, time.Local)
+		if err != nil {
+			continue
+		}
+		if index == 0 || !previousDate.AddDate(0, 0, 1).Equal(date) {
+			currentRun = 1
+		} else {
+			currentRun++
+		}
+		if currentRun > longestRun {
+			longestRun = currentRun
+		}
+		previousDate = date
+	}
+
+	return currentRun, longestRun
 }
 
 // incrementTagCounts counts each distinct tag at most once for one memo payload.

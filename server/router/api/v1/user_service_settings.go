@@ -119,6 +119,8 @@ func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.Upda
 				updatedGeneral.ShowCommentPreview = incomingGeneral.ShowCommentPreview
 			case "comment_indicator_on_hover":
 				updatedGeneral.CommentIndicatorOnHover = incomingGeneral.CommentIndicatorOnHover
+			case "show_full_profile_stats":
+				updatedGeneral.ShowFullProfileStats = incomingGeneral.ShowFullProfileStats
 			default:
 				// Ignore unsupported fields.
 			}
@@ -179,6 +181,7 @@ func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.Upda
 	if _, err := s.Store.UpsertUserSetting(ctx, storeSetting); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upsert user setting: %v", err)
 	}
+	s.invalidateUserStatsCache()
 
 	return s.GetUserSetting(ctx, &v1pb.GetUserSettingRequest{Name: request.Setting.Name})
 }
