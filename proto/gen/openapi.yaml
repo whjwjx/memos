@@ -2932,6 +2932,32 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/users/{user}:getProfileStats:
+        get:
+            tags:
+                - UserService
+            description: GetUserProfileStats returns privacy-preserving aggregate stats for a user's public Profile page.
+            operationId: UserService_GetUserProfileStats
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UserProfileStats'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/users/{user}:getStats:
         get:
             tags:
@@ -5643,6 +5669,56 @@ components:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
                     type: string
                     description: How long before occurrence_time this reminder was sent.
+        UserProfileStats:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: |-
+                        The resource name of the user profile statistics singleton.
+                         Format: users/{user}/profileStats
+                totalMemoCount:
+                    type: integer
+                    description: Total memo count included in this aggregate.
+                    format: int32
+                totalTagCount:
+                    type: integer
+                    description: Total unique tag count included in this aggregate.
+                    format: int32
+                activeDayCount:
+                    type: integer
+                    description: Number of active days included in this aggregate.
+                    format: int32
+                yearMemoCount:
+                    type: integer
+                    description: Number of memos created in the current year.
+                    format: int32
+                currentStreak:
+                    type: integer
+                    description: Current consecutive active-day streak ending today or the latest active day.
+                    format: int32
+                longestStreak:
+                    type: integer
+                    description: Longest consecutive active-day streak.
+                    format: int32
+                includesAllMemos:
+                    type: boolean
+                    description: Whether the stats include all normal memos instead of only memos visible to the current viewer.
+                dailyActivity:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/UserProfileStats_DailyActivity'
+                    description: Daily aggregate activity counts. Does not expose memo ids, content, tags, locations, or timestamps.
+        UserProfileStats_DailyActivity:
+            type: object
+            properties:
+                date:
+                    type: string
+                    description: Local-date-like day key in YYYY-MM-DD format.
+                count:
+                    type: integer
+                    description: Number of memos on this date.
+                    format: int32
         UserPushNotificationConfig:
             type: object
             properties:
@@ -5736,6 +5812,9 @@ components:
                     description: |-
                         Whether the memo card comment count indicator is only shown on hover.
                          When true, the indicator is hidden until the card is hovered. Defaults to false (always shown).
+                showFullProfileStats:
+                    type: boolean
+                    description: Whether the public Profile page may show aggregate stats from all normal memos.
             description: General user settings configuration.
         UserSetting_TagMetadata:
             type: object

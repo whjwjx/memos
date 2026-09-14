@@ -58,6 +58,9 @@ message GeneralUserSetting {
   // Whether the memo card comment count indicator is only shown on hover.
   // When true, the indicator is hidden until the card is hovered. Defaults to false (always shown).
   bool comment_indicator_on_hover = 8;
+  // Whether the public Profile page may show aggregate stats from all normal memos.
+  // When false, Profile stats are limited to memos visible to the current viewer.
+  bool show_full_profile_stats = 9;
 }
 
 message UserTagMetadata {

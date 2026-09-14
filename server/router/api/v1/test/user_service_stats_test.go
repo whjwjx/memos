@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
@@ -219,6 +221,78 @@ func TestGetUserStats_PinnedMemoUsesCanonicalResourceName(t *testing.T) {
 	resp, err := ts.Service.GetUserStats(userCtx, &v1pb.GetUserStatsRequest{Name: fmt.Sprintf("users/%s", user.Username)})
 	require.NoError(t, err)
 	require.Equal(t, []string{"memos/pinned-stats-memo"}, resp.PinnedMemos)
+}
+
+func TestGetUserProfileStats_UsesVisibleStatsByDefaultAndFullStatsWhenEnabled(t *testing.T) {
+	ctx := context.Background()
+	ts := NewTestService(t)
+	defer ts.Cleanup()
+
+	user, err := ts.CreateHostUser(ctx, "profile-stats-user")
+	require.NoError(t, err)
+	userCtx := ts.CreateUserContext(ctx, user.ID)
+
+	now := time.Now().In(time.Local)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, time.Local).Unix()
+	yesterday := time.Date(now.Year(), now.Month(), now.Day()-1, 8, 0, 0, 0, time.Local).Unix()
+
+	_, err = ts.Store.CreateMemo(ctx, &store.Memo{
+		UID:        "profile-stats-public",
+		CreatorID:  user.ID,
+		CreatedTs:  today,
+		Content:    "public memo",
+		Visibility: store.Public,
+		Payload:    &storepb.MemoPayload{Tags: []string{"public", "public"}},
+	})
+	require.NoError(t, err)
+	_, err = ts.Store.CreateMemo(ctx, &store.Memo{
+		UID:        "profile-stats-private",
+		CreatorID:  user.ID,
+		CreatedTs:  yesterday,
+		Content:    "private memo",
+		Visibility: store.Private,
+		Payload:    &storepb.MemoPayload{Tags: []string{"private"}},
+	})
+	require.NoError(t, err)
+
+	userName := fmt.Sprintf("users/%s", user.Username)
+	defaultResp, err := ts.Service.GetUserProfileStats(ctx, &v1pb.GetUserProfileStatsRequest{Name: userName})
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s/profileStats", userName), defaultResp.Name)
+	require.False(t, defaultResp.IncludesAllMemos)
+	require.Equal(t, int32(1), defaultResp.TotalMemoCount)
+	require.Equal(t, int32(1), defaultResp.TotalTagCount)
+	require.Equal(t, int32(1), defaultResp.ActiveDayCount)
+	require.Equal(t, int32(1), defaultResp.YearMemoCount)
+	require.Len(t, defaultResp.DailyActivity, 1)
+	require.Equal(t, time.Unix(today, 0).In(time.Local).Format("2006-01-02"), defaultResp.DailyActivity[0].Date)
+	require.Equal(t, int32(1), defaultResp.DailyActivity[0].Count)
+
+	_, err = ts.Service.UpdateUserSetting(userCtx, &v1pb.UpdateUserSettingRequest{
+		Setting: &v1pb.UserSetting{
+			Name: fmt.Sprintf("%s/settings/GENERAL", userName),
+			Value: &v1pb.UserSetting_GeneralSetting_{
+				GeneralSetting: &v1pb.UserSetting_GeneralSetting{ShowFullProfileStats: true},
+			},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"show_full_profile_stats"}},
+	})
+	require.NoError(t, err)
+
+	fullResp, err := ts.Service.GetUserProfileStats(ctx, &v1pb.GetUserProfileStatsRequest{Name: userName})
+	require.NoError(t, err)
+	require.True(t, fullResp.IncludesAllMemos)
+	require.Equal(t, int32(2), fullResp.TotalMemoCount)
+	require.Equal(t, int32(2), fullResp.TotalTagCount)
+	require.Equal(t, int32(2), fullResp.ActiveDayCount)
+	require.Equal(t, int32(2), fullResp.YearMemoCount)
+	require.Equal(t, int32(2), fullResp.CurrentStreak)
+	require.Equal(t, int32(2), fullResp.LongestStreak)
+	require.Len(t, fullResp.DailyActivity, 2)
+	require.Equal(t, time.Unix(yesterday, 0).In(time.Local).Format("2006-01-02"), fullResp.DailyActivity[0].Date)
+	require.Equal(t, int32(1), fullResp.DailyActivity[0].Count)
+	require.Equal(t, time.Unix(today, 0).In(time.Local).Format("2006-01-02"), fullResp.DailyActivity[1].Date)
+	require.Equal(t, int32(1), fullResp.DailyActivity[1].Count)
 }
 
 func TestListAllUserStats_FilterExcludesPrivateMemos(t *testing.T) {

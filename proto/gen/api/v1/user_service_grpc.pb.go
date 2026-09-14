@@ -28,6 +28,7 @@ const (
 	UserService_DeleteUser_FullMethodName                    = "/memos.api.v1.UserService/DeleteUser"
 	UserService_ListAllUserStats_FullMethodName              = "/memos.api.v1.UserService/ListAllUserStats"
 	UserService_GetUserStats_FullMethodName                  = "/memos.api.v1.UserService/GetUserStats"
+	UserService_GetUserProfileStats_FullMethodName           = "/memos.api.v1.UserService/GetUserProfileStats"
 	UserService_GetUserSetting_FullMethodName                = "/memos.api.v1.UserService/GetUserSetting"
 	UserService_UpdateUserSetting_FullMethodName             = "/memos.api.v1.UserService/UpdateUserSetting"
 	UserService_ListUserSettings_FullMethodName              = "/memos.api.v1.UserService/ListUserSettings"
@@ -74,6 +75,8 @@ type UserServiceClient interface {
 	ListAllUserStats(ctx context.Context, in *ListAllUserStatsRequest, opts ...grpc.CallOption) (*ListAllUserStatsResponse, error)
 	// GetUserStats returns statistics for a specific user.
 	GetUserStats(ctx context.Context, in *GetUserStatsRequest, opts ...grpc.CallOption) (*UserStats, error)
+	// GetUserProfileStats returns privacy-preserving aggregate stats for a user's public Profile page.
+	GetUserProfileStats(ctx context.Context, in *GetUserProfileStatsRequest, opts ...grpc.CallOption) (*UserProfileStats, error)
 	// GetUserSetting returns the user setting.
 	GetUserSetting(ctx context.Context, in *GetUserSettingRequest, opts ...grpc.CallOption) (*UserSetting, error)
 	// UpdateUserSetting updates the user setting.
@@ -208,6 +211,16 @@ func (c *userServiceClient) GetUserStats(ctx context.Context, in *GetUserStatsRe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UserStats)
 	err := c.cc.Invoke(ctx, UserService_GetUserStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetUserProfileStats(ctx context.Context, in *GetUserProfileStatsRequest, opts ...grpc.CallOption) (*UserProfileStats, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserProfileStats)
+	err := c.cc.Invoke(ctx, UserService_GetUserProfileStats_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -465,6 +478,8 @@ type UserServiceServer interface {
 	ListAllUserStats(context.Context, *ListAllUserStatsRequest) (*ListAllUserStatsResponse, error)
 	// GetUserStats returns statistics for a specific user.
 	GetUserStats(context.Context, *GetUserStatsRequest) (*UserStats, error)
+	// GetUserProfileStats returns privacy-preserving aggregate stats for a user's public Profile page.
+	GetUserProfileStats(context.Context, *GetUserProfileStatsRequest) (*UserProfileStats, error)
 	// GetUserSetting returns the user setting.
 	GetUserSetting(context.Context, *GetUserSettingRequest) (*UserSetting, error)
 	// UpdateUserSetting updates the user setting.
@@ -548,6 +563,9 @@ func (UnimplementedUserServiceServer) ListAllUserStats(context.Context, *ListAll
 }
 func (UnimplementedUserServiceServer) GetUserStats(context.Context, *GetUserStatsRequest) (*UserStats, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUserStats not implemented")
+}
+func (UnimplementedUserServiceServer) GetUserProfileStats(context.Context, *GetUserProfileStatsRequest) (*UserProfileStats, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserProfileStats not implemented")
 }
 func (UnimplementedUserServiceServer) GetUserSetting(context.Context, *GetUserSettingRequest) (*UserSetting, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUserSetting not implemented")
@@ -779,6 +797,24 @@ func _UserService_GetUserStats_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).GetUserStats(ctx, req.(*GetUserStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetUserProfileStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserProfileStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetUserProfileStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetUserProfileStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetUserProfileStats(ctx, req.(*GetUserProfileStatsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1235,6 +1271,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUserStats",
 			Handler:    _UserService_GetUserStats_Handler,
+		},
+		{
+			MethodName: "GetUserProfileStats",
+			Handler:    _UserService_GetUserProfileStats_Handler,
 		},
 		{
 			MethodName: "GetUserSetting",

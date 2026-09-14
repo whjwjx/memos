@@ -980,6 +980,10 @@
       "browser-notification-unsupported-description": "当前浏览器无法接收 Web Push 通知。可尝试 Chrome、Edge，或已添加到主屏幕的 iOS Web App。",
       "notifications-description": "管理发送到当前浏览器的提醒。",
       "notifications-title": "通知",
+      "profile-description": "设置公开主页上展示的聚合数据范围。",
+      "profile-title": "公开主页",
+      "show-full-profile-stats": "显示完整主页统计",
+      "show-full-profile-stats-description": "公开主页展示所有正常备忘录的聚合数量、活跃日期和每日数量。备忘录内容和私密标签名称不会公开。",
       "uploads-privacy-description": "控制上传媒体时提交的隐私敏感信息。",
       "uploads-privacy-title": "上传与隐私"
     },
@@ -1339,6 +1343,12 @@
       "total-size": "总大小",
       "last-updated": "更新于 {{time}}",
       "refresh": "刷新"
+    }
+  },
+  "profile": {
+    "stats": {
+      "current-streak": "连续",
+      "day-count": "{{date}} {{count}} 条"
     }
   },
   "tag": {

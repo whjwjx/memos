@@ -1179,6 +1179,10 @@
       "browser-notification-unsupported-description": "This browser cannot receive Web Push notifications. Try Chrome, Edge, or an installed iOS web app.",
       "notifications-description": "Control reminders delivered to this browser.",
       "notifications-title": "Notifications",
+      "profile-description": "Choose how aggregate numbers are shown on your public profile page.",
+      "profile-title": "Profile",
+      "show-full-profile-stats": "Show full profile stats",
+      "show-full-profile-stats-description": "Show aggregate counts, active dates, and daily counts from all normal memos on your public profile. Memo content and private tag names stay hidden.",
       "uploads-privacy-description": "Control privacy-sensitive information submitted with uploaded media.",
       "uploads-privacy-title": "Uploads & privacy",
       "show-comment-preview": "Show comment previews on memo cards",
@@ -1430,6 +1434,12 @@
       "total-size": "Total size",
       "last-updated": "Last updated {{time}}",
       "refresh": "Refresh"
+    }
+  },
+  "profile": {
+    "stats": {
+      "current-streak": "Streak",
+      "day-count": "{{count}} notes on {{date}}"
     }
   },
   "tag": {

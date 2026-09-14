@@ -197,6 +197,7 @@ func convertUserSettingFromStore(storeSetting *storepb.UserSetting, user *store.
 					CalendarDayEnd:          general.CalendarDayEnd,
 					ShowCommentPreview:      general.ShowCommentPreview,
 					CommentIndicatorOnHover: general.CommentIndicatorOnHover,
+					ShowFullProfileStats:    general.ShowFullProfileStats,
 				},
 			}
 		} else {
@@ -255,6 +256,7 @@ func convertUserSettingToStore(apiSetting *v1pb.UserSetting, userID int32, key s
 					CalendarDayEnd:          general.CalendarDayEnd,
 					ShowCommentPreview:      general.ShowCommentPreview,
 					CommentIndicatorOnHover: general.CommentIndicatorOnHover,
+					ShowFullProfileStats:    general.ShowFullProfileStats,
 				},
 			}
 		} else {

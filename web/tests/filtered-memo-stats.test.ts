@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Mock dependencies BEFORE importing the hook under test.
 vi.mock("@/hooks/useUserQueries", () => ({
   useAllUserStats: vi.fn(),
+  useUserProfileStats: vi.fn(),
   useUserStats: vi.fn(),
 }));
 vi.mock("@/hooks/useMemoQueries", () => ({
@@ -24,7 +25,7 @@ vi.mock("@/contexts/ViewContext", async () => {
 });
 
 import { useFilteredMemoStats } from "@/hooks/useFilteredMemoStats";
-import { useAllUserStats, useUserStats } from "@/hooks/useUserQueries";
+import { useAllUserStats, useUserProfileStats, useUserStats } from "@/hooks/useUserQueries";
 
 const wrapper = ({ children }: { children: ReactNode }) => children as never;
 
@@ -47,6 +48,10 @@ describe("useFilteredMemoStats", () => {
       },
       isLoading: false,
     } as unknown as ReturnType<typeof useUserStats>);
+    vi.mocked(useUserProfileStats).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUserProfileStats>);
   });
 
   afterEach(() => {
@@ -107,7 +112,7 @@ describe("useFilteredMemoStats", () => {
     warn.mockRestore();
   });
 
-  it("disables both statistics queries when deferred", () => {
+  it("disables statistics queries when deferred", () => {
     mockUseView.mockReturnValue({
       timeBasis: "create_time",
       orderByTimeAsc: false,
@@ -118,6 +123,7 @@ describe("useFilteredMemoStats", () => {
     renderHook(() => useFilteredMemoStats({ userName: "users/test", context: "explore", enabled: false }), { wrapper });
 
     expect(useUserStats).toHaveBeenCalledWith("users/test", { enabled: false });
+    expect(useUserProfileStats).toHaveBeenCalledWith("users/test", { enabled: false });
     expect(useAllUserStats).toHaveBeenCalledWith(expect.anything(), { enabled: false });
   });
 });
